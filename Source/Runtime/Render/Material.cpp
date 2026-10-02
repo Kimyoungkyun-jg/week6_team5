@@ -31,13 +31,11 @@ UMaterial* UMaterial::CreateInstance(const UMaterial* Source)
 	UMaterial* Instance = FObjectFactory::ConstructObject<UMaterial>();
 
 	Instance->ParamLayout = Source->ParamLayout;
-	Instance->Shader = Source->Shader;
 	Instance->Textures = Source->Textures;
-	Instance->BlendState = Source->BlendState;
-	Instance->DepthStencilState = Source->DepthStencilState;
-	Instance->SamplerState = Source->SamplerState;
 	Instance->BaseColor = Source->BaseColor;
 	Instance->UVScrollSpeed = Source->UVScrollSpeed;
+	Instance->PSOType = Source->PSOType;
+	Instance->SamplerState = Source->SamplerState;
 
 	// ParamBuffer는 TUniquePtr라 복사할 수 없다.
 	// 원본이 갖고 있으면 같은 크기로 새로 만들어 준다. 내용은 매 프레임 갱신되므로 옮기지 않는다.
@@ -70,23 +68,22 @@ const UMaterial* UMaterial::GetBaseAsset() const
 json UMaterial::SaveMaterial(const UMaterial* Material)
 {
 	json Out;
-
 	if (!Material->GetPath().empty())
 	{
 		Out["Asset"] = Material->GetPath();
 		return Out;
 	}
-
 	const UMaterial* Base = Material->GetBaseAsset();
 	Out["Base"] = Base ? Base->GetPath() : FString("DefaultMaterial");
+
+	// PSOType을 uint8 정수로 저장!
+	Out["PSOType"] = static_cast<uint8>(Material->PSOType);
 	Out["BaseColor"] = Material->BaseColor;
 	Out["UVScrollSpeed"] = {
 		Material->UVScrollSpeed.X,
 		Material->UVScrollSpeed.Y
 	};
 	Out["SamplerState"] = Material->SamplerState == ESamplerState::LinearWrap ? "LinearWrap" : "LinearClamp";
-	Out["BlendState"] = Material->BlendState == EBlendState::AlphaBlend ? "AlphaBlend" : "Opaque";
-
 	json Textures = json::array();
 	for (UTexture2D* Texture : Material->Textures)
 	{
@@ -96,7 +93,6 @@ json UMaterial::SaveMaterial(const UMaterial* Material)
 			Textures.push_back(nullptr);
 	}
 	Out["Textures"] = Textures;
-
 	return Out;
 }
 
@@ -146,10 +142,19 @@ UMaterial* UMaterial::LoadMaterial(const json& In)
 		const FString State = In["SamplerState"].get<FString>();
 		Instance->SamplerState = State == "LinearWrap" ? ESamplerState::LinearWrap : ESamplerState::LinearClamp;
 	}
-	if (In.contains("BlendState"))
+
+	// PSOType 복원
+	if (In.contains("PSOType"))
+	{
+		Instance->PSOType = static_cast<EPSOType>(In["PSOType"].get<uint8>());
+	}
+	// 예전 저장 파일 호환: BlendState 문자열을 알맞은 PSOType으로 변환
+	else if (In.contains("BlendState"))
 	{
 		const FString State = In["BlendState"].get<FString>();
-		Instance->BlendState = State == "AlphaBlend" ? EBlendState::AlphaBlend : EBlendState::Opaque;
+		Instance->PSOType = (State == "AlphaBlend")
+			? EPSOType::StaticMesh_Translucent
+			: EPSOType::StaticMesh_Opaque;
 	}
 
 	return Instance;

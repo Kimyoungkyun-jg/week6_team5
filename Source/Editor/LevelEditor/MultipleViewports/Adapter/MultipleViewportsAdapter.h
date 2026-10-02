@@ -78,8 +78,12 @@ public:
     FVector GetEngineCameraLocation(int32 ViewIndex) const;
     // 지정 View의 카메라 Forward를 엔진 FVector로 계산해 반환한다.
     FVector GetEngineCameraForward(int32 ViewIndex) const;
+    
     // Core Billboard 계산 결과를 엔진 월드 행렬로 변환한다.
-    FMatrix BuildEngineBillboardMatrix(int32 ViewIndex, const FVector& WorldPosition, float Width, float Height) const;
+    //FMatrix BuildEngineBillboardMatrix(int32 ViewIndex, const FVector& WorldPosition, float Width, float Height) const;
+    
+    
+    
     // 지정 View가 직교 투영인지 반환한다.
     bool IsOrthographic(int32 ViewIndex) const;
     // 활성 View의 로컬 마우스 좌표를 Core로 역투영해 엔진 Ray로 반환한다.
@@ -136,7 +140,7 @@ private:
         bool bParticlesPrepared = false;
         TArray<int32> AliveParticleIndices;
     };
-    TMap<ObjectId, PrimitiveSnapshot> PrimitiveById;
+    TMap<ObjectId, UPrimitiveComponent*> PrimitiveById;
     // Host가 컬링 입력 버퍼를 소유하고 용량을 재사용한다.
     TArray<FRenderableObject> RenderObjects;
     // 불투명 파티클은 최종 렌더러가 거리 정렬하지 않아 기존 Core 정렬을 유지한다.

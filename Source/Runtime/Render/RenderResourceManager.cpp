@@ -7,6 +7,54 @@
 
 
 
+struct FPipelineTableEntry
+{
+	EPSOType Type;
+	const char* ShaderPath;
+	D3D11_PRIMITIVE_TOPOLOGY Topology;
+	ERasterizerState RasterizerState;
+	EBlendState BlendState;
+	EDepthStencilState DepthStencilState;
+};
+
+constexpr FPipelineTableEntry PipelineTable[] =
+{
+	{ EPSOType::StaticMesh_Opaque,       "Resources/Shader/StaticMeshShader.hlsl",    D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidBack, EBlendState::Opaque,       EDepthStencilState::Default },
+	{ EPSOType::StaticMesh_Translucent,  "Resources/Shader/StaticMeshShader.hlsl",    D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidBack, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
+	{ EPSOType::StaticMesh_Wireframe,    "Resources/Shader/StaticMeshShader.hlsl",    D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::Wireframe, EBlendState::Opaque,       EDepthStencilState::Default },
+	{ EPSOType::Particle_AlphaBlend,     "Resources/Shader/ParticleSubUVShader.hlsl", D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidNone, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
+	{ EPSOType::Particle_Additive,       "Resources/Shader/ParticleSubUVShader.hlsl", D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidNone, EBlendState::Additive,     EDepthStencilState::ReadOnly },
+	{ EPSOType::Skybox,                  "Resources/Shader/SkyboxShader.hlsl",        D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidNone, EBlendState::Opaque,       EDepthStencilState::ReadOnly },
+	{ EPSOType::Grid,                    "Resources/Shader/GridShader.hlsl",          D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidBack, EBlendState::AlphaBlend,   EDepthStencilState::Default },
+	{ EPSOType::Outline_Mask,            "Resources/Shader/OutlineShader.hlsl",       D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidNone, EBlendState::NoColorWrite, EDepthStencilState::StencilMask },
+	{ EPSOType::Outline_Draw,            "Resources/Shader/OutlineShader.hlsl",       D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST, ERasterizerState::SolidNone, EBlendState::Opaque,       EDepthStencilState::StencilOutline }
+};
+
+void FRenderResourceManager::InitPipelineStates()
+{
+	for (size_t i = 0; i < static_cast<size_t>(EPSOType::Count); ++i)
+	{
+		const auto& Entry = PipelineTable[i];
+		const EPSOType Type = static_cast<EPSOType>(i);
+		PipelineStateMap[Type] = MakeUnique<FPipelineState>();
+		FPipelineState* State = PipelineStateMap[Type].get();
+		State->Shader = GetShaderProgram(Entry.ShaderPath);
+		State->Topology = Entry.Topology;
+		State->RasterizerState = Entry.RasterizerState;
+		State->BlendState = Entry.BlendState;
+		State->DepthStencilState = Entry.DepthStencilState;
+	}
+}
+
+FPipelineState* FRenderResourceManager::GetPSO(const EPSOType& InType)
+{
+	if (auto* Found = Get().PipelineStateMap.Find(InType))
+	{
+		return Found->get();
+	}
+	return nullptr;
+}
+
 void FRenderResourceManager::ScanShaders(const fs::path& ShaderRoot)
 {
 	std::error_code ErrorCode;
@@ -47,6 +95,8 @@ FShaderProgram* FRenderResourceManager::GetShaderProgram(const FString& InPath)
 
 	return nullptr;
 }
+
+
 
 void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 { 

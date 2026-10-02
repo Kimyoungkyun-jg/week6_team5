@@ -48,17 +48,35 @@ bool UBillboardComponent::LineTraceComponentForView(
 	return QuadMesh && TraceMesh(WorldRay, QuadMesh->GetMeshData(), BillboardWorldMatrix, OutHit);
 }
 
-// 기본 카메라용 행렬을 구해 공통 렌더 패킷 제출 경로로 전달한다.
-void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
+
+void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& ViewContext)
 {
-	// 렌더러가 역참조하므로 둘 중 하나라도 없으면 보내지 않는다
+	// 리소스가 없으면 제출하지 않음
 	if (QuadMesh == nullptr || Material == nullptr)
 	{
 		return;
 	}
+	const FVector WorldPos = GetWorldLocation();
+	const FVector WorldScale = GetWorldScale3D();
+	
+	// 뷰포트 카메라를 바라보는 빌보드 방향 벡터 계산
+	FVector Facing = ViewContext.bOrthographic
+		? (ViewContext.CameraForward * -1.0f)
+		: (ViewContext.CameraPosition - WorldPos).Normalized();
+	
+	// 축 구성
+	FVector Up = FVector(0.0f, 0.0f, 1.0f);
+	FVector Right = FVector::Cross(Up, Facing).Normalized();
+	FVector RealUp = FVector::Cross(Facing, Right).Normalized();
+	
+	// 빌보드 월드 행렬 조립 (Y는 너비, Z는 높이 스케일 반영)
+	FMatrix BillboardWorldMatrix = FMatrix::Identity;
+	BillboardWorldMatrix.M[0][0] = Facing.X;  BillboardWorldMatrix.M[0][1] = Facing.Y;  BillboardWorldMatrix.M[0][2] = Facing.Z;
+	BillboardWorldMatrix.M[1][0] = Right.X * WorldScale.Y; BillboardWorldMatrix.M[1][1] = Right.Y * WorldScale.Y; BillboardWorldMatrix.M[1][2] = Right.Z * WorldScale.Y;
+	BillboardWorldMatrix.M[2][0] = RealUp.X * WorldScale.Z; BillboardWorldMatrix.M[2][1] = RealUp.Y * WorldScale.Z; BillboardWorldMatrix.M[2][2] = RealUp.Z * WorldScale.Z;
+	BillboardWorldMatrix.M[3][0] = WorldPos.X; BillboardWorldMatrix.M[3][1] = WorldPos.Y; BillboardWorldMatrix.M[3][2] = WorldPos.Z;
+	
 
-	FMatrix BillboardWorldMatrix;
-	GetWorldTransformedMatrix(&BillboardWorldMatrix);
 	SubmitToRenderQueue(RenderQueue, BillboardWorldMatrix);
 }
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "MaterialInterface.h"
-#include "Render/RenderStates.h"
+#include "RenderResourceManager.h"
 #include "Render/Texture2D.h"
 
 class FShader;
@@ -32,12 +32,15 @@ public:
 	virtual ~UMaterial() override = default;
 
 	EMaterialParamLayout ParamLayout = EMaterialParamLayout::None;
-	FShaderProgram* Shader;
+
 	TArray<UTexture2D*> Textures;
-	TUniquePtr<FConstantBuffer> ParamBuffer;
-	EBlendState BlendState = EBlendState::Opaque;
-	EDepthStencilState DepthStencilState = EDepthStencilState::Default;
 	ESamplerState SamplerState = ESamplerState::LinearClamp;
+	
+	TUniquePtr<FConstantBuffer> ParamBuffer;
+
+	EPSOType PSOType = EPSOType::StaticMesh_Opaque;
+
+
 
 	FVector4 BaseColor = FVector4(1, 1, 1, 1);
 	FVector2 UVScrollSpeed = FVector2(0.0f, 0.0f);

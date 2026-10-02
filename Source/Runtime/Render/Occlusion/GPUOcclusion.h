@@ -7,7 +7,7 @@
 #include <vector>
 
 class FPrimitiveSceneProxy;
-struct FLODViewContext;
+struct FViewContext;
 
 struct FGPUOcclusionSettings
 {
@@ -43,7 +43,7 @@ public:
 
 	// Proxies는 프러스텀을 통과한 물체들. 성공하면 GetOccluded()[i] = 1이면 Proxies[i]가 가려진 것이다.
 	// 호출 전후로 바인딩된 렌더 타깃은 되돌려 놓는다.
-	bool Run(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& View);
+	bool Run(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FViewContext& View);
 
 	const std::vector<uint8>& GetOccluded() const { return Occluded; }
 
@@ -63,8 +63,8 @@ private:
 	bool EnsureTargets(uint32 Width, uint32 Height);
 	bool EnsureItemCapacity(uint32 Count);
 	bool EnsureOccluderCapacity(uint32 Count);
-	bool FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& View);
-	void DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, const FLODViewContext& View);
+	bool FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FViewContext& View);
+	void DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, const FViewContext& View);
 	void BuildHiZ();
 	void Cull(const FMatrix& ViewProjection, uint32 Count);
 	bool ReadBack(uint32 Count);

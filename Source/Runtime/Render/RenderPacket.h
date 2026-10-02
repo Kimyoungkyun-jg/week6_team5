@@ -25,6 +25,42 @@ struct FRenderPacket
     bool bOccludedByGpu = false;
 };
 
+struct FViewContext
+{
+    int32 ViewIndex = 0;
+    uint32 Width = 0;
+    uint32 Height = 0;
+    FVector CameraPosition = FVector::ZeroVector;
+    FVector CameraForward = FVector::ZeroVector;
+    float ProjectionScaleSquared = 0.0f;
+    float NearZ = 0.0f;
+    bool bOrthographic = false;
+    float CameraDepth = 0.0f;
+    FMatrix ViewProjection = FMatrix::Identity;
+    void Prepare()
+    {
+        CameraDepth = CameraPosition.X * CameraForward.X
+            + CameraPosition.Y * CameraForward.Y + CameraPosition.Z * CameraForward.Z;
+    }
+
+    FMatrix BuildBillboardMatrix(const FVector& WorldPosition, float Width, float Height) const
+    {
+        // 뷰포트 카메라를 바라보는 방향 벡터 계산
+        FVector Facing = bOrthographic
+            ? (CameraForward * -1.0f)
+            : (CameraPosition - WorldPosition).Normalized();
+        FVector Up = FVector(0.0f, 0.0f, 1.0f);
+        FVector Right = FVector::Cross(Up, Facing).Normalized();
+        FVector RealUp = FVector::Cross(Facing, Right).Normalized();
+        FMatrix Matrix = FMatrix::Identity;
+        Matrix.M[0][0] = Facing.X;  Matrix.M[0][1] = Facing.Y;  Matrix.M[0][2] = Facing.Z;
+        Matrix.M[1][0] = Right.X * Width;  Matrix.M[1][1] = Right.Y * Width;  Matrix.M[1][2] = Right.Z * Width;
+        Matrix.M[2][0] = RealUp.X * Height; Matrix.M[2][1] = RealUp.Y * Height; Matrix.M[2][2] = RealUp.Z * Height;
+        Matrix.M[3][0] = WorldPosition.X; Matrix.M[3][1] = WorldPosition.Y; Matrix.M[3][2] = WorldPosition.Z;
+        return Matrix;
+    }
+};
+
 // Shared bindings, with one ordinary indexed draw per item.
 struct FStaticDrawItem
 {

@@ -9,7 +9,7 @@ static_assert(offsetof(FLODSphere, RadiusSquared) == 12 && sizeof(FLODSphere) ==
 namespace
 {
     template<bool Orthographic>
-    void SelectBatch(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs)
+    void SelectBatch(const TArray<FLODSelectionInput>& Inputs, const FViewContext& View, TArray<uint8>& OutLODs)
     {
         const __m128 FX = _mm_set1_ps(View.CameraForward.X);
         const __m128 FY = _mm_set1_ps(View.CameraForward.Y);
@@ -61,7 +61,7 @@ namespace
     }
 }
 
-void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs)
+void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FViewContext& View, TArray<uint8>& OutLODs)
 {
     OutLODs.SetNum(Inputs.Num(), false);
     if (View.Width == 0 || View.Height == 0)

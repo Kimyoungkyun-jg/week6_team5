@@ -122,80 +122,48 @@ void UParticleSubUVComponent::TickComponent(float DeltaTime)
 }
 
 // 기본 카메라 기준으로 파티클 상수와 렌더 패킷을 구성한다.
-void UParticleSubUVComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
+void UParticleSubUVComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& ViewContext)
 {
-	assert(QuadMesh != nullptr);
-	assert(Material != nullptr);
-	
-	Constants.Reset();
-	Constants.Reserve(Particles.Num());
-
-	const FVector CameraPos = GetOwner()->GetWorld()->GetMainCamera()->GetCameraComponent()->GetWorldLocation();
-	for (FParticle& Particle : Particles)
+	// 리소스가 유효하지 않으면 반환
+	if (QuadMesh == nullptr || Material == nullptr || Particles.IsEmpty())
 	{
-		if (Particle.bAlive == false)
+		return;
+	}
+	
+	// 뷰 제출을 위한 파티클 상수 데이터 준비
+	BeginViewSubmission();
+	const FVector CameraPos = ViewContext.CameraPosition;
+	
+	// 살아있는 파티클을 순회하며 패킷 생성
+	
+	
+	for (int32 Index = 0; Index < Particles.Num(); ++Index)
+	{
+		const FParticle& Particle = Particles[Index];
+		if (!Particle.bAlive)
 		{
 			continue;
 		}
-
-
-		FMatrix WorldMatrix = FMatrix::Identity; 
-		Super::GetWorldTransformedMatrix(&WorldMatrix);
-
-		// Scale, Move
-		WorldMatrix.M[0][0] *= Particle.Scale;
-		WorldMatrix.M[0][1] *= Particle.Scale;
-		WorldMatrix.M[0][2] *= Particle.Scale;
-		WorldMatrix.M[0][3] *= Particle.Scale;
-
-		WorldMatrix.M[1][0] *= Particle.Scale;
-		WorldMatrix.M[1][1] *= Particle.Scale;
-		WorldMatrix.M[1][2] *= Particle.Scale;
-		WorldMatrix.M[1][3] *= Particle.Scale;
-
-		WorldMatrix.M[2][0] *= Particle.Scale;
-		WorldMatrix.M[2][1] *= Particle.Scale;
-		WorldMatrix.M[2][2] *= Particle.Scale;
-		WorldMatrix.M[2][3] *= Particle.Scale;
-
-		WorldMatrix.M[3][0] = Particle.Location.X;
-		WorldMatrix.M[3][1] = Particle.Location.Y;
-		WorldMatrix.M[3][2] = Particle.Location.Z;
-		WorldMatrix.M[3][3] = 1.0f;
-
-		const FVector ParticlePos = Particle.Location;
-		const FVector CameraToParticleVec = ParticlePos - CameraPos;
-
-		const float CameraToParticleDistance = 
-			CameraToParticleVec.X *
-			CameraToParticleVec.X +
-
-			CameraToParticleVec.Y *
-			CameraToParticleVec.Y +
-
-			CameraToParticleVec.Z *
-			CameraToParticleVec.Z;
-
-		FRenderPacket Packet;
-		Packet.Model = RenderQueue.StoreWorldMatrix(WorldMatrix);
-		Packet.Mesh = QuadMesh;
-		Packet.Material = Material;
-
-		FSubUVConstants C;
-		C.CurrentFrame =  Particle.SubUVFrame;
-		C.AtlasColSize = ColSize;
-		C.AtlasRowSize = RowSize;
-		C.Alpha = Particle.Alpha;
-
-		Constants.Add(C);
-
-		Packet.MaterialParamData = &Constants.Last();
-		Packet.MaterialParamDataSize = sizeof(FSubUVConstants);
-
-		Packet.CameraToParticleDistance = CameraToParticleDistance;
-
-		RenderQueue.Add(Packet);
+		// 카메라 방향을 바라보는 빌보드 월드 행렬 구성
+		// 직교 투영이면 카메라 전방 방향, 원근 투영이면 파티클에서 카메라로 향하는 벡터 사용
+		FVector LookDir = ViewContext.bOrthographic
+			? (ViewContext.CameraForward * -1.0f)
+			: (CameraPos - Particle.Location).Normalized();
+		FVector Up = FVector(0.0f, 0.0f, 1.0f);
+		FVector Right = FVector::Cross(Up, LookDir).Normalized();
+		FVector RealUp = FVector::Cross(LookDir, Right).Normalized();
+		FMatrix ParticleWorld = FMatrix::Identity;
+		ParticleWorld.M[0][0] = LookDir.X; ParticleWorld.M[0][1] = LookDir.Y; ParticleWorld.M[0][2] = LookDir.Z;
+		ParticleWorld.M[1][0] = Right.X * Particle.Scale; ParticleWorld.M[1][1] = Right.Y * Particle.Scale; ParticleWorld.M[1][2] = Right.Z * Particle.Scale;
+		ParticleWorld.M[2][0] = RealUp.X * Particle.Scale; ParticleWorld.M[2][1] = RealUp.Y * Particle.Scale; ParticleWorld.M[2][2] = RealUp.Z * Particle.Scale;
+		ParticleWorld.M[3][0] = Particle.Location.X; ParticleWorld.M[3][1] = Particle.Location.Y; ParticleWorld.M[3][2] = Particle.Location.Z;
+		// 카메라와의 거리 제곱 계산
+		const FVector Delta = Particle.Location - CameraPos;
+		const float DistanceSquared = Delta.Dot(Delta);
+		// 기존 단일 파티클 제출 함수 호출
+		SubmitParticleToRenderQueue(RenderQueue, Index, ParticleWorld, DistanceSquared);
 	}
+
 }
 
 // 파티클 위치·속도·수명 등 재생성 상태를 초기화한다.
@@ -305,8 +273,8 @@ void UParticleSubUVComponent::SubmitParticleToRenderQueue(
 }
 
 
-// 실제 재질의 블렌드 상태로 프레임 공통 정렬과 View별 정렬을 구분한다.
+// 재질의 파이프라인 상태로 불투명 여부를 검사한다
 bool UParticleSubUVComponent::UsesOpaqueMaterial() const
 {
-    return Material && Material->BlendState == EBlendState::Opaque;
+    return Material && Material->PSOType == EPSOType::StaticMesh_Opaque;
 }

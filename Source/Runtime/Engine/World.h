@@ -18,7 +18,7 @@
 class ULevel;
 class UBillboardComponent;
 
-struct FLODViewContext;
+struct FViewContext;
 
 
 enum EWorldType
@@ -61,7 +61,7 @@ public:
 
 	void ClearWorld();
 
-	void GatherRenderPackets(FRenderQueue& RenderArray, const FLODViewContext* LODView = nullptr, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
+	void GatherRenderPackets(FRenderQueue& RenderArray, const FViewContext* View = nullptr, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
 
 	void CreateMainCamera();
 

@@ -21,6 +21,7 @@ public:
 	UStaticMeshComponent* GetStaticMeshComponent() const { return StaticMeshComponent; }
 	void SetPrimitiveType(EPrimitiveType Type);
 
+	
 private:
 	UStaticMeshComponent* StaticMeshComponent = nullptr;
 	FRotator rotator;

@@ -1,28 +1,11 @@
 #pragma once
 #include "Core/Types.h"
 #include "Engine/PrimitiveSceneProxy.h"
+#include "Render/RenderPacket.h"
 
-struct FLODViewContext
-{
-    uint32 Width = 0;
-    uint32 Height = 0;
-    FVector CameraPosition;
-    FVector CameraForward;
-    float ProjectionScaleSquared = 0.0f;
-    float NearZ = 0.0f;
-    bool bOrthographic = false;
-    float CameraDepth = 0.0f;
-    FMatrix ViewProjection; // Current view used by the GPU occlusion pass.
-
-    void Prepare()
-    {
-        CameraDepth = CameraPosition.X * CameraForward.X
-            + CameraPosition.Y * CameraForward.Y + CameraPosition.Z * CameraForward.Z;
-    }
-};
 
 template<bool Orthographic>
-inline uint32 SelectSphereLOD(const FLODSelectionInput& Input, const FLODViewContext& View)
+inline uint32 SelectSphereLOD(const FLODSelectionInput& Input, const FViewContext& View)
 {
     const FMeshRenderState* State = Input.State;
     if (!State || State->LODCount <= 1 || View.Width == 0 || View.Height == 0) return 0;
@@ -40,11 +23,10 @@ inline uint32 SelectSphereLOD(const FLODSelectionInput& Input, const FLODViewCon
     return DesiredLOD < State->LODCount ? DesiredLOD : State->LODCount - 1;
 }
 
-inline uint32 SelectLOD(const FPrimitiveSceneProxy& Proxy, const FLODViewContext& View)
+inline uint32 SelectLOD(const FPrimitiveSceneProxy& Proxy, const FViewContext& View)
 {
     const FLODSelectionInput Input{Proxy.GetLODSphere(), Proxy.GetRenderState()};
     return View.bOrthographic ? SelectSphereLOD<true>(Input, View) : SelectSphereLOD<false>(Input, View);
 }
 
-// Recomputed for every current view; previous selections are never reused.
-void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FLODViewContext& View, TArray<uint8>& OutLODs);
+void SelectLODs(const TArray<FLODSelectionInput>& Inputs, const FViewContext& View, TArray<uint8>& OutLODs);

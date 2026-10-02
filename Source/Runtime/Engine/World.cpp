@@ -167,7 +167,7 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum, FRenderer* Renderer)
+void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* View, const FFrustumPlanes* Frustum, FRenderer* Renderer)
 {
 
 
@@ -201,10 +201,10 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 	// Cull이 켜져 있으면 가려진 물체를 목록에서 빼서 이후 Gather·정렬·드로우를 모두 건너뛴다.
 	// 꺼져 있으면(검증 모드) 목록은 그대로 두고 패킷에 판정만 표시한다.
 	const uint8* OccludedMask = nullptr;
-	if (Renderer && LODView && Renderer->GetGPUOcclusion().GetSettings().bEnabled)
+	if (Renderer && View && Renderer->GetGPUOcclusion().GetSettings().bEnabled)
 	{
 		FGPUOcclusion& Occlusion = Renderer->GetGPUOcclusion();
-		if (Occlusion.Run(VisibleProxies.GetData(), VisibleProxies.Num(), *LODView))
+		if (Occlusion.Run(VisibleProxies.GetData(), VisibleProxies.Num(), *View))
 		{
 			const std::vector<uint8>& Occluded = Occlusion.GetOccluded();
 			if (Occlusion.GetSettings().bCull)
@@ -259,12 +259,12 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
 
         LODInputs.Reset();
-        if (LODView)
+        if (View)
         {
             LODInputs.Reserve(VisibleProxies.Num());
             for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
                 LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
-            SelectLODs(LODInputs, *LODView, SelectedLODs);
+            SelectLODs(LODInputs, *View, SelectedLODs);
         }
 		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
 			{
@@ -307,7 +307,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 						continue;
 					}
 
-					const uint32 LOD = LODView ? SelectedLODs[VisibleIndex] : 0;
+					const uint32 LOD = View ? SelectedLODs[VisibleIndex] : 0;
 					const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
 					++Out.LODCounts[LOD];                          // RenderStats 대신 조각 전용 통계
 
@@ -326,7 +326,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 						const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + i);
 						Out.LODTriangles[LOD] += Section.IndexCount / 3;
 
-						if (bStaticGroups && Section.Material && Section.Material->BlendState == EBlendState::Opaque)
+						if (bStaticGroups && Section.Material && Section.Material->PSOType == EPSOType::StaticMesh_Opaque)
 						{
 							FStaticDrawGroup& Group = FindGroup(Section.Material, Mesh, static_cast<uint8>(LOD));
 							Group.Items.push_back({ Proxy, Slot, Section.StartIndex, Section.IndexCount, bOccludedByGpu ? 1u : 0u });
@@ -381,7 +381,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 				const uint32 FirstNew = RenderQueue.Num();
 
 				// 프록시 캐시가 없는 스태틱 메시는 기존처럼 LOD를 골라 제출하고, 그 외는 컴포넌트에 맡긴다.
-				UStaticMeshComponent* StaticMeshComponent = LODView ? Cast<UStaticMeshComponent>(Primitive) : nullptr;
+				UStaticMeshComponent* StaticMeshComponent = View ? Cast<UStaticMeshComponent>(Primitive) : nullptr;
 				if (StaticMeshComponent && StaticMeshComponent->GetStaticMesh())
 				{
 					const uint32 LOD = SelectedLODs[VisibleIndex];
@@ -389,7 +389,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 				}
 				else
 				{
-					Primitive->SubmitToRenderQueue(RenderQueue);
+					Primitive->SubmitToRenderQueue(RenderQueue, *View);
 				}
 
 				// continue 없이 항상 여기까지 와서 새 패킷에 여유 칸을 배정한다.

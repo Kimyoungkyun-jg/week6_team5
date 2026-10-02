@@ -3,16 +3,16 @@
 #include "Launch/EntryPoint.h"
 
 #include "Editor/HitoriEd/EditorEngine.h"
-#include "Programs/ObjViewer/ObjViewerApp.h"
 #include "Programs/Benchmark/BenchmarkApp.h"
+#include "Programs/ObjViewer/ObjViewerApp.h"
 
-UClass* GetEngineClass()
-{
+
+UClass *GetEngineClass() {
 #ifdef OBJ_VIEWER
-	return UObjViewerEngine::StaticClass();
+  return UObjViewerEngine::StaticClass();
 #elif BENCHMARK
-	return UBenchmarkEngine::StaticClass();
+  // return UBenchmarkEngine::StaticClass();
 #else
-	return UEditorEngine::StaticClass();
+  return UEditorEngine::StaticClass();
 #endif
 }

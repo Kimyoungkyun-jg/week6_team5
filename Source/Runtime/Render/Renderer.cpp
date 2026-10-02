@@ -37,7 +37,7 @@ namespace
 
 	uint64 MakeSortKey(const FRenderPacket& Packet)
 	{
-		if (Packet.Material->BlendState != EBlendState::Opaque)
+		if (Packet.Material->PSOType != EPSOType::StaticMesh_Opaque)
 		{
 			const uint32 DistanceBits = std::bit_cast<uint32>(Packet.CameraToParticleDistance);
 			return (1ull << 63) | static_cast<uint64>(~DistanceBits);
@@ -453,13 +453,11 @@ void FRenderer::EndObjectConstants()
 // Material마다 Shader/Texture/Sampler/State 꽂기
 void FRenderer::BindMaterial(UMaterial* material)
 {
-	RenderCommand::BindShaderProgram(material->Shader);
-	RenderCommand::SetBlendState(material->BlendState);
-	// 반투명은 뒤에 그려지는 Grid·다른 반투명을 가리지 않도록 깊이를 쓰지 않는다.
-	const bool bTranslucent = material->BlendState != EBlendState::Opaque;
-	RenderCommand::SetDepthStencilState(bTranslucent && material->DepthStencilState == EDepthStencilState::Default
-		? EDepthStencilState::ReadOnly : material->DepthStencilState);
-
+	if (FPipelineState* PSO = FRenderResourceManager::GetPSO(material->PSOType))
+	{
+		RenderCommand::BindPipelineState(*PSO);
+	}
+	// 텍스처와 샘플러만 바인딩
 	for (int i = 0; i < material->Textures.size(); i++)
 	{
 		RenderCommand::BindShaderResource(i, material->Textures[i], EShaderBindFlagBits::Pixel);
@@ -481,7 +479,7 @@ void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 		FStaticMeshMaterialParams Params{};
 		Params.BaseColor = RenderPacket.Material->BaseColor;
 		Params.UVOffset = RenderPacket.Material->UVScrollSpeed * TotalTime;
-		Params.bOpaque = RenderPacket.Material->BlendState == EBlendState::Opaque ? 1.0f : 0.0f;
+		Params.bOpaque = (RenderPacket.Material->PSOType == EPSOType::StaticMesh_Opaque) ? 1.0f : 0.0f;
 
 		RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), &Params, sizeof(FStaticMeshMaterialParams));
 		RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);

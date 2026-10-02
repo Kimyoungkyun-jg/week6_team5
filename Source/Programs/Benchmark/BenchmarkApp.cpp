@@ -291,8 +291,10 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	const float ScaleX = Projection.M[1][0];
 	const float ScaleY = Projection.M[2][1];
 
-	// LOD에 카메라 정보 저장
-	FLODViewContext LODView{ Width, Height };
+	// 카메라 뷰 정보 저장
+	FViewContext LODView;
+	LODView.Width = Width;
+	LODView.Height = Height;
 	LODView.ViewProjection = ViewProjection;
 	LODView.CameraPosition = Camera->GetWorldLocation();
 	LODView.CameraForward = Camera->GetWorldRotation()

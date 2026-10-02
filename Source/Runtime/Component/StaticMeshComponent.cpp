@@ -2,6 +2,7 @@
 #include "StaticMeshComponent.h"
 #include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
+#include "Asset/LOD/StaticMeshLODSelector.h"
 
 #include "Engine/PrimitiveSceneProxy.h"
 
@@ -58,10 +59,7 @@ UMaterial* UStaticMeshComponent::GetDefaultMaterial(int32 SlotIndex) const
 }
 
 // 기존 호출 경로는 LOD0를 사용한다.
-void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue)
-{
-	SubmitToRenderQueue(RenderQueue, 0);
-}
+
 
 // 지정한 LOD의 Section으로 패킷을 만든다.
 void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, uint32 LODIndex)
@@ -84,6 +82,23 @@ void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, uint32
         Packet.LODIndex = static_cast<uint8>(LODIndex);
     }
 }
+void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& ViewContext)
+{
+	if (!StaticMesh)
+	{
+		return;
+	}
+	// 씬 프록시가 있으면 카메라 거리/화면 비율 기반으로 LOD 계산
+	uint32 SelectedLOD = 0;
+	if (const FPrimitiveSceneProxy* Proxy = GetSceneProxy())
+	{
+		SelectedLOD = SelectLOD(*Proxy, ViewContext);
+	}
+	// 결정된 LOD로 렌더 큐에 패킷 등록
+	SubmitToRenderQueue(RenderQueue, SelectedLOD);
+}
+
+
 /*
 // Section별 Material·Texture와 인덱스 범위를 보존해 패킷을 제출한다.
 void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue)

@@ -37,7 +37,7 @@ public:
 
 	// Todo: subuv
 	//void SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueue);
-	virtual void SubmitToRenderQueue(FRenderQueue& RenderQueue);
+	virtual void SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& ViewContext);
 
 	virtual const FStaticMeshData* GetMeshData() const { return nullptr; }
 

@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "GPUOcclusion.h"
 
 #include "Render/Renderer.h"
@@ -7,6 +7,7 @@
 #include "Render/Material.h"
 #include "Render/Shader.h"
 #include "Engine/PrimitiveSceneProxy.h"
+#include "Render/RenderResourceManager.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
 #include "Core/Async/TaskPool.h"
 #include "Core/Stats/LightweightStats.h"
@@ -378,7 +379,7 @@ namespace
 
 // 물체마다 판정 입력(AABB)을 채우고, 가림막 후보 점수(화면 크기)를 매긴다.
 // 점수 칸별로 개수와 화면 넓이 합을 조각마다 따로 모아 두면, 가림막 커트라인을 정렬 없이 잡을 수 있다.
-bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& View)
+bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FViewContext& View)
 {
 	ScoreBuckets.resize(Count);
 	OccluderLODs.resize(Count);
@@ -437,7 +438,7 @@ bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32
 }
 
 // 화면에 크게 보이는 물체를 실제 메시로 가림막 깊이 버퍼에 그린다. 본 패스와 같은 셰이더·행렬·LOD라 깊이가 정확하다.
-void FGPUOcclusion::DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, const FLODViewContext& View)
+void FGPUOcclusion::DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, const FViewContext& View)
 {
 	// 가장 먼저 비운다. 가림막을 하나도 못 그리고 끝나도 깊이가 1(아무것도 안 가림)이어야 한다.
 	// (지난 프레임 깊이가 남아 있으면 지금 보이는 물체를 가려진 것으로 판정할 수 있다.)
@@ -506,18 +507,19 @@ void FGPUOcclusion::DrawOccluders(const FPrimitiveSceneProxy* const* Proxies, co
 		{
 			const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + s);
 			// 반투명 부분은 뒤를 가리지 않는다.
-			if (!Section.Material || Section.Material->BlendState != EBlendState::Opaque)
+			if (!Section.Material || Section.Material->PSOType != EPSOType::StaticMesh_Opaque)
 				continue;
 
+			FShaderProgram* Shader = FRenderResourceManager::GetPSO(Section.Material->PSOType)->Shader;
 			FOccluderBucket* Target = nullptr;
 			for (FOccluderBucket& Bucket : OccluderBuckets)
-				if (Bucket.Mesh == Proxy->GetMesh() && Bucket.LOD == LOD && Bucket.Shader == Section.Material->Shader)
+				if (Bucket.Mesh == Proxy->GetMesh() && Bucket.LOD == LOD && Bucket.Shader == Shader)
 				{
 					Target = &Bucket;
 					break;
 				}
 			if (!Target)
-				Target = &OccluderBuckets.emplace_back(FOccluderBucket{ Proxy->GetMesh(), LOD, Section.Material->Shader, {} });
+				Target = &OccluderBuckets.emplace_back(FOccluderBucket{ Proxy->GetMesh(), LOD, Shader, {} });
 			Target->Draws.push_back({ Selected, Section.StartIndex, Section.IndexCount });
 			Stats.OccluderTriangles += Section.IndexCount / 3;
 			bAnyOpaque = true;
@@ -653,7 +655,7 @@ bool FGPUOcclusion::ReadBack(uint32 Count)
 	return true;
 }
 
-bool FGPUOcclusion::Run(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FLODViewContext& View)
+bool FGPUOcclusion::Run(const FPrimitiveSceneProxy* const* Proxies, uint32 Count, const FViewContext& View)
 {
 	SCOPE_CYCLE_COUNTER(STAT_GPUOcclusion);
 

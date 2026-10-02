@@ -102,4 +102,7 @@ private:
 	void OpenScene();
 	void SaveCurrentScene();
 	void SaveSceneAs();
+
+	// 액터 머리 위에 UUID 라벨 렌더링
+	void RenderActorUUIDs(int32 ViewIndex, const FMatrix& ViewProjection, const FVector& CameraLocation, const FVector& CameraForward);
 };

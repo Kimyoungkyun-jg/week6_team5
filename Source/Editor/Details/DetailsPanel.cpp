@@ -507,7 +507,7 @@ namespace
 					ImGui::SetNextItemWidth(-1.0f);
 
 					const char* BlendItems[] = { "Opaque", "Alpha Blend" };
-					int BlendIndex = Effective ? static_cast<int>(Effective->BlendState) : static_cast<int>(EBlendState::Opaque);
+					int BlendIndex = (Effective && Effective->PSOType == EPSOType::StaticMesh_Translucent) ? 1 : 0;
 					if (ImGui::BeginCombo("##BlendState", BlendItems[BlendIndex]))
 					{
 						for (int i = 0; i < IM_ARRAYSIZE(BlendItems); ++i)
@@ -517,7 +517,7 @@ namespace
 								Override = EnsureMaterialOverride(MeshComponent, Slot, Effective, Override);
 								if (Override)
 								{
-									Override->BlendState = static_cast<EBlendState>(i);
+									Override->PSOType = (i == 1) ? EPSOType::StaticMesh_Translucent : EPSOType::StaticMesh_Opaque;
 									Effective = Override;
 								}
 							}

@@ -425,10 +425,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
 	
-	if ((!bIsPIE || ViewIndex != 0)&& SettingsPanel->GetSettings().bDrawBatchLine)
+	// 라인 배처 렌더링
+	if ((!bIsPIE || ViewIndex != 0) && SettingsPanel->GetSettings().bDrawBatchLine)
 	{
-		// 라인 배처는 매 프레임 한 번만 비우고 한 번만 그린다.
-		// 바운딩박스는 그 안에 쌓이는 여러 항목 중 하나일 뿐이다.
 		LineBatcher->BeginFrame();
 
 		if (SettingsPanel->GetSettings().bDrawBoundingBox)
@@ -437,7 +436,6 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 			EditorWorld->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
-		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
 		if (Gizmo->GetTarget())
 		{
 			if (ALightActor* LightActor = Cast<ALightActor>(Gizmo->GetTarget()->GetOwner()))
@@ -447,29 +445,21 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		}
 
 		LineBatcher->OnRender(ViewProjection);
-
 	}
 
 	const bool bDrawPrimitives = bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
-	const ERasterizerState SceneRasterizerState = (!bIsPIE && MultipleViewportsAdapter.IsViewWireframe(ViewIndex))
-		? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
 
-	// 렌더 루프 — 반드시 RenderAll보다 먼저
+	// 스카이박스 렌더링
 	SkyboxRenderer->OnRender(ViewProjection, ViewCameraLocation);
+
+	// 불투명 메시 렌더링
 	if (bDrawPrimitives)
 	{
-		RenderCommand::SetRasterizerState(SceneRasterizerState);
-		RenderCommand::SetBlendState(EBlendState::Opaque);
-		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
-
-		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		// 반투명은 Grid 뒤에 합성되어야 하므로 불투명만 먼저 그린다.
 		Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
 		Renderer->RenderOpaque(ViewProjection);
-		// 장면 Wireframe이 Grid·Gizmo·UI로 전파되지 않도록 복원한다.
-		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
+	// 에디터 그리드 렌더링
 	if ((!bIsPIE || ViewIndex != 0) && SettingsPanel->GetSettings().bDrawBatchLine)
 	{
 		const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
@@ -495,19 +485,14 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		}
 	}
 
+	// 반투명 메시 렌더링
 	if (bDrawPrimitives)
 	{
-		// Grid 파이프라인이 바꾼 상태를 장면 기준으로 되돌린 뒤 반투명을 먼 것부터 그린다.
-		RenderCommand::SetRasterizerState(SceneRasterizerState);
-		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		Renderer->RenderTranslucent(ViewProjection);
-		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
-
+	// 텍스트 컴포넌트 렌더링
 	UWorld* TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
-
-	// TextRenderComponent 렌더링
 	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent)
 	{
 		if (!TextComponent || !TextComponent->GetFont() || !TextComponent->IsVisible())
@@ -516,7 +501,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		}
 
 		if (TextComponent->GetOwner() && TextComponent->GetOwner()->GetWorld() != TargetWorld)
+		{
 			continue;
+		}
 
 		TextRenderer->OnRender(
 			TextComponent->GetText(),
@@ -527,65 +514,32 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		);
 	}
 
-	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if ((!bIsPIE || ViewIndex != 0) && Outline->GetTarget())
+	// 에디터 오버레이 렌더링
+	if (!bIsPIE || ViewIndex != 0)
 	{
-		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
-	}
+		if (Outline->GetTarget())
+		{
+			OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
+		}
 
-	if ((!bIsPIE || ViewIndex != 0) && Gizmo->GetTarget())
-	{
-		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
-
-		FBox box = Target->CalcBounds();
+		if (Gizmo->GetTarget())
+		{
+			RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
+			GizmoRenderer->OnRender(
+				*Gizmo,
+				ViewProjection,
+				ViewCameraLocation,
+				MultipleViewportsAdapter.IsOrthographic(ViewIndex)
+			);
+		}
 
 		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
-		GizmoRenderer->OnRender(
-			*Gizmo,
-			ViewProjection,
-			ViewCameraLocation,
-			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
-	}
-
-	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
-
-	if ((!bIsPIE || ViewIndex != 0) && SettingsPanel->GetSettings().bShowUUID)
-	{
-		for (AActor* Actor : EditorWorld->GetPersistentLevel()->GetActors())
+		if (SettingsPanel->GetSettings().bShowUUID)
 		{
-			if (!Actor)
-				continue;
-
-			UPrimitiveComponent* Primitive =
-				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
-
-			if (!Primitive)
-				continue;
-
-			FBox Box =
-				Primitive->CalcBounds();
-
-			FVector UUIDLocation;
-			UUIDLocation.X = (Box.Min.X + Box.Max.X) * 0.5f;
-			UUIDLocation.Y = (Box.Min.Y + Box.Max.Y) * 0.5f;
-			UUIDLocation.Z = Box.Max.Z + 0.5f;
-
-			FString Text =
-				"UUID : " + std::to_string(Actor->GetUUID());
-
-			TextRenderer->BuildTextMesh(
-				Text,
-				0.5f,
-				*SystemFont
-			);
-
-			const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
-			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
+			RenderActorUUIDs(ViewIndex, ViewProjection, ViewCameraLocation, ViewCameraForward);
 		}
 	}
-
-
 
 	RenderCommand::EndRenderPass(ViewRenderingInfo);
 }
@@ -665,4 +619,44 @@ void UEditorEngine::SaveCurrentScene()
 void UEditorEngine::SaveSceneAs()
 {
 	FEditorFileUtils::SaveSceneAs(EditorWorld);
+}
+
+void UEditorEngine::RenderActorUUIDs(int32 ViewIndex, const FMatrix& ViewProjection, const FVector& CameraLocation, const FVector& CameraForward)
+{
+	const bool bOrtho = MultipleViewportsAdapter.IsOrthographic(ViewIndex);
+
+	for (AActor* Actor : EditorWorld->GetPersistentLevel()->GetActors())
+	{
+		if (!Actor) continue;
+		UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+		
+		if (!Primitive) continue;
+		
+		// 액터 머리 위 위치 계산
+		FBox Box = Primitive->CalcBounds();
+		FVector UUIDLocation(
+			(Box.Min.X + Box.Max.X) * 0.5f,
+			(Box.Min.Y + Box.Max.Y) * 0.5f,
+			Box.Max.Z + 0.5f
+		);
+		
+		FString Text = "UUID : " + std::to_string(Actor->GetUUID());
+		TextRenderer->BuildTextMesh(Text, 0.5f, *SystemFont);
+		// 빌보드로 렌더링
+
+
+		FVector Facing = bOrtho
+			? (CameraForward * -1.0f)
+			: (CameraLocation - UUIDLocation).Normalized();
+		FVector Up = FVector(0.0f, 0.0f, 1.0f);
+		FVector Right = FVector::Cross(Up, Facing).Normalized();
+		FVector RealUp = FVector::Cross(Facing, Right).Normalized();
+		FMatrix BillboardWorld = FMatrix::Identity;
+		BillboardWorld.M[0][0] = Facing.X;  BillboardWorld.M[0][1] = Facing.Y;  BillboardWorld.M[0][2] = Facing.Z;
+		BillboardWorld.M[1][0] = Right.X;   BillboardWorld.M[1][1] = Right.Y;   BillboardWorld.M[1][2] = Right.Z;
+		BillboardWorld.M[2][0] = RealUp.X;  BillboardWorld.M[2][1] = RealUp.Y;  BillboardWorld.M[2][2] = RealUp.Z;
+		BillboardWorld.M[3][0] = UUIDLocation.X; BillboardWorld.M[3][1] = UUIDLocation.Y; BillboardWorld.M[3][2] = UUIDLocation.Z;
+
+		TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
+	}
 }

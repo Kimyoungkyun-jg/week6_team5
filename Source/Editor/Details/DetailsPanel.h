@@ -18,11 +18,20 @@ public:
 	void OnRender() override;
 	const char* GetPanelName() const override { return "Details"; }
 
-	void SetTarget(USceneComponent* InTargetOrNull) { Target = InTargetOrNull; }
+	void SetTarget(USceneComponent* InTargetOrNull) { 
+		Target = InTargetOrNull; 
+		SelectedComponent = nullptr;
+	}
 
 	void SetWorld(UWorld* InWorld) { World = InWorld; }
 
 	ImFont* GetCustomFont() { return CustomFont; }
+
+
+private:
+	void DrawComponentTree(USceneComponent* SceneComp);
+	void DrawAddComponentPopup(AActor* Owner);
+	UActorComponent* SelectedComponent = nullptr;
 
 private:
 	UWorld* World = nullptr;

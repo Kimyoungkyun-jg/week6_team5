@@ -34,6 +34,28 @@ UParticleSubUVComponent::UParticleSubUVComponent()
 void UParticleSubUVComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	SetParticles(10);
+}
+
+// 열·행 개수가 양수인지 검사해 SubUV 분할 수를 설정한다.
+void UParticleSubUVComponent::SetSubUVSize(uint32 NewColSize, uint32 NewRowSize)
+{
+	assert(NewColSize > 0 && NewRowSize > 0);
+
+	ColSize = NewColSize;
+	RowSize = NewRowSize;
+}
+
+// 유효한 프레임 속도를 저장하고 음수·0이면 기본값을 쓴다.
+void UParticleSubUVComponent::SetFrameRate(float InFrameRate)
+{
+	FrameRate = (InFrameRate > 0.0f) ? InFrameRate : 1.0f;
+}
+
+void UParticleSubUVComponent::SetParticles(int32 particlecount)
+{
+	if (ParticleCount == particlecount) return;
+	ParticleCount = particlecount;
 
 	Particles.Reserve(ParticleCount);
 	for (int32 i = 0; i < ParticleCount; ++i)
@@ -52,21 +74,6 @@ void UParticleSubUVComponent::BeginPlay()
 
 		Particles.Add(Particle);
 	}
-}
-
-// 열·행 개수가 양수인지 검사해 SubUV 분할 수를 설정한다.
-void UParticleSubUVComponent::SetSubUVSize(uint32 NewColSize, uint32 NewRowSize)
-{
-	assert(NewColSize > 0 && NewRowSize > 0);
-
-	ColSize = NewColSize;
-	RowSize = NewRowSize;
-}
-
-// 유효한 프레임 속도를 저장하고 음수·0이면 기본값을 쓴다.
-void UParticleSubUVComponent::SetFrameRate(float InFrameRate)
-{
-	FrameRate = (InFrameRate > 0.0f) ? InFrameRate : 1.0f;
 }
 
 // DeltaTime으로 이동·수명·Atlas 프레임을 갱신한다.

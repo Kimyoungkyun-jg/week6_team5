@@ -61,6 +61,23 @@ public:
 	void SetSubUVSize(uint32 Cols, uint32 Rows);
 	void SetFrameRate(float InFrameRate);
 
+	void SetParticles(int32 particlecount = 10);
+	
+	virtual FBox CalcLocalBounds() const override
+	{
+		const float MaxScale = std::max(StartScale, EndScale);
+		const float Radius = MaxScale * 1.2f;
+
+		const float MaxTravelUp = std::max(0.0f, MaxRiseSpeed) * MaxLifeTime;
+		const float MaxTravelDown = std::min(0.0f, MinRiseSpeed) * MaxLifeTime;
+
+		const FVector BoxMin(-Radius, -Radius, MaxTravelDown - Radius);
+		const FVector BoxMax(Radius, Radius, MaxTravelUp + Radius);
+
+		return FBox{ BoxMin, BoxMax };
+	}
+
+
 private:
 	void RespawnParticle(FParticle& Particle);
 
@@ -75,7 +92,7 @@ private:
 	// ---- 튜닝 값 ----
 	// 방출은 수명이 끝난 파티클이 무작위 시점에 리스폰되는 방식이다.
 	// 초당 평균 방출량 ≈ ParticleCount / 평균 수명. 수명 범위가 넓을수록 방출 간격이 더 불규칙해진다.
-	int32 ParticleCount = 10;           // 동시에 존재하는 파티클 수 (생성자에서만 반영)
+	int32 ParticleCount = 0;           // 동시에 존재하는 파티클 수 (생성자에서만 반영)
 
 	float MinLifeTime = 6.0f;           // 수명 최소값(초)
 	float MaxLifeTime = 8.0f;          // 수명 최대값(초)

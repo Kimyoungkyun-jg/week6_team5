@@ -14,6 +14,7 @@
 
 #include "Collision/Ray.h"
 #include "Component/BillboardComponent.h"
+#include "Component/ParticleSubUVComponent.h"
 
 #include "Component/StaticMeshComponent.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
@@ -123,6 +124,16 @@ void UWorld::Tick(float DeltaTime)
 			PathTracker.Tick(Level->GetActors(), DeltaTime);
 		}
 	}
+	else if(worldType == EWorldType::Editor)
+	{
+
+		for (TObjectIterator<UParticleSubUVComponent> Comp; Comp; ++Comp)
+		{
+			Comp->SetParticles(10); // 이걸 매틱마다 하는게 맞나?
+			Comp->TickComponent(DeltaTime);
+		}
+	}
+
 
 
 	{
@@ -519,24 +530,6 @@ bool UWorld::DestroyActor(AActor* Actor)
 	// 2. PathTracker에서 제거
 	PathTracker.OnObjectDestroyed(Actor);
 
-	//// 3. PrimitiveComponents에서 제거
-	//for (UActorComponent* Component : Actor->Components)
-	//{
-	//	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component);
-
-	//	if (!Primitive)
-	//		continue;
-
-	//	for (int32 i = PrimitiveComponents.Num() - 1; i >= 0; --i)
-	//	{
-	//		if (PrimitiveComponents[i] == Primitive)
-	//		{
-	//			PrimitiveComponents.RemoveAt(i, 1);
-	//			break;
-	//		}
-	//	}
-	//}
-
 	// 4. Level의 Actors에서 제거
 	for (int32 i = Level->Actors.Num() - 1; i >= 0; --i)
 	{
@@ -686,13 +679,6 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 	Init();
 	worldType = EWorldType::PIE;
 
-	if (SrcWorld->GetMainCamera() && MainCamera)
-	{
-		MainCamera->GetRootComponent()->SetTransform(
-			SrcWorld->GetMainCamera()->GetRootComponent()->GetTransform()
-		);
-	}
-
 	if (ULevel* SrcLevel = SrcWorld->GetPersistentLevel())
 	{
 		for (AActor* SrcActor : SrcLevel->GetActors())
@@ -710,11 +696,17 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 			
 			for (int i = 0; i < NewActor->Components.size(); i++)
 			{
-				UStaticMeshComponent* newSMC = Cast<UStaticMeshComponent>(NewActor->Components[i]);
-				UStaticMeshComponent* srcSMC = Cast<UStaticMeshComponent>(SrcActor->Components[i]);
-				if (newSMC && srcSMC)
+				if (UStaticMeshComponent* newSMC = Cast<UStaticMeshComponent>(NewActor->Components[i]))
 				{
+					UStaticMeshComponent* srcSMC = Cast<UStaticMeshComponent>(SrcActor->Components[i]);
 					newSMC->SetStaticMesh(srcSMC->GetStaticMesh());
+				}
+				else if (UTextRenderComponent* newTRC = Cast<UTextRenderComponent>(NewActor->Components[i]))
+				{
+					UTextRenderComponent* srcTRC = Cast<UTextRenderComponent>(SrcActor->Components[i]);
+					newTRC->SetText(srcTRC->GetText());
+					newTRC->SetFont(srcTRC->GetFont());
+					newTRC->SetTextSize(srcTRC->GetTextSize());
 				}
 			}
 

@@ -685,6 +685,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
                     SortInputs.Add({static_cast<ObjectId>(Index + 1), Particles[Index].Location});
                 SortParticlesByCameraDistance(SortInputs, Views.Cameras[ViewIndex].Transform.Location, SortedParticleIds);
             }
+            
             for (int32 Order = 0; Order < Snapshot.AliveParticleIndices.Num(); ++Order)
             {
                 const int32 ParticleIndex = bOpaque ? static_cast<int32>(SortedParticleIds[Order] - 1) : Snapshot.AliveParticleIndices[Order];
@@ -719,6 +720,8 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
             Primitive->SubmitToRenderQueue(OutQueue);
         }
     }
+
+
     SelectLODs(LODInputs, LODContext, SelectedLODs);
     for (uint32 I = 0; I < static_cast<uint32>(PendingStaticMeshes.Num()); ++I)
         PendingStaticMeshes[I]->SubmitToRenderQueue(OutQueue, SelectedLODs[I]);

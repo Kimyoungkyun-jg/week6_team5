@@ -6,12 +6,19 @@
 #include "Component/PrimitiveComponent.h"
 #include "Component/StaticMeshComponent.h"
 #include "Component/TextRenderComponent.h"
+#include "Component/SpotLightComponent.h"
+#include "Component/ParticleSubUVComponent.h"
+#include "Component/BillboardComponent.h"
+#include "Component/TextRenderComponent.h"
 #include "Asset/AssetManager.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
 #include "Text/Font.h"
 #include "UObject/UObjectIterator.h"
 #include "GameFramework/Actor.h"
+#include <format>
+#include <iostream>
+#include <string>
 
 namespace
 {
@@ -528,6 +535,109 @@ namespace
 		}
 	}
 
+	void DrawMaterial(UBillboardComponent* BillboardComponent)
+	{
+		const int32 NumSlots = BillboardComponent->GetNumMaterials();
+		if (NumSlots <= 0)
+		{
+			return;
+		}
+
+		if (!ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			return;
+		}
+
+		const float ThumbnailSize = 64.0f;
+
+		// 메쉬 내의 매터리얼 별 Slot 순회
+		for (int32 Slot = 0; Slot < NumSlots; ++Slot)
+		{
+			ImGui::PushID(Slot);
+
+			FString SlotLabel = std::format("[{}]", Slot);
+			bool bOpen = ImGui::TreeNode(SlotLabel.c_str());
+
+			UMaterial* Effective = BillboardComponent->GetMaterial(Slot);
+			UTexture2D* Texture = (Effective && Effective->Textures.Num() > 0) ? Effective->Textures[0] : nullptr;
+
+			ImGui::SameLine();
+
+			if (bOpen)
+			{
+				if (ImGui::BeginTable("MaterialProperties", 2))
+				{
+					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Texture");
+
+					ImGui::TableSetColumnIndex(1);
+
+					// 1: 텍스처 썸네일
+					if (Texture && Texture->GetResource())
+					{
+						ImGui::Image((ImTextureID)Texture->GetResource()->GetSRV(), { ThumbnailSize, ThumbnailSize });
+						if (ImGui::IsItemHovered())
+						{
+							ImGui::SetTooltip("%s", Texture->GetPath().c_str());
+						}
+					}
+					else
+					{
+						ImGui::Button("Empty", { ThumbnailSize, ThumbnailSize });
+					}
+					if (ImGui::BeginDragDropTarget())
+					{
+						if (const ImGuiPayload* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Texture))
+						{	
+							UTexture2D* DroppedTexture = *static_cast<UTexture2D**>(Payload->Data);
+							
+							BillboardComponent->GetMaterial(0)->Textures[0] = DroppedTexture;
+						}
+						ImGui::EndDragDropTarget();
+					}
+					ImGui::SameLine();
+
+					// 2: 텍스처 경로
+					if (Texture)
+					{
+						fs::path Path(Texture->GetPath());
+						FString FileName = Path.filename().string();
+
+						ImGui::TextWrapped("%s", FileName.c_str());
+						if (ImGui::IsItemHovered())
+						{
+							ImGui::SetTooltip("%s", Texture->GetPath().c_str());
+						}
+					}
+					else
+					{
+						ImGui::TextDisabled("(Empty)");
+					}
+
+					ImGui::TableNextRow();
+
+					// 3: Base Color
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Base Color");
+
+					ImGui::TableSetColumnIndex(1);
+					ImGui::SetNextItemWidth(-1.0f);
+
+
+					ImGui::EndTable();
+				}
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+
+			ImGui::Separator();
+		}
+	}
+
 	// UClass에 등록된 프로퍼티를 타입에 맞는 위젯으로 그린다
 	void DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
 	{
@@ -699,32 +809,174 @@ void FDetailsPanel::OnRender()
 
 	if (Target)
 	{
-		// 액터 -> 컴포넌트 순으로, 클래스별 프로퍼티 표시
-		DrawProperties(Target->GetOwner(), CustomFont);
+		AActor* Owner = Target->GetOwner();
+		if (Owner)
+		{
+			ImGui::AlignTextToFramePadding();
+			ImGui::Text("%s", Owner->GetName().c_str());
 
-		// 선택된 컴포넌트뿐 아니라 같은 액터의 다른 컴포넌트도 보여준다.
-		// (예: 라이트는 빌보드를 클릭해서 고르지만 수치는 SpotLight 쪽에 있다)
-		if (AActor* Owner = Target->GetOwner())
-		{
-			for (UActorComponent* Component : Owner->GetComponents())
+			// 컴포넌트 추가 버튼 배치
+			const float ButtonWidth = 70.0f;
+			ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ButtonWidth);
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.55f, 0.15f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.70f, 0.20f, 1.0f));
+			
+			if (ImGui::Button("+ Add", ImVec2(ButtonWidth, 0)))
 			{
-				// 같은 클래스를 상속한 컴포넌트가 여럿이면 헤더 ID가 겹치므로 분리한다
-				ImGui::PushID(Component);
-				DrawProperties(Component, CustomFont);
-				if (UMeshComponent* MeshComponent = Cast<UMeshComponent>(Component))
-				{
-					DrawMaterialSlots(MeshComponent);
-				}
-				ImGui::PopID();
+				ImGui::OpenPopup("AddComponentPopup");
 			}
+
+			ImGui::PopStyleColor(2);
+			DrawAddComponentPopup(Owner);
+			ImGui::Spacing();
+
+
+			// 액터 노드
+			ImGui::BeginChild("ComponentHierarchy", ImVec2(0, 130), true);
+
+			const bool bActorSelected = (SelectedComponent == nullptr);
+			ImGuiTreeNodeFlags ActorFlags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_DefaultOpen;
+			
+			if (bActorSelected) ActorFlags |= ImGuiTreeNodeFlags_Selected;
+			
+			FString ActorSelfLabel = std::format("{} (self)", Owner->GetName());
+			
+			if (ImGui::TreeNodeEx(ActorSelfLabel.c_str(), ActorFlags))
+			{
+				if (ImGui::IsItemClicked())
+				{
+					SelectedComponent = nullptr; // 액터 자체 선택
+				}
+				ImGui::TreePop();
+			}
+			
+			// RootComponent부터 시작하는 컴포넌트 트리
+			if (USceneComponent* Root = Owner->GetRootComponent())
+			{
+				DrawComponentTree(Root);
+			}
+			ImGui::EndChild();
+			ImGui::Separator();
+
+
 		}
-		else
+
+		if (SelectedComponent == nullptr && Owner)
 		{
-			DrawProperties(Target, CustomFont);
+			// 액터 속성 표시
+			DrawProperties(Owner, CustomFont);
+		}
+		else if (SelectedComponent)
+		{
+			// 해당 컴포넌트 속성 & 머티리얼 슬롯 표시
+			DrawProperties(SelectedComponent, CustomFont);
+			if (UMeshComponent* MeshComponent = Cast<UMeshComponent>(SelectedComponent))
+			{
+				DrawMaterialSlots(MeshComponent);
+			}
+			else if (UBillboardComponent* BillBoardComponent = Cast<UBillboardComponent>(SelectedComponent))
+			{
+				DrawMaterial(BillBoardComponent);
+			}
 		}
 	}
 
 	ImGui::End();
+}
+
+void FDetailsPanel::DrawComponentTree(USceneComponent* SceneComp)
+{
+	if (!SceneComp) return;
+    
+	const bool bHasChildren = !SceneComp->GetAttachChildren().IsEmpty();
+	const bool bIsSelected = (SelectedComponent == SceneComp);
+	
+	ImGuiTreeNodeFlags NodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_DefaultOpen;
+    
+	if (!bHasChildren) NodeFlags |= ImGuiTreeNodeFlags_Leaf;
+    if (bIsSelected) NodeFlags |= ImGuiTreeNodeFlags_Selected;
+   
+	// 표시 이름: 컴포넌트 이름 (클래스명)
+	FString Label = std::format("{} ({})", SceneComp->GetName(), SceneComp->GetClass()->Name);
+    ImGui::PushID(SceneComp);
+    const bool bNodeOpen = ImGui::TreeNodeEx(Label.c_str(), NodeFlags);
+    
+	// 노드 클릭 시 해당 컴포넌트 선택
+    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
+    {
+        SelectedComponent = SceneComp;
+        Target = SceneComp; // 하단 프로퍼티 창의 타깃 갱신
+    }
+    
+	// 자식 컴포넌트들 재귀 렌더링
+    if (bNodeOpen)
+    {
+        for (USceneComponent* Child : SceneComp->GetAttachChildren())
+        {
+            DrawComponentTree(Child);
+        }
+        ImGui::TreePop();
+    }
+    ImGui::PopID();
+
+
+}
+
+void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
+{
+	if (ImGui::BeginPopup("AddComponentPopup"))
+	{
+		ImGui::TextDisabled("Add Component");
+		ImGui::Separator();
+		
+		// 추가 가능한 컴포넌트 목록
+		if (ImGui::Selectable("StaticMesh Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UStaticMeshComponent>("StaticMesh");
+			if (Owner->GetRootComponent())
+				NewComp->SetupAttachment(Owner->GetRootComponent());
+			if (World)
+				World->GetScene().AddPrimitive(NewComp);
+		}
+		if (ImGui::Selectable("SpotLight Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<USpotLightComponent>("SpotLight");
+			if (Owner->GetRootComponent())
+				NewComp->SetupAttachment(Owner->GetRootComponent());
+		}
+		if (ImGui::Selectable("ParticleSubUV Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UParticleSubUVComponent>("Particle");
+			if (Owner->GetRootComponent())
+			{
+				NewComp->SetupAttachment(Owner->GetRootComponent());
+				NewComp->SetParticles(10);
+			}
+				
+
+			if (World)
+				World->GetScene().AddPrimitive(NewComp);
+		}
+		if (ImGui::Selectable("TextRender Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UTextRenderComponent>("TextRender");
+			if (Owner->GetRootComponent())
+				NewComp->SetupAttachment(Owner->GetRootComponent());
+			if (World)
+				World->GetScene().AddPrimitive(NewComp);
+		}
+		if (ImGui::Selectable("Billboard Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UBillboardComponent>("Billboard");
+			if (Owner->GetRootComponent())
+				NewComp->SetupAttachment(Owner->GetRootComponent());
+			if (World)
+				World->GetScene().AddPrimitive(NewComp);
+		}
+		ImGui::EndPopup();
+	}
+
+
 }
 
 FDetailsPanel::~FDetailsPanel()

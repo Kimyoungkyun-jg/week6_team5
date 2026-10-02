@@ -196,7 +196,10 @@ void UEditorEngine::BeginFrame(const float DeltaTime)
 	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
 
 	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
+	{
 		DeleteActor(OutlinerPanel->GetSelectedActor());
+	}
+
 }
 
 // 패널의 Layout·Preset 요청과 입력을 Adapter에 반영한다.
@@ -422,7 +425,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
 	
-	if (!bIsPIE && SettingsPanel->GetSettings().bDrawBatchLine)
+	if ((!bIsPIE || ViewIndex != 0)&& SettingsPanel->GetSettings().bDrawBatchLine)
 	{
 		// 라인 배처는 매 프레임 한 번만 비우고 한 번만 그린다.
 		// 바운딩박스는 그 안에 쌓이는 여러 항목 중 하나일 뿐이다.
@@ -467,7 +470,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
-	if (!bIsPIE && SettingsPanel->GetSettings().bDrawBatchLine)
+	if ((!bIsPIE || ViewIndex != 0) && SettingsPanel->GetSettings().bDrawBatchLine)
 	{
 		const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
 
@@ -501,6 +504,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
+
+	UWorld* TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
+
 	// TextRenderComponent 렌더링
 	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent)
 	{
@@ -508,6 +514,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		{
 			continue;
 		}
+
+		if (TextComponent->GetOwner() && TextComponent->GetOwner()->GetWorld() != TargetWorld)
+			continue;
 
 		TextRenderer->OnRender(
 			TextComponent->GetText(),
@@ -519,12 +528,12 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 	}
 
 	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (!bIsPIE && Outline->GetTarget())
+	if ((!bIsPIE || ViewIndex != 0) && Outline->GetTarget())
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (!bIsPIE && Gizmo->GetTarget())
+	if ((!bIsPIE || ViewIndex != 0) && Gizmo->GetTarget())
 	{
 		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
 
@@ -541,7 +550,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
-	if (!bIsPIE && SettingsPanel->GetSettings().bShowUUID)
+	if ((!bIsPIE || ViewIndex != 0) && SettingsPanel->GetSettings().bShowUUID)
 	{
 		for (AActor* Actor : EditorWorld->GetPersistentLevel()->GetActors())
 		{
@@ -615,7 +624,7 @@ void UEditorEngine::DeleteActor(AActor* Actor)
 		return;
 
 	OutlinerPanel->SelectActor(nullptr);
-
+	
 	Actor->Destroy();
 }
 

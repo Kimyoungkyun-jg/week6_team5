@@ -240,11 +240,41 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 		SettingsPanel->GetMutableSettings().MultipleViewportsVertical = Ratio.Vertical;
 	}
 
-	MultipleViewportsAdapter.UpdateInput(
-		DeltaTime,
-		LocalMousePosition,
-		SettingsPanel->GetSettings().CameraSpeed,
-		SettingsPanel->GetSettings().MouseSensitivity);
+	if(World && World->IsPIEWorld() && !bIsSimulatingInEditor)
+	{
+		ACameraActor* PIECamera = FindFirstSceneCamera();
+
+		if(PIECamera && PIECamera->GetCameraComponent())
+		{
+			ViewportsPanel->SetShowNoCamera(false);
+			UCameraComponent* CameraComp = PIECamera->GetCameraComponent();
+
+			FViewCamera ViewCamera;
+			
+			ViewCamera.Transform.Location = CameraComp->GetWorldLocation();
+			ViewCamera.Transform.Rotation = CameraComp->GetWorldRotation();
+			ViewCamera.Projection.Mode = EProjectionMode::Perspective;
+			ViewCamera.Projection.FovDegrees = CameraComp->GetFieldOfView();
+			ViewCamera.Projection.NearClip = CameraComp->GetNearZ();
+			ViewCamera.Projection.FarClip = CameraComp->GetFarZ();
+
+			MultipleViewportsAdapter.SetViewCamera(0, ViewCamera);
+		}
+		else
+		{
+			ViewportsPanel->SetShowNoCamera(true);
+		}
+	}
+
+	else
+	{
+		MultipleViewportsAdapter.UpdateInput(
+			DeltaTime,
+			LocalMousePosition,
+			SettingsPanel->GetSettings().CameraSpeed,
+			SettingsPanel->GetSettings().MouseSensitivity);
+	}
+
 	// 겹친 창은 Hover 선택에서 제외하고 우클릭 Capture를 우선한다.
 	if (ViewportsPanel->IsHovered() || MultipleViewportsAdapter.GetCapturedViewIndex() != InvalidViewIndex)
 		MultipleViewportsAdapter.SetEditorViewIndex(MultipleViewportsAdapter.GetActiveViewIndex());
@@ -592,13 +622,13 @@ void UEditorEngine::SaveSceneAs()
 
 void UEditorEngine::StartPIE()
 {
-	if (GetWorldContextFromType(EWorldType::WorldType_PIE) != nullptr) return;
+	if (GetWorldContextFromType(EWorldType::PIE) != nullptr) return;
 
-	FWorldContext* EditorContext = GetWorldContextFromType(EWorldType::WorldType_Editor);
+	FWorldContext* EditorContext = GetWorldContextFromType(EWorldType::Editor);
 	if (!EditorContext || !EditorContext->World)
 		return;
 
-	FWorldContext& PIEWorldContext = CreateNewWorldContext(EWorldType::WorldType_PIE);
+	FWorldContext& PIEWorldContext = CreateNewWorldContext(EWorldType::PIE);
 	if (!PIEWorldContext.World)
 		return;
 
@@ -628,13 +658,13 @@ void UEditorEngine::StartPIE()
 
 void UEditorEngine::EndPIE()
 {
-	FWorldContext* PIEWorldContext = GetWorldContextFromType(EWorldType::WorldType_PIE);
+	FWorldContext* PIEWorldContext = GetWorldContextFromType(EWorldType::PIE);
 	if(!PIEWorldContext || !PIEWorldContext->World)
 		return;
 
 	PIEWorldContext->World->EndPlay();
 
-	FWorldContext* EditorWorldContext = GetWorldContextFromType(EWorldType::WorldType_Editor);
+	FWorldContext* EditorWorldContext = GetWorldContextFromType(EWorldType::Editor);
 	if(EditorWorldContext && EditorWorldContext->World)
 		World = EditorWorldContext->World;
 
@@ -645,5 +675,19 @@ void UEditorEngine::EndPIE()
 	EditorControlsPanel->SetWorld(World);
 	SettingsPanel->SetWorld(World);
 
-	DestroyWorldContext(EWorldType::WorldType_PIE);
+	DestroyWorldContext(EWorldType::PIE);
+}
+
+ACameraActor* UEditorEngine::FindFirstSceneCamera()
+{
+	if (!World || !World->GetPersistentLevel()) return nullptr;
+
+	for (AActor* Actor : World->GetPersistentLevel()->GetActors())
+	{
+		if (ACameraActor* Camera = Cast<ACameraActor>(Actor))
+		{
+			return Camera;
+		}
+	}
+	return nullptr;
 }

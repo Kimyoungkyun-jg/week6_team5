@@ -5,7 +5,7 @@ UEngine* GEngine = nullptr;
 
 bool UEngine::Init()
 {
-	World = CreateNewWorldContext(EWorldType::WorldType_Editor).World;
+	World = CreateNewWorldContext(EWorldType::Editor).World;
 	if(World == nullptr)
 		return false;
 	return true;

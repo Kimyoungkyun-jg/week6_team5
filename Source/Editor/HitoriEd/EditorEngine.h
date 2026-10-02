@@ -64,6 +64,9 @@ private:
 	// 화면 합성과 View 설정 보관으로 프레임을 마무리한다.
 	void EndFrame();
 
+	// 씬에 배치된 카메라를 찾아 반환한다.
+	ACameraActor* FindFirstSceneCamera();
+
 	// FEngineLoop 소유. OnInit에서 받아 둔다.
 	FWindow* MainWindow = nullptr;
 	FSwapchain* MainWindowSC = nullptr;
@@ -93,6 +96,8 @@ private:
 	FRenderQueue RenderQueue;
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
+
+	bool bIsSimulatingInEditor = false;
 
 	void ResetSceneSelection();
 

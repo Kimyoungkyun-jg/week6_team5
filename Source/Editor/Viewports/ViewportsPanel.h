@@ -35,6 +35,8 @@ public:
 	// UI에서 발생한 View별 Camera Preset 요청을 한 번 소비하도록 반환한다.
 	bool ConsumeCameraPresetRequest(int32& OutViewIndex, EMultipleViewportsCameraPreset& OutPreset);
 
+	void SetShowNoCamera(bool bValue) { bShowNoCamera = bValue; }
+
 private:
 	FMultipleViewportsAdapter* ViewportAdapter = nullptr;
 	struct FViewSlot
@@ -74,4 +76,7 @@ private:
 	int32 RequestedSingleViewIndex = 0;
 	int32 PendingCameraPresetViewIndex = InvalidViewIndex;
 	EMultipleViewportsCameraPreset PendingCameraPreset = EMultipleViewportsCameraPreset::Perspective;
+
+	// 월드에 카메라 액터가 없는 경우
+	bool bShowNoCamera = false;
 };

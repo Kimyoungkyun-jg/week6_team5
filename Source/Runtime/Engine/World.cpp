@@ -37,7 +37,17 @@ DECLARE_CYCLE_STAT("Gather - Submit", STAT_GatherSubmit);
 
 UWorld::~UWorld()
 {
-
+	ClearWorld();
+	for(ULevel* Level : Levels)
+	{
+		if(Level)
+		{
+			delete Level;
+		}
+	}
+	Levels.Reset();
+	PersistentLevel = nullptr;
+	CurrentLevel = nullptr;
 }
 
 bool  UWorld::Init()
@@ -702,7 +712,7 @@ UWorld* UWorld::DuplicateWorld(UWorld* SourceWorld, UWorld* DestinationWorld)
 		PIEWorld->Init();
 	}
 
-	PIEWorld->SetWorldType(EWorldType::WorldType_PIE);
+	PIEWorld->SetWorldType(EWorldType::PIE);
 
 	ULevel* SrcLevel = SourceWorld->GetPersistentLevel();
 	ULevel* DstLevel = PIEWorld->GetPersistentLevel();

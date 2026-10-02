@@ -157,6 +157,26 @@ void FViewportsPanel::OnRender()
 		{ContentOrigin.x + ContentSize.x, ContentOrigin.y + ContentSize.y}, true);
 	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
 	{
+		if (bShowNoCamera)
+		{
+			// 0번 뷰포트(메인 원근 뷰포트) 영역을 어두운 회색으로 덮어버림
+			const ImVec2 ViewMin {
+				ContentOrigin.x + Slots[0].Rect.X, ContentOrigin.y + Slots[0].Rect.Y
+			};
+			const ImVec2 ViewMax{ ViewMin.x + Slots[0].Rect.Width, ViewMin.y + Slots[0].Rect.Height };
+
+			// 회색 채우기
+			DrawList->AddRectFilled(ViewMin, ViewMax, IM_COL32(45, 45, 48, 255));
+			const char* WarningText = "No Camera";
+			ImVec2 TextSize = ImGui::CalcTextSize(WarningText);
+			ImVec2 CenterPos{
+				ViewMin.x + (Slots[0].Rect.Width - TextSize.x) * 0.5f,
+				ViewMin.y + (Slots[0].Rect.Height - TextSize.y) * 0.5f
+			};
+			DrawList->AddText(CenterPos, IM_COL32(220, 220, 220, 255), WarningText);
+
+			continue;
+		}
 		const FViewSlot& Slot = Slots[ViewIndex];
 		if (!Slot.bActive || !Slot.ColorTarget)
 			continue;

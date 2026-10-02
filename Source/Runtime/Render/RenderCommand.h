@@ -8,7 +8,6 @@ class UTexture2D;
 class FShaderProgram;
 class FVertexShader;
 class FPixelShader;
-struct FRenderingInfo;
 
 enum class EShaderBindFlagBits : uint32
 {
@@ -74,8 +73,8 @@ public:
 	static void BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 	static void BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 
-	static void BeginRenderPass(const FRenderingInfo& RenderingInfo);
-	static void EndRenderPass(const FRenderingInfo& RenderingInfo);
+	static void BeginRenderPass(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height);
+	static void EndRenderPass();
 	static void ClearDepthStencil(FTexture2D* DepthStencilTexture, float Depth = 1.0f, uint8 Stencil = 0);
 
 	static void SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 InHeight);

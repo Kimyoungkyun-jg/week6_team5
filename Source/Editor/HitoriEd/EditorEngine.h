@@ -18,7 +18,7 @@
 #include "Editor/EditorControls/EditorControlsPanel.h"
 #include "Editor/Settings/SettingsPanel.h"
 #include "Editor/Viewports/ViewportsPanel.h"
-#include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
+#include "Editor/LevelEditor/MultipleViewports/Core/MultipleViewports.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
 
 #include "Editor/Rendering/Outline.h"
@@ -30,6 +30,10 @@
 //Temp
 #include "Text/Font.h"
 #include "Text/TextRenderer.h"
+#include <Editor\Viewports\EditorViewportClient.h>
+#include <Container\Array.h>
+
+class FSceneRenderer;
 
 class UEditorEngine : public UEngine
 {
@@ -43,8 +47,8 @@ public:
 
 	// Active View의 입력과 Picking 결과만 Gizmo 및 선택 상태에 반영한다.
 	void UpdateGizmoAndPicking();
-	// View 하나의 Scene·Grid·Gizmo·텍스트를 해당 ViewProjection으로 렌더한다.
-	void RenderFrame(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue, const bool bIsPIE);
+	// 뷰포트 하나의 씬과 에디터 요소를 렌더링한다.
+	void RenderFrame(FEditorViewportClient* ViewClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer, const bool bIsPIE);
 
 
 	// 네 View 결과와 ImGui를 메인 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
@@ -88,11 +92,14 @@ private:
 	FEditorControlsPanel* EditorControlsPanel = nullptr;
 	FSettingsPanel* SettingsPanel = nullptr;
 	FViewportsPanel* ViewportsPanel = nullptr;
-	FMultipleViewportsAdapter MultipleViewportsAdapter;
+	FSplitRatio ViewportSplitRatio{0.5f, 0.5f};
+	ELayoutMode ViewportLayoutMode = ELayoutMode::QuadSplit;
+	int32 SingleViewportIndex = 0;
 	FRenderQueue RenderQueue;
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 
+	TArray<FEditorViewportClient*> AllViewportClients;
 
 	bool bIsStep = false;
 
@@ -104,5 +111,5 @@ private:
 	void SaveSceneAs();
 
 	// 액터 머리 위에 UUID 라벨 렌더링
-	void RenderActorUUIDs(int32 ViewIndex, const FMatrix& ViewProjection, const FVector& CameraLocation, const FVector& CameraForward);
+	void RenderActorUUIDs(const FSceneView& View);
 };

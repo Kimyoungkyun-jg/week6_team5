@@ -8,8 +8,7 @@
 #include "GameFramework/Actor/LightActor.h"
 #include "GameFramework/Actor/TextRenderActor.h"
 #include "GameFramework/Actor/SpinActor.h"
-
-class FMultipleViewportsAdapter;
+class FViewportsPanel;
 
 // 액터 생성과 카메라·기즈모 편집에 필요한 패널 상태를 보관한다.
 class FEditorControlsPanel : public IEditorPanel
@@ -21,9 +20,11 @@ public:
 	const char* GetPanelName() const override { return "Editor Controls"; }
 	inline void SetGizmo(FGizmo* InGizmo) { Gizmo = InGizmo; }
 	inline void SetWorld(UWorld* InWorld) { World = InWorld; }
+	inline void SetViewportsPanel(FViewportsPanel* InPanel) { ViewportsPanel = InPanel; }
 
 	float DeltaTime = 1.0f;
-	UWorld* World = nullptr; // SpawnActor MainCamera
+	UWorld* World = nullptr;
+	FViewportsPanel* ViewportsPanel = nullptr;
 
 	void AddActor(uint32 Index);
 
@@ -47,13 +48,10 @@ public:
 		ASpinActor::StaticClass(),
 	};
 
-    void SetViewportAdapter(FMultipleViewportsAdapter* InAdapter) { ViewportAdapter = InAdapter; }
-
 private:
 	static constexpr float SectionGap = 10.0f;
 	static constexpr float SubsectionGap = 4.0f;
 
     void DrawCameraProperties();
-    FMultipleViewportsAdapter* ViewportAdapter = nullptr;
-
 };
+

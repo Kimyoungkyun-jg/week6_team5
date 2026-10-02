@@ -5,6 +5,8 @@
 #include "Material.h"
 #include <array>
 #include <utility>
+#include <algorithm>
+#include <bit>
 
 class FPrimitiveSceneProxy;
 inline constexpr uint32 InvalidObjectSlot = ~0u;
@@ -88,13 +90,30 @@ class FRenderQueue : public TArray<FRenderPacket>
     using FMatrixBlock = std::array<FMatrix, MatricesPerBlock>;
     TArray<TUniquePtr<FMatrixBlock>> MatrixBlocks;
     uint32 MatrixCount = 0;
+    uint32 FirstTranslucentIndex = 0;
+
+    // 패킷 정렬 키 생성
+    static uint64 MakeSortKey(const FRenderPacket& Packet)
+    {
+        if (Packet.Material->PSOType != EPSOType::StaticMesh_Opaque)
+        {
+            const uint64 DistanceBits = static_cast<uint64>(std::bit_cast<uint32>(Packet.CameraToParticleDistance));
+            return (1ull << 63) | (~DistanceBits & 0xFFFFFFFFull);
+        }
+
+        return (static_cast<uint64>(Packet.Material->SortID) << 47)
+            | (static_cast<uint64>(Packet.Mesh->SortID) << 31)
+            | (static_cast<uint64>(Packet.LODIndex & 0x3) << 29);
+    }
+
 public:
     FRenderQueue() = default;
     FRenderQueue(const FRenderQueue&) = delete;
     FRenderQueue& operator=(const FRenderQueue&) = delete;
     FRenderQueue(FRenderQueue&& Other) noexcept
         : FPackets(std::move(Other)), MatrixBlocks(std::move(Other.MatrixBlocks)),
-          MatrixCount(std::exchange(Other.MatrixCount, 0)) {}
+          MatrixCount(std::exchange(Other.MatrixCount, 0)),
+          FirstTranslucentIndex(std::exchange(Other.FirstTranslucentIndex, 0)) {}
     FRenderQueue& operator=(FRenderQueue&& Other) noexcept
     {
         if (this != &Other)
@@ -102,6 +121,7 @@ public:
             FPackets::operator=(std::move(Other));
             MatrixBlocks = std::move(Other.MatrixBlocks);
             MatrixCount = std::exchange(Other.MatrixCount, 0);
+            FirstTranslucentIndex = std::exchange(Other.FirstTranslucentIndex, 0);
         }
         return *this;
     }
@@ -115,9 +135,59 @@ public:
         ++MatrixCount;
         return &Stored;
     }
+
+    // 큐 자체 정렬
+    void Sort()
+    {
+        if (IsEmpty())
+        {
+            FirstTranslucentIndex = 0;
+            return;
+        }
+
+        struct FSortItem
+        {
+            uint64 Key = 0;
+            int32 Index = 0;
+        };
+
+        const int32 TotalPackets = Num();
+        TArray<FSortItem> SortItems;
+        SortItems.Reserve(TotalPackets);
+        for (int32 Index = 0; Index < TotalPackets; ++Index)
+        {
+            const FRenderPacket& Packet = (*this)[Index];
+            if (!Packet.Mesh || !Packet.Material) continue;
+            SortItems.Add({ MakeSortKey(Packet), Index });
+        }
+
+        std::sort(SortItems.begin(), SortItems.end(), [](const FSortItem& A, const FSortItem& B)
+        {
+            return A.Key < B.Key;
+        });
+
+        FirstTranslucentIndex = 0;
+        while (FirstTranslucentIndex < static_cast<uint32>(SortItems.Num()) && !(SortItems[FirstTranslucentIndex].Key >> 63))
+        {
+            ++FirstTranslucentIndex;
+        }
+
+        TArray<FRenderPacket> Sorted;
+        Sorted.Reserve(Num());
+        for (const FSortItem& Item : SortItems)
+        {
+            Sorted.Add(std::move((*this)[Item.Index]));
+        }
+
+        *static_cast<FPackets*>(this) = std::move(Sorted);
+    }
+
+    uint32 GetFirstTranslucentIndex() const { return FirstTranslucentIndex; }
+
     void Reset()
     {
         FPackets::Reset();
         MatrixCount = 0;
+        FirstTranslucentIndex = 0;
     }
 };

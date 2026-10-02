@@ -191,10 +191,11 @@ void FEngineLoop::Exit()
 
 void FEngineLoop::BeginBackbufferPass()
 {
-	FRenderingInfo Info = Swapchain->GetRenderingInfo();
-	Info.DepthStencil.Texture = DepthBuffer.get();
-
-	RenderCommand::BeginRenderPass(Info);
+	RenderCommand::BeginRenderPass(
+		Swapchain->GetBackbuffer(),
+		DepthBuffer.get(),
+		MainWindow ? MainWindow->GetWidth() : 0,
+		MainWindow ? MainWindow->GetHeight() : 0);
 
 	RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	RenderCommand::SetBlendState(EBlendState::Opaque);
@@ -204,10 +205,7 @@ void FEngineLoop::BeginBackbufferPass()
 
 void FEngineLoop::EndBackbufferPass()
 {
-	FRenderingInfo Info = Swapchain->GetRenderingInfo();
-	Info.DepthStencil.Texture = DepthBuffer.get();
-
-	RenderCommand::EndRenderPass(Info);
+	RenderCommand::EndRenderPass();
 }
 
 uint32 FEngineLoop::GetViewportWidth() const

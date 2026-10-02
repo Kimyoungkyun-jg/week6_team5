@@ -4,16 +4,18 @@
 
 #include "Core/EngineStatics.h"
 #include "Core/EngineTimer.h"
-#include "Launch/LaunchEngineLoop.h"
 #include "Core/StatOverlay.h"
 #include "Input/InputSystem.h"
+#include "Launch/LaunchEngineLoop.h"
+
 
 #include "ObjectSystem/ObjectFactory.h"
 
 #include "Render/GeometryGenerator.h"
 
-#include "Engine/World.h"
 #include "Engine/Level.h"
+#include "Engine/World.h"
+
 
 #include "Render/Renderer.h"
 
@@ -23,640 +25,667 @@
 
 #include "Asset/AssetManager.h"
 #include "Render/RenderResourceManager.h"
+#include "Render/SceneRenderer.h"
 
-#include "Render/RenderCommand.h"
-#include "Editor/Outliner/OutlinerPanel.h"
 #include "Editor/HitoriEd/EditorFileUtils.h"
+#include "Editor/Outliner/OutlinerPanel.h"
+#include "Render/RenderCommand.h"
 #include "UObject/UObjectIterator.h"
+
 
 #include "Core/EngineLog.h"
 #include "Core/Stats/LightweightStats.h"
 
-namespace
-{
-	DECLARE_CYCLE_STAT("Viewport Update", STAT_ViewportUpdate);
-	DECLARE_CYCLE_STAT("World Tick", STAT_WorldTick);
-	DECLARE_CYCLE_STAT("Editor Tick", STAT_EditorTick);
-	DECLARE_CYCLE_STAT("Capture World", STAT_CaptureWorld);
-	DECLARE_CYCLE_STAT("Build Render Queue", STAT_BuildRenderQueue);
-	DECLARE_CYCLE_STAT("ImGui", STAT_ImGui);
-}
+namespace {
+DECLARE_CYCLE_STAT("Viewport Update", STAT_ViewportUpdate);
+DECLARE_CYCLE_STAT("World Tick", STAT_WorldTick);
+DECLARE_CYCLE_STAT("Editor Tick", STAT_EditorTick);
+DECLARE_CYCLE_STAT("Capture World", STAT_CaptureWorld);
+DECLARE_CYCLE_STAT("Build Render Queue", STAT_BuildRenderQueue);
+DECLARE_CYCLE_STAT("ImGui", STAT_ImGui);
+} // namespace
 
 #include "Core/SplashScreen.h"
 
-FEngineConfig UEditorEngine::GetConfig() const
-{
-	FEngineConfig Desc;
-	Desc.Title = L"Hitori Engine";
-	Desc.Width = 1920;
-	Desc.Height = 1080;
-	Desc.bBorderless = false;
-	Desc.SyncInterval = 0;
-	// View는 각자 깊이 버퍼를 쓰고 백버퍼에는 ImGui만 그린다.
-	Desc.bCreateDepthBuffer = false;
-	Desc.bExitOnEscape = false;
-	// 파일이 없으면 검은 배경에 상태 텍스트만 표시된다.
-	Desc.SplashImage = "Resources/Splash.png";
-	return Desc;
+FEngineConfig UEditorEngine::GetConfig() const {
+  FEngineConfig Desc;
+  Desc.Title = L"Hitori Engine";
+  Desc.Width = 1920;
+  Desc.Height = 1080;
+  Desc.bBorderless = false;
+  Desc.SyncInterval = 0;
+  // View는 각자 깊이 버퍼를 쓰고 백버퍼에는 ImGui만 그린다.
+  Desc.bCreateDepthBuffer = false;
+  Desc.bExitOnEscape = false;
+  // 파일이 없으면 검은 배경에 상태 텍스트만 표시된다.
+  Desc.SplashImage = "Resources/Splash.png";
+  return Desc;
 }
 
 // 렌더 자원·월드·에디터와 MultipleViewports 연결을 초기화한다.
 // Device·Window·Swapchain·AssetManager는 FEngineLoop가 먼저 만들어 둔다.
-bool UEditorEngine::Init()
-{
-	if (!Super::Init())
-		return false;
+bool UEditorEngine::Init() {
+  if (!Super::Init())
+    return false;
 
-	MainWindow = GetEngineLoop().GetMainWindow();
-	MainWindowSC = GetEngineLoop().GetSwapchain();
-	Renderer = GetEngineLoop().GetRenderer();
-	FRenderDevice* RenderDevice = GetEngineLoop().GetRenderDevice();
+  MainWindow = GetEngineLoop().GetMainWindow();
+  MainWindowSC = GetEngineLoop().GetSwapchain();
+  Renderer = GetEngineLoop().GetRenderer();
+  FRenderDevice *RenderDevice = GetEngineLoop().GetRenderDevice();
 
-	EditorUI = MakeUnique<FEditorUI>();
-	EditorUI->Init();
+  EditorUI = MakeUnique<FEditorUI>();
+  EditorUI->Init();
 
-	EditorUI->SetNewSceneCallback([this]() { CreateNewScene(); });
-	EditorUI->SetOpenSceneCallback([this]() { OpenScene(); });
-	EditorUI->SetSaveSceneCallback([this]() { SaveCurrentScene(); });
-	EditorUI->SetSaveSceneAsCallback([this]() { SaveSceneAs(); });
+  EditorUI->SetNewSceneCallback([this]() { CreateNewScene(); });
+  EditorUI->SetOpenSceneCallback([this]() { OpenScene(); });
+  EditorUI->SetSaveSceneCallback([this]() { SaveCurrentScene(); });
+  EditorUI->SetSaveSceneAsCallback([this]() { SaveSceneAs(); });
 
-	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
-	FLog::AddSink(OutputLogPanel);
-	HTR_LOG(Info, "Editor Initialize...");
+  OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
+  FLog::AddSink(OutputLogPanel);
+  HTR_LOG(Info, "Editor Initialize...");
 
-	HTR_LOG(Info, "Initialize ImGui...");
-	ImGuiRenderer = MakeUnique<FImGuiRenderer>();
-	if (!ImGuiRenderer->Init(MainWindow->GetHandle(), RenderDevice->GetDevice(), RenderDevice->GetContext()))
-	{
-		HTR_LOG(Error, "Failed To Initialize ImGui!");
-	}
-	HTR_LOG(Info, "Initialize ImGui Success!");
+  HTR_LOG(Info, "Initialize ImGui...");
+  ImGuiRenderer = MakeUnique<FImGuiRenderer>();
+  if (!ImGuiRenderer->Init(MainWindow->GetHandle(), RenderDevice->GetDevice(),
+                           RenderDevice->GetContext())) {
+    HTR_LOG(Error, "Failed To Initialize ImGui!");
+  }
+  HTR_LOG(Info, "Initialize ImGui Success!");
 
-	GridRenderer = MakeUnique<FGridRenderer>();
-	GridRenderer->Init(Renderer);
+  GridRenderer = MakeUnique<FGridRenderer>();
+  GridRenderer->Init(Renderer);
 
-	GizmoRenderer = MakeUnique<FGizmoRenderer>();
-	GizmoRenderer->Init(Renderer);
+  GizmoRenderer = MakeUnique<FGizmoRenderer>();
+  GizmoRenderer->Init(Renderer);
 
-	Gizmo = MakeUnique<FGizmo>();
+  Gizmo = MakeUnique<FGizmo>();
 
-	// 필요한 Panel들 추가후 raw pointer 반환(소유권 = EditorUI)
-	DetailsPanel = EditorUI->AddEditorPanel<FDetailsPanel>();
-	EditorControlsPanel = EditorUI->AddEditorPanel<FEditorControlsPanel>();
-	ViewportsPanel = EditorUI->AddEditorPanel<FViewportsPanel>();
-	ContentDrawerPanel = EditorUI->AddEditorPanel<FContentDrawerPanel>();
+  // 필요한 Panel들 추가후 raw pointer 반환(소유권 = EditorUI)
+  DetailsPanel = EditorUI->AddEditorPanel<FDetailsPanel>();
+  EditorControlsPanel = EditorUI->AddEditorPanel<FEditorControlsPanel>();
+  ViewportsPanel = EditorUI->AddEditorPanel<FViewportsPanel>();
+  ContentDrawerPanel = EditorUI->AddEditorPanel<FContentDrawerPanel>();
 
-	// OutLine
-	OutlineRenderer = MakeUnique<FOutlineRenderer>();
-	OutlineRenderer->Init(Renderer);
+  // OutLine
+  OutlineRenderer = MakeUnique<FOutlineRenderer>();
+  OutlineRenderer->Init(Renderer);
 
-	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
+  SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
-	Outline = MakeUnique<FOutline>();
+  Outline = MakeUnique<FOutline>();
 
-	SystemFont = UAssetManager::GetAssetByPath<UFont>("Assets/Fonts/Pretendard.json");
+  SystemFont =
+      UAssetManager::GetAssetByPath<UFont>("Assets/Fonts/Pretendard.json");
 
-	TextRenderer = MakeUnique<FTextRenderer>();
-	TextRenderer->Init();
+  TextRenderer = MakeUnique<FTextRenderer>();
+  TextRenderer->Init();
 
-	// 투영 행렬 생성 
-	MultipleViewportsAdapter.InitializeFromWorld(*EditorWorld);
-	// 화면 나눔 비율 설정 가져오기
-	MultipleViewportsAdapter.SetSplitRatio({
-		SettingsPanel->GetSettings().MultipleViewportsHorizontal,
-		SettingsPanel->GetSettings().MultipleViewportsVertical });
-	// SingleView에 사용할 인덱스 설정
-	MultipleViewportsAdapter.SetSingleViewIndex(
-		SettingsPanel->GetSettings().MultipleViewportsSingleViewIndex);
-	// 뷰포트 레이아웃 설정
-	MultipleViewportsAdapter.SetLayoutMode(
-		SettingsPanel->GetSettings().bMultipleViewportsSingle
-		? ELayoutMode::Single
-		: ELayoutMode::QuadSplit);
-	EditorWorld->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
+  // 화면 나눔 비율 설정 가져오기
+  ViewportSplitRatio = {SettingsPanel->GetSettings().MultipleViewportsHorizontal,
+                        SettingsPanel->GetSettings().MultipleViewportsVertical};
+  // SingleView에 사용할 인덱스 설정
+  SingleViewportIndex =
+      SettingsPanel->GetSettings().MultipleViewportsSingleViewIndex;
+  // 뷰포트 레이아웃 설정
+  ViewportLayoutMode = SettingsPanel->GetSettings().bMultipleViewportsSingle
+                           ? ELayoutMode::Single
+                           : ELayoutMode::QuadSplit;
+  EditorWorld->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(
+      true);
 
-	/// 삭제 예정
-	//SceneManager = EditorUI->AddEditorPanel<FSceneManager>();
-	//SceneManager->SetWorld(World);
+  /// 삭제 예정
+  // SceneManager = EditorUI->AddEditorPanel<FSceneManager>();
+  // SceneManager->SetWorld(World);
 
-	OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
-	OutlinerPanel->SetWorld(EditorWorld);
-	OutlinerPanel->SetSelectionCallback(
-		[this](UPrimitiveComponent* Primitive)
-		{
-			Gizmo->SetTarget(Primitive);
-			Outline->SetTarget(Primitive);
-			DetailsPanel->SetTarget(Primitive);
-		}
-	);
+  OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
+  OutlinerPanel->SetWorld(EditorWorld);
+  OutlinerPanel->SetSelectionCallback([this](UPrimitiveComponent *Primitive) {
+    Gizmo->SetTarget(Primitive);
+    Outline->SetTarget(Primitive);
+    DetailsPanel->SetTarget(Primitive);
+  });
 
-	OutlinerPanel->SetDeleteActorCallback(
-		[this](AActor* Actor)
-		{
-			DeleteActor(Actor);
-		}
-	);
+  OutlinerPanel->SetDeleteActorCallback(
+      [this](AActor *Actor) { DeleteActor(Actor); });
 
-	LineBatcher = MakeUnique<FLineBatcher>();
-	LineBatcher->Init(Renderer, EditorWorld);
+  LineBatcher = MakeUnique<FLineBatcher>();
+  LineBatcher->Init(Renderer, EditorWorld);
 
-	DetailsPanel->SetWorld(EditorWorld);
+  DetailsPanel->SetWorld(EditorWorld);
 
-	EditorControlsPanel->SetWorld(EditorWorld);
-	EditorControlsPanel->SetGizmo(Gizmo.get());
-	EditorControlsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+  EditorControlsPanel->SetWorld(EditorWorld);
+  EditorControlsPanel->SetGizmo(Gizmo.get());
+  EditorControlsPanel->SetViewportsPanel(ViewportsPanel);
 
-	SettingsPanel->SetWorld(EditorWorld);
-	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
-	ViewportsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+  SettingsPanel->SetWorld(EditorWorld);
+  SettingsPanel->SetViewportsPanel(ViewportsPanel);
+  ViewportsPanel->SetLayoutMode(ViewportLayoutMode, SingleViewportIndex);
 
-	SkyboxRenderer = MakeUnique<FSkyboxRenderer>();
-	SkyboxRenderer->Init("Assets/SkySphere/Sky.jpg");
+  for (int32 i = 0; i < 4; ++i) {
+    if (FEditorViewportClient *Client = ViewportsPanel->GetViewportClient(i)) {
+      Client->SetWorld(EditorWorld);
+      AllViewportClients.Add(Client);
+    }
+  }
+  SettingsPanel->ApplyViewportSettings();
 
-	return true;
+  SkyboxRenderer = MakeUnique<FSkyboxRenderer>();
+  SkyboxRenderer->Init("Assets/SkySphere/Sky.jpg");
+
+  return true;
 }
 
-// 프레임 시작·View 상태·월드 갱신 후 View별 오프스크린 렌더와 UI 합성을 진행한다.
-// 입력·창 메시지는 FEngineLoop가 먼저 처리하고 Present는 호출 직후에 한다.
-void UEditorEngine::Tick(const float DeltaTime)
-{
-	BeginFrame(DeltaTime);
-	UpdateMultipleViewportState(DeltaTime);
-	
+// 프레임 시작·View 상태·월드 갱신 후 View별 오프스크린 렌더와 UI 합성을
+// 진행한다. 입력·창 메시지는 FEngineLoop가 먼저 처리하고 Present는 호출 직후에
+// 한다.
+void UEditorEngine::Tick(const float DeltaTime) {
+  BeginFrame(DeltaTime);
+  UpdateMultipleViewportState(DeltaTime);
 
-	TickWorld(DeltaTime);
-	RenderMultipleViewports();
-	EndFrame();
+  TickWorld(DeltaTime);
+  RenderMultipleViewports();
+  EndFrame();
 }
 
 // DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
-void UEditorEngine::BeginFrame(const float DeltaTime)
-{
-	FStatOverlay::Tick(DeltaTime);
-	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
+void UEditorEngine::BeginFrame(const float DeltaTime) {
+  FStatOverlay::Tick(DeltaTime);
+  EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
 
-	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
-	{
-		DeleteActor(OutlinerPanel->GetSelectedActor());
-	}
-
+  if (!ImGui::GetIO().WantTextInput &&
+      FInputSystem::IsKeyPressed(EKeyCode::Delete)) {
+    DeleteActor(OutlinerPanel->GetSelectedActor());
+  }
 }
 
 // 패널의 Layout·Preset 요청과 입력을 Adapter에 반영한다.
-void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
-{
-	SCOPE_CYCLE_COUNTER(STAT_ViewportUpdate);
+void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime) {
+  SCOPE_CYCLE_COUNTER(STAT_ViewportUpdate);
 
-	const FVector2 ViewportSize = ViewportsPanel->GetContentSize();
-	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
+  const FVector2 ViewportSize = ViewportsPanel->GetContentSize();
+  const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
 
-	ELayoutMode RequestedLayout{};
-	int32 RequestedSingleViewIndex = MultipleViewportsAdapter.GetSingleViewIndex();
-	
-	if (ViewportsPanel->ConsumeLayoutRequest(RequestedLayout, RequestedSingleViewIndex))
-	{
-		if (RequestedLayout == ELayoutMode::Single)
-			MultipleViewportsAdapter.SetSingleViewIndex(RequestedSingleViewIndex);
-		MultipleViewportsAdapter.SetLayoutMode(RequestedLayout);
+  ELayoutMode RequestedLayout{};
+  int32 RequestedSingleViewIndex = SingleViewportIndex;
 
-		FEditorSettings& Settings = SettingsPanel->GetMutableSettings();
-		Settings.bMultipleViewportsSingle = RequestedLayout == ELayoutMode::Single;
-		Settings.MultipleViewportsSingleViewIndex = RequestedSingleViewIndex;
-	}
+  if (ViewportsPanel->ConsumeLayoutRequest(RequestedLayout,
+                                           RequestedSingleViewIndex)) {
+    if (RequestedLayout == ELayoutMode::Single)
+      SingleViewportIndex = RequestedSingleViewIndex;
+    ViewportLayoutMode = RequestedLayout;
 
-	int32 PresetViewIndex = InvalidViewIndex;
-	EMultipleViewportsCameraPreset RequestedPreset = EMultipleViewportsCameraPreset::Perspective;
-	
-	if (ViewportsPanel->ConsumeCameraPresetRequest(PresetViewIndex, RequestedPreset))
-		MultipleViewportsAdapter.ApplyCameraPreset(PresetViewIndex, RequestedPreset);
-	MultipleViewportsAdapter.UpdateLayout(ViewportSize, LocalMousePosition);
+    FEditorSettings &Settings = SettingsPanel->GetMutableSettings();
+    Settings.bMultipleViewportsSingle = RequestedLayout == ELayoutMode::Single;
+    Settings.MultipleViewportsSingleViewIndex = RequestedSingleViewIndex;
+  }
 
-	// PIE 액션 처리
-	switch (ViewportsPanel->ConsumePIEAction())
-	{
-	case EPIEAction::Play:
-		PlayWorld = FObjectFactory::ConstructObject<UWorld>();
-		PlayWorld->DuplicateWorld(EditorWorld);
-		break;
-	case EPIEAction::Pause:
-		if (PlayWorld)
-			PlayWorld->GetbIsTickEnable() = false;
-		break;
-	case EPIEAction::Resume:
-		if (PlayWorld)
-			PlayWorld->GetbIsTickEnable() = true;
-		break;
-	case EPIEAction::Step:
-		if (PlayWorld)
-		{
-			bIsStep = true;
-			PlayWorld->GetbIsTickEnable() = true;
-		}
-		break;
-	case EPIEAction::Stop:
-		if (PlayWorld)
-		{
-			PlayWorld->ClearWorld();    // 액터 틱 해제, 렌더 프록시 제거, 액터 delete 수행
-			delete PlayWorld;           
-			PlayWorld = nullptr;         
-		}
-		break;
-	default:
-		break;
-	}
+  // PIE 액션 처리
+  switch (ViewportsPanel->ConsumePIEAction()) {
+  case EPIEAction::Play:
+    PlayWorld = FObjectFactory::ConstructObject<UWorld>();
+    PlayWorld->DuplicateWorld(EditorWorld);
+    break;
+  case EPIEAction::Pause:
+    if (PlayWorld)
+      PlayWorld->GetbIsTickEnable() = false;
+    break;
+  case EPIEAction::Resume:
+    if (PlayWorld)
+      PlayWorld->GetbIsTickEnable() = true;
+    break;
+  case EPIEAction::Step:
+    if (PlayWorld) {
+      bIsStep = true;
+      PlayWorld->GetbIsTickEnable() = true;
+    }
+    break;
+  case EPIEAction::Stop:
+    if (PlayWorld) {
+      PlayWorld
+          ->ClearWorld(); // 액터 틱 해제, 렌더 프록시 제거, 액터 delete 수행
+      delete PlayWorld;
+      PlayWorld = nullptr;
+    }
+    break;
+  default:
+    break;
+  }
 
-	const float HorizontalDrag = ViewportsPanel->ConsumeHorizontalDrag();
-	const float VerticalDrag = ViewportsPanel->ConsumeVerticalDrag();
-	if (HorizontalDrag != 0.0f)
-		MultipleViewportsAdapter.ApplySplitterDrag(EDragAxis::Horizontal, HorizontalDrag, ViewportSize);
-	if (VerticalDrag != 0.0f)
-		MultipleViewportsAdapter.ApplySplitterDrag(EDragAxis::Vertical, VerticalDrag, ViewportSize);
-	if (HorizontalDrag != 0.0f || VerticalDrag != 0.0f)
-	{
-		MultipleViewportsAdapter.UpdateLayout(ViewportSize, LocalMousePosition);
-		const FSplitRatio Ratio = MultipleViewportsAdapter.GetSplitRatio();
-		SettingsPanel->GetMutableSettings().MultipleViewportsHorizontal = Ratio.Horizontal;
-		SettingsPanel->GetMutableSettings().MultipleViewportsVertical = Ratio.Vertical;
-	}
+  const float HorizontalDrag = ViewportsPanel->ConsumeHorizontalDrag();
+  const float VerticalDrag = ViewportsPanel->ConsumeVerticalDrag();
+  if (HorizontalDrag != 0.0f)
+    ViewportSplitRatio = ApplySplitterDrag(ViewportSplitRatio, EDragAxis::Horizontal,
+                                           HorizontalDrag, ViewportSize, 0.1f);
+  if (VerticalDrag != 0.0f)
+    ViewportSplitRatio = ApplySplitterDrag(ViewportSplitRatio, EDragAxis::Vertical,
+                                           VerticalDrag, ViewportSize, 0.1f);
+  if (HorizontalDrag != 0.0f || VerticalDrag != 0.0f) {
+    SettingsPanel->GetMutableSettings().MultipleViewportsHorizontal =
+        ViewportSplitRatio.Horizontal;
+    SettingsPanel->GetMutableSettings().MultipleViewportsVertical =
+        ViewportSplitRatio.Vertical;
+  }
 
-	MultipleViewportsAdapter.UpdateInput(
-		DeltaTime,
-		LocalMousePosition,
-		SettingsPanel->GetSettings().CameraSpeed,
-		SettingsPanel->GetSettings().MouseSensitivity);
-	// 겹친 창은 Hover 선택에서 제외하고 우클릭 Capture를 우선한다.
-	if (ViewportsPanel->IsHovered() || MultipleViewportsAdapter.GetCapturedViewIndex() != InvalidViewIndex)
-		MultipleViewportsAdapter.SetEditorViewIndex(MultipleViewportsAdapter.GetActiveViewIndex());
+  FRect ViewRects[4]{};
+  if (ViewportLayoutMode == ELayoutMode::Single) {
+    for (int32 i = 0; i < 4; ++i) {
+      ViewRects[i] = (i == SingleViewportIndex)
+                         ? FRect{0.0f, 0.0f, ViewportSize.X, ViewportSize.Y}
+                         : FRect{};
+    }
+  } else {
+    ComputeViewRects(ViewportSplitRatio, ViewportSize, ViewRects);
+  }
+
+  for (int32 i = 0; i < 4; ++i) {
+    const bool bSlotActive = (ViewportLayoutMode == ELayoutMode::Single)
+                                 ? (i == SingleViewportIndex)
+                                 : true;
+    ViewportsPanel->SetView(i, ViewRects[i], bSlotActive);
+  }
+
+  // 마우스 오버 감지
+  int32 HoveredViewIndex = -1;
+  if (ViewportsPanel->IsHovered()) {
+    for (int32 i = 0; i < 4; ++i) {
+      if (ViewRects[i].Width > 0.0f && ViewRects[i].Height > 0.0f &&
+          LocalMousePosition.X >= ViewRects[i].X &&
+          LocalMousePosition.X < ViewRects[i].X + ViewRects[i].Width &&
+          LocalMousePosition.Y >= ViewRects[i].Y &&
+          LocalMousePosition.Y < ViewRects[i].Y + ViewRects[i].Height) {
+        HoveredViewIndex = i;
+        break;
+      }
+    }
+  }
+
+  // 마우스 캡처 및 활성 뷰 결정
+  static int32 CapturedViewportIndex = -1;
+  if (FInputSystem::IsMouseReleased(EMouseButton::Right)) {
+    CapturedViewportIndex = -1;
+  }
+  if (FInputSystem::IsMousePressed(EMouseButton::Right) && HoveredViewIndex != -1) {
+    CapturedViewportIndex = HoveredViewIndex;
+  }
+  if (CapturedViewportIndex != -1) {
+    ViewportsPanel->SetActiveViewIndex(CapturedViewportIndex);
+  } else if (FInputSystem::IsMousePressed(EMouseButton::Left) && HoveredViewIndex != -1) {
+    ViewportsPanel->SetActiveViewIndex(HoveredViewIndex);
+  }
+
+  const int32 WheelDelta = FInputSystem::GetWheelDelta();
+  const float MoveSpeed = 10.0f * SettingsPanel->GetSettings().CameraSpeed;
+  const float MouseSens = 0.2f * SettingsPanel->GetSettings().MouseSensitivity;
+
+  // 뷰포트 입력 처리
+  for (int32 i = 0; i < 4; ++i) {
+    if (FEditorViewportClient *Client = ViewportsPanel->GetViewportClient(i)) {
+      if (Client->IsActive()) {
+        Client->TickInput(DeltaTime, i == CapturedViewportIndex, i == HoveredViewIndex, WheelDelta, MoveSpeed, MouseSens);
+      }
+    }
+  }
+
+  // 활성 뷰포트 시점 동기화
+  const int32 ActiveIndex = ViewportsPanel->GetActiveViewIndex();
+  if (FEditorViewportClient *ActiveClient = ViewportsPanel->GetViewportClient(ActiveIndex)) {
+    if (ACameraActor *MainCam = EditorWorld->GetMainCamera()) {
+      if (UCameraComponent *CamCom = MainCam->GetCameraComponent()) {
+        CamCom->SetRelativeLocation(ActiveClient->GetViewLocation());
+        CamCom->SetRelativeRotation(ActiveClient->GetViewRotation());
+        CamCom->SetFieldOfView(ActiveClient->GetViewFOV());
+        CamCom->SetOrthoWidth(ActiveClient->GetOrthoWidth());
+        CamCom->SetIsOrthogonal(!ActiveClient->IsPerspective());
+      }
+    }
+  }
 }
 
 // 월드를 한 번 Tick·Capture한 뒤 에디터와 피킹을 갱신한다.
-void UEditorEngine::TickWorld(const float DeltaTime)
-{
-	if (PlayWorld) // PIE모드 일대
-	{
-		{
-			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-			
-			PlayWorld->Tick(DeltaTime);
+void UEditorEngine::TickWorld(const float DeltaTime) {
+  if (PlayWorld) // PIE모드 일대
+  {
+    {
+      SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 
-			if (bIsStep) //딱 한프레임만 실행
-			{
-				PlayWorld->GetbIsTickEnable() = false;
-				bIsStep = false;
-			}
+      PlayWorld->Tick(DeltaTime);
 
-		}
-		{
-			SCOPE_CYCLE_COUNTER(STAT_EditorTick);
-			EditorUI->Tick(DeltaTime);
-		}
-		{
-			SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
-			MultipleViewportsAdapter.CaptureWorld(*PlayWorld);
-		}
-	}
-	else
-	{
+      if (bIsStep) // 딱 한프레임만 실행
+      {
+        PlayWorld->GetbIsTickEnable() = false;
+        bIsStep = false;
+      }
+    }
+    {
+      SCOPE_CYCLE_COUNTER(STAT_EditorTick);
+      EditorUI->Tick(DeltaTime);
+    }
+  } else {
 
-		{
-			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
+    {
+      SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 
-			EditorWorld->Tick(DeltaTime);
-		}
-		{
-			SCOPE_CYCLE_COUNTER(STAT_EditorTick);
-			EditorUI->Tick(DeltaTime);
-		}
-		{
-			SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
-			MultipleViewportsAdapter.CaptureWorld(*EditorWorld);
-		}
+      EditorWorld->Tick(DeltaTime);
+    }
+    {
+      SCOPE_CYCLE_COUNTER(STAT_EditorTick);
+      EditorUI->Tick(DeltaTime);
+    }
 
-
-		UpdateGizmoAndPicking();
-	}
+    UpdateGizmoAndPicking();
+  }
 }
 
-// 공유 월드 캡처로 활성 View별 렌더 큐를 만들고 렌더한다.
-void UEditorEngine::RenderMultipleViewports()
-{
-	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
-	{
-		const bool bActive = MultipleViewportsAdapter.IsViewActive(ViewIndex);
-		ViewportsPanel->SetView(ViewIndex, MultipleViewportsAdapter.GetViewRect(ViewIndex), bActive);
-		if (!bActive)
-			continue;
+// 뷰포트 클라이언트를 순회하며 씬 렌더러를 통해 렌더링한다
+void UEditorEngine::RenderMultipleViewports() {
+  for (int32 ViewIndex = 0; ViewIndex < AllViewportClients.Num(); ++ViewIndex) {
+    FEditorViewportClient *ViewClient = AllViewportClients[ViewIndex];
+    if (!ViewClient || !ViewClient->IsActive())
+      continue;
 
-		{
-			SCOPE_CYCLE_COUNTER(STAT_BuildRenderQueue);
-			MultipleViewportsAdapter.BuildRenderQueue(ViewIndex, RenderQueue);
-		}
+    const FRect &Rect = ViewClient->GetRect();
+    if (Rect.Width <= 0.0f || Rect.Height <= 0.0f)
+      continue;
 
-		const bool bIsPIE = PlayWorld == nullptr ? false : true;
+    // 뷰 사각형과 시점 정보 생성
+    const FViewRect CurrentViewRect{Rect.X, Rect.Y, Rect.Width, Rect.Height};
+    const FSceneView SceneView = ViewClient->CalcSceneView(CurrentViewRect);
 
-		RenderFrame(
-			ViewIndex,
-			ViewportsPanel->GetRenderingInfo(ViewIndex),
-			MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
-			RenderQueue, bIsPIE);
-	}
+    const bool bIsPIE = PlayWorld != nullptr;
+    UWorld *CurrentWorld = bIsPIE ? PlayWorld : EditorWorld;
 
-	EMultipleViewportsCameraPreset CameraPresets[4]{};
-	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
-		CameraPresets[ViewIndex] = MultipleViewportsAdapter.GetCameraPreset(ViewIndex);
-	ViewportsPanel->SetControlState(
-		MultipleViewportsAdapter.GetLayoutMode(),
-		MultipleViewportsAdapter.GetSingleViewIndex(),
-		CameraPresets);
+    // 씬 렌더러 생성
+    FSceneRenderer SceneRenderer(CurrentWorld, SceneView);
+    SceneRenderer.InitViews(Renderer);
+
+    // 프레임 렌더링
+    RenderFrame(ViewClient, SceneView, SceneRenderer, bIsPIE);
+  }
 }
 
 // 화면을 표시하고 UI 변경 후 View 설정을 보관한다.
-void UEditorEngine::EndFrame()
-{
-	PresentFrame();
-	// UI 변경 후 설정을 복사해 종료 시 카메라 수명에 의존하지 않는다.
-	SettingsPanel->CaptureViewportSettings();
-	// 프로파일러 반영
-	FStatRegistry::EndFrame();
+void UEditorEngine::EndFrame() {
+  PresentFrame();
+  // UI 변경 후 설정을 복사해 종료 시 카메라 수명에 의존하지 않는다.
+  SettingsPanel->CaptureViewportSettings();
+  // 프로파일러 반영
+  FStatRegistry::EndFrame();
 }
 
-// 입력 View의 Ray와 피킹으로 Gizmo·공유 선택을 갱신한다.
-void UEditorEngine::UpdateGizmoAndPicking()
-{
-	// Delete는 BeginFrame에서 한 번만 처리하고 여기서는 View 입력만 다룬다.
-	const int32 ViewIndex = MultipleViewportsAdapter.GetActiveViewIndex();
-	if (ViewIndex == InvalidViewIndex || !ViewportsPanel->IsHovered())
-		return;
+// 활성 뷰포트 클라이언트에 기즈모 및 피킹 처리를 위임한다
+void UEditorEngine::UpdateGizmoAndPicking() {
+  const int32 ViewIndex = ViewportsPanel->GetActiveViewIndex();
+  if (ViewIndex < 0 || ViewIndex >= 4 || !ViewportsPanel->IsHovered())
+    return;
 
-	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
-	FRay Ray{};
-	if (!MultipleViewportsAdapter.TryGetActiveViewRay(LocalMousePosition, Ray))
-		return;
+  FEditorViewportClient *ViewClient =
+      ViewportsPanel->GetViewportClient(ViewIndex);
+  if (!ViewClient || !ViewClient->IsActive())
+    return;
 
-	const FRect& Rect = MultipleViewportsAdapter.GetViewRect(ViewIndex);
-	const FVector2 ViewLocalMouse(
-		LocalMousePosition.X - Rect.X,
-		LocalMousePosition.Y - Rect.Y);
-	const FMatrix ViewProjection = MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex);
-	bool bMouseDown = FInputSystem::IsMouseDown(EMouseButton::Left);
-
-	Gizmo->Update(
-		Ray,
-		ViewLocalMouse,
-		ViewProjection,
-		static_cast<int>(Rect.Width),
-		static_cast<int>(Rect.Height),
-		bMouseDown,
-		MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
-		MultipleViewportsAdapter.IsOrthographic(ViewIndex));
-
-	if (FInputSystem::IsMousePressed(EMouseButton::Left) && !Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
-	{
-		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *EditorWorld);
-		MultipleViewportsAdapter.ApplyLastPickToOutliner(*OutlinerPanel);
-	}
-
+  const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
+  ViewClient->UpdateGizmoAndPicking(Gizmo.get(), LocalMousePosition, [this](AActor *SelectedActor) {
+    OutlinerPanel->SelectActor(SelectedActor);
+  });
 }
 
-// View 행렬로 Scene·Grid·Gizmo·텍스트·Outline을 렌더한다.
-void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue, const bool bIsPIE)
-{
-	RenderCommand::BeginRenderPass(ViewRenderingInfo);
-	
-	// 라인 배처 렌더링
-	if ((!bIsPIE || ViewIndex != 0) && SettingsPanel->GetSettings().bDrawBatchLine)
-	{
-		LineBatcher->BeginFrame();
+// 뷰포트 하나의 씬과 에디터 요소를 렌더링한다
+void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
+                                const FSceneView &SceneView,
+                                FSceneRenderer &SceneRenderer,
+                                const bool bIsPIE) {
+  const int32 ViewIndex = SceneView.ViewIndex;
+  FTexture2D *ColorTarget = ViewClient ? ViewClient->GetColorTarget() : nullptr;
+  FTexture2D *DepthTarget = ViewClient ? ViewClient->GetDepthTarget() : nullptr;
+  const uint32 Width = ViewClient
+                           ? ViewClient->GetWidth()
+                           : static_cast<uint32>(SceneView.ViewRect.Width);
+  const uint32 Height = ViewClient
+                            ? ViewClient->GetHeight()
+                            : static_cast<uint32>(SceneView.ViewRect.Height);
+  const FViewportSettings ViewportSetting{0, 0, Width, Height, 0.0f, 1.0f};
 
-		if (SettingsPanel->GetSettings().bDrawBoundingBox)
-		{
-			LineBatcher->BuildVertexBuffer();
-			EditorWorld->GetPathTracker().OnRender(LineBatcher.get());
-		}
+  RenderCommand::BeginRenderPass(ColorTarget, DepthTarget, Width, Height);
 
-		if (Gizmo->GetTarget())
-		{
-			if (ALightActor* LightActor = Cast<ALightActor>(Gizmo->GetTarget()->GetOwner()))
-			{
-				LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
-			}
-		}
+  // 라인 배처 렌더링
+  if ((!bIsPIE || ViewIndex != 0) &&
+      SettingsPanel->GetSettings().bDrawBatchLine) {
+    LineBatcher->BeginFrame();
 
-		LineBatcher->OnRender(ViewProjection);
-	}
+    if (SettingsPanel->GetSettings().bDrawBoundingBox) {
+      LineBatcher->BuildVertexBuffer();
+      EditorWorld->GetPathTracker().OnRender(LineBatcher.get());
+    }
 
-	const bool bDrawPrimitives = bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
+    if (Gizmo->GetTarget()) {
+      if (ALightActor *LightActor =
+              Cast<ALightActor>(Gizmo->GetTarget()->GetOwner())) {
+        LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
+      }
+    }
 
-	// 스카이박스 렌더링
-	SkyboxRenderer->OnRender(ViewProjection, ViewCameraLocation);
+    LineBatcher->OnRender(SceneView.ViewProjectionMatrix);
+  }
 
-	// 불투명 메시 렌더링
-	if (bDrawPrimitives)
-	{
-		Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
-		Renderer->RenderOpaque(ViewProjection);
-	}
+  const bool bDrawPrimitives =
+      bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
 
-	// 에디터 그리드 렌더링
-	if ((!bIsPIE || ViewIndex != 0) && SettingsPanel->GetSettings().bDrawBatchLine)
-	{
-		const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
+  // 스카이박스 렌더링
+  SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix,
+                           SceneView.ViewLocation);
 
-		if (SettingsPanel->GetSettings().bDrawPSGrid && !MultipleViewportsAdapter.IsOrthographic(ViewIndex))
-		{
-			GridRenderer->OnRenderPSGrid(
-				ViewProjection, ViewCameraLocation, SettingsPanel->GetSettings(), ViewRenderingInfo.ViewportSetting
-			);
-		}
-		else
-		{
-			GridRenderer->OnRenderBatchGrid(
-				ViewProjection,
-				ViewCameraLocation,
-				ViewCameraForward,
-				GridPlane,
-				static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
-				!MultipleViewportsAdapter.IsOrthographic(ViewIndex) ||
-				MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
-				ViewRenderingInfo.ViewportSetting
-			);
-		}
-	}
+  // 불투명 메시 렌더링
+  if (bDrawPrimitives) {
+    SceneRenderer.RenderOpaque(Renderer);
+  }
 
-	// 반투명 메시 렌더링
-	if (bDrawPrimitives)
-	{
-		Renderer->RenderTranslucent(ViewProjection);
-	}
+  // 에디터 그리드 렌더링
+  if ((!bIsPIE || ViewIndex != 0) &&
+      SettingsPanel->GetSettings().bDrawBatchLine) {
+    EGridPlane GridPlane = EGridPlane::XY;
+    if (ViewClient) {
+      switch (ViewClient->GetViewportType()) {
+      case ELevelViewportType::Top:
+      case ELevelViewportType::Bottom:
+        GridPlane = EGridPlane::XY;
+        break;
+      case ELevelViewportType::Front:
+      case ELevelViewportType::Back:
+        GridPlane = EGridPlane::YZ;
+        break;
+      case ELevelViewportType::Left:
+      case ELevelViewportType::Right:
+        GridPlane = EGridPlane::XZ;
+        break;
+      default:
+        GridPlane = EGridPlane::XY;
+        break;
+      }
+    }
 
-	// 텍스트 컴포넌트 렌더링
-	UWorld* TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
-	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent)
-	{
-		if (!TextComponent || !TextComponent->GetFont() || !TextComponent->IsVisible())
-		{
-			continue;
-		}
+    if (SettingsPanel->GetSettings().bDrawPSGrid && SceneView.bIsPerspective) {
+      GridRenderer->OnRenderPSGrid(
+          SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+          SettingsPanel->GetSettings(), ViewportSetting);
+    } else {
+      GridRenderer->OnRenderBatchGrid(
+          SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+          SceneView.ViewForward, GridPlane,
+          static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
+          SceneView.bIsPerspective, ViewportSetting);
+    }
+  }
 
-		if (TextComponent->GetOwner() && TextComponent->GetOwner()->GetWorld() != TargetWorld)
-		{
-			continue;
-		}
+  // 반투명 메시 렌더링
+  if (bDrawPrimitives) {
+    SceneRenderer.RenderTranslucent(Renderer);
+  }
 
-		TextRenderer->OnRender(
-			TextComponent->GetText(),
-			TextComponent->GetWorldMatrix(),
-			TextComponent->GetTextSize(),
-			*TextComponent->GetFont(),
-			ViewProjection
-		);
-	}
+  // 텍스트 컴포넌트 렌더링
+  UWorld *TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
+  for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent;
+       ++TextComponent) {
+    if (!TextComponent || !TextComponent->GetFont() ||
+        !TextComponent->IsVisible()) {
+      continue;
+    }
 
-	// 에디터 오버레이 렌더링
-	if (!bIsPIE || ViewIndex != 0)
-	{
-		if (Outline->GetTarget())
-		{
-			OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
-		}
+    if (TextComponent->GetOwner() &&
+        TextComponent->GetOwner()->GetWorld() != TargetWorld) {
+      continue;
+    }
 
-		if (Gizmo->GetTarget())
-		{
-			RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
-			GizmoRenderer->OnRender(
-				*Gizmo,
-				ViewProjection,
-				ViewCameraLocation,
-				MultipleViewportsAdapter.IsOrthographic(ViewIndex)
-			);
-		}
+    TextRenderer->OnRender(
+        TextComponent->GetText(), TextComponent->GetWorldMatrix(),
+        TextComponent->GetTextSize(), *TextComponent->GetFont(),
+        SceneView.ViewProjectionMatrix);
+  }
 
-		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
+  // 에디터 오버레이 렌더링
+  if (!bIsPIE || ViewIndex != 0) {
+    if (Outline->GetTarget()) {
+      OutlineRenderer->OnRender(*Outline, SceneView.ViewProjectionMatrix,
+                                ViewportSetting);
+    }
 
-		if (SettingsPanel->GetSettings().bShowUUID)
-		{
-			RenderActorUUIDs(ViewIndex, ViewProjection, ViewCameraLocation, ViewCameraForward);
-		}
-	}
+    if (Gizmo->GetTarget()) {
+      RenderCommand::ClearDepthStencil(DepthTarget);
+      GizmoRenderer->OnRender(*Gizmo, SceneView.ViewProjectionMatrix,
+                              SceneView.ViewLocation,
+                              !SceneView.bIsPerspective);
+    }
 
-	RenderCommand::EndRenderPass(ViewRenderingInfo);
+    RenderCommand::ClearDepthStencil(DepthTarget);
+
+    if (SettingsPanel->GetSettings().bShowUUID) {
+      RenderActorUUIDs(SceneView);
+    }
+  }
+
+  RenderCommand::EndRenderPass();
 }
 
+// View Texture가 포함된 UI를 Swapchain 백버퍼에 합성한다. Present는
+// FEngineLoop가 한다.
+void UEditorEngine::PresentFrame() {
+  // Swapchain 렌더링
+  RenderCommand::BeginRenderPass(MainWindowSC->GetBackbuffer(), nullptr,
+                                 MainWindow ? MainWindow->GetWidth() : 0,
+                                 MainWindow ? MainWindow->GetHeight() : 0);
 
+  {
+    SCOPE_CYCLE_COUNTER(STAT_ImGui);
 
-// View Texture가 포함된 UI를 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
-void UEditorEngine::PresentFrame()
-{
-	// Swapchain 렌더링
-	RenderCommand::BeginRenderPass(MainWindowSC->GetRenderingInfo());
+    ImGuiRenderer->Begin();
 
-	{
-		SCOPE_CYCLE_COUNTER(STAT_ImGui);
+    EditorUI->OnRender();
 
-		ImGuiRenderer->Begin();
+    ImGuiRenderer->End();
+  }
 
-		EditorUI->OnRender();
-
-		ImGuiRenderer->End();
-	}
-
-	RenderCommand::EndRenderPass(MainWindowSC->GetRenderingInfo());
+  RenderCommand::EndRenderPass();
 }
 
-// ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
-void UEditorEngine::PreExit()
-{
-	ImGuiRenderer->Shutdown();
+// 종료 전 정리
+void UEditorEngine::PreExit() {
+  if (SettingsPanel) {
+    SettingsPanel->CaptureViewportSettings();
+    SettingsPanel->SaveSettings();
+    SettingsPanel->SetViewportsPanel(nullptr);
+  }
+  if (EditorControlsPanel) {
+    EditorControlsPanel->SetViewportsPanel(nullptr);
+  }
+  ImGuiRenderer->Shutdown();
 }
 
 // 선택과 Gizmo 참조를 정리한 뒤 Actor를 삭제한다.
-void UEditorEngine::DeleteActor(AActor* Actor)
-{
-	if (!Actor)
-		return;
+void UEditorEngine::DeleteActor(AActor *Actor) {
+  if (!Actor)
+    return;
 
-	OutlinerPanel->SelectActor(nullptr);
-	
-	Actor->Destroy();
+  OutlinerPanel->SelectActor(nullptr);
+
+  Actor->Destroy();
 }
 
 // 씬 변경으로 무효화된 에디터의 선택 참조를 모두 해제한다.
-void UEditorEngine::ResetSceneSelection()
-{
-	Gizmo->SetTarget(nullptr);
-	Outline->SetTarget(nullptr);
-	DetailsPanel->SetTarget(nullptr);
-	OutlinerPanel->SelectActor(nullptr);
+void UEditorEngine::ResetSceneSelection() {
+  Gizmo->SetTarget(nullptr);
+  Outline->SetTarget(nullptr);
+  DetailsPanel->SetTarget(nullptr);
+  OutlinerPanel->SelectActor(nullptr);
 }
 
 // 새 씬 생성이 성공하면 에디터 선택 상태를 초기화한다.
-void UEditorEngine::CreateNewScene()
-{
-	if (!FEditorFileUtils::NewScene(EditorWorld))
-		return;
+void UEditorEngine::CreateNewScene() {
+  if (!FEditorFileUtils::NewScene(EditorWorld))
+    return;
 
-	ResetSceneSelection();
+  ResetSceneSelection();
 }
 
 // 씬 불러오기가 성공하면 에디터 선택 상태를 초기화한다.
-void UEditorEngine::OpenScene()
-{
-	if (!FEditorFileUtils::LoadScene(EditorWorld))
-		return;
+void UEditorEngine::OpenScene() {
+  if (!FEditorFileUtils::LoadScene(EditorWorld))
+    return;
 
-	ResetSceneSelection();
+  ResetSceneSelection();
 }
 
 // 공통 파일 유틸리티로 현재 씬을 저장한다.
-void UEditorEngine::SaveCurrentScene()
-{
-	FEditorFileUtils::SaveScene(EditorWorld);
+void UEditorEngine::SaveCurrentScene() {
+  FEditorFileUtils::SaveScene(EditorWorld);
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
-void UEditorEngine::SaveSceneAs()
-{
-	FEditorFileUtils::SaveSceneAs(EditorWorld);
+void UEditorEngine::SaveSceneAs() {
+  FEditorFileUtils::SaveSceneAs(EditorWorld);
 }
 
-void UEditorEngine::RenderActorUUIDs(int32 ViewIndex, const FMatrix& ViewProjection, const FVector& CameraLocation, const FVector& CameraForward)
-{
-	const bool bOrtho = MultipleViewportsAdapter.IsOrthographic(ViewIndex);
+void UEditorEngine::RenderActorUUIDs(const FSceneView &SceneView) {
+  const bool bOrtho = !SceneView.bIsPerspective;
+  UWorld *TargetWorld = PlayWorld ? PlayWorld : EditorWorld;
 
-	for (AActor* Actor : EditorWorld->GetPersistentLevel()->GetActors())
-	{
-		if (!Actor) continue;
-		UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Actor->GetRootComponent());
-		
-		if (!Primitive) continue;
-		
-		// 액터 머리 위 위치 계산
-		FBox Box = Primitive->CalcBounds();
-		FVector UUIDLocation(
-			(Box.Min.X + Box.Max.X) * 0.5f,
-			(Box.Min.Y + Box.Max.Y) * 0.5f,
-			Box.Max.Z + 0.5f
-		);
-		
-		FString Text = "UUID : " + std::to_string(Actor->GetUUID());
-		TextRenderer->BuildTextMesh(Text, 0.5f, *SystemFont);
-		// 빌보드로 렌더링
+  for (AActor *Actor : TargetWorld->GetPersistentLevel()->GetActors()) {
+    if (!Actor)
+      continue;
+    UPrimitiveComponent *Primitive =
+        Cast<UPrimitiveComponent>(Actor->GetRootComponent());
 
+    if (!Primitive)
+      continue;
 
-		FVector Facing = bOrtho
-			? (CameraForward * -1.0f)
-			: (CameraLocation - UUIDLocation).Normalized();
-		FVector Up = FVector(0.0f, 0.0f, 1.0f);
-		FVector Right = FVector::Cross(Up, Facing).Normalized();
-		FVector RealUp = FVector::Cross(Facing, Right).Normalized();
-		FMatrix BillboardWorld = FMatrix::Identity;
-		BillboardWorld.M[0][0] = Facing.X;  BillboardWorld.M[0][1] = Facing.Y;  BillboardWorld.M[0][2] = Facing.Z;
-		BillboardWorld.M[1][0] = Right.X;   BillboardWorld.M[1][1] = Right.Y;   BillboardWorld.M[1][2] = Right.Z;
-		BillboardWorld.M[2][0] = RealUp.X;  BillboardWorld.M[2][1] = RealUp.Y;  BillboardWorld.M[2][2] = RealUp.Z;
-		BillboardWorld.M[3][0] = UUIDLocation.X; BillboardWorld.M[3][1] = UUIDLocation.Y; BillboardWorld.M[3][2] = UUIDLocation.Z;
+    // 액터 머리 위 위치 계산
+    FBox Box = Primitive->CalcBounds();
+    FVector UUIDLocation((Box.Min.X + Box.Max.X) * 0.5f,
+                         (Box.Min.Y + Box.Max.Y) * 0.5f, Box.Max.Z + 0.5f);
 
-		TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
-	}
+    FString Text = "UUID : " + std::to_string(Actor->GetUUID());
+    TextRenderer->BuildTextMesh(Text, 0.5f, *SystemFont);
+    // 빌보드로 렌더링
+
+    FVector Facing = bOrtho ? (SceneView.ViewForward * -1.0f)
+                            : (SceneView.ViewLocation - UUIDLocation).Normalized();
+    FVector Up = FVector(0.0f, 0.0f, 1.0f);
+    FVector Right = FVector::Cross(Up, Facing).Normalized();
+    FVector RealUp = FVector::Cross(Facing, Right).Normalized();
+    FMatrix BillboardWorld = FMatrix::Identity;
+    BillboardWorld.M[0][0] = Facing.X;
+    BillboardWorld.M[0][1] = Facing.Y;
+    BillboardWorld.M[0][2] = Facing.Z;
+    BillboardWorld.M[1][0] = Right.X;
+    BillboardWorld.M[1][1] = Right.Y;
+    BillboardWorld.M[1][2] = Right.Z;
+    BillboardWorld.M[2][0] = RealUp.X;
+    BillboardWorld.M[2][1] = RealUp.Y;
+    BillboardWorld.M[2][2] = RealUp.Z;
+    BillboardWorld.M[3][0] = UUIDLocation.X;
+    BillboardWorld.M[3][1] = UUIDLocation.Y;
+    BillboardWorld.M[3][2] = UUIDLocation.Z;
+
+    TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont,
+                           SceneView.ViewProjectionMatrix);
+  }
 }

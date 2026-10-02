@@ -1,13 +1,11 @@
 #pragma once
 
 #include "RenderDevice.h"
-#include "RenderingInfo.h"
 
 class FWindow;
 
 class FSwapchain
 {
-public:
 public:
 	FSwapchain(FRenderDevice* InRenderDevice, FWindow* InWindow);
 	void CreateBackbuffer();
@@ -18,12 +16,10 @@ public:
 
 	void SwapBuffers(uint32 SyncInterval = 1, uint32 Flags = 0);
 
-	const FRenderingInfo& GetRenderingInfo() const { return RenderingInfo; }
+	FTexture2D* GetBackbuffer() const { return BackbufferTexture.get(); }
 	// Tearing을 허용하면 보더리스 창에서도 주사율 상한 없이 Present한다.
 	bool IsTearingAllowed() const { return bAllowTearing; }
 private:
-	void ValidateRenderingInfo();
-
 	FRenderDevice* RenderDevice;
 
 	bool bAllowTearing = false;
@@ -32,6 +28,4 @@ private:
 	ComPtr<IDXGISwapChain> Swapchain;
 
 	TUniquePtr<FTexture2D> BackbufferTexture;
-
-	FRenderingInfo RenderingInfo{};
 };

@@ -8,6 +8,8 @@
 #include "Editor/EditorUI/ImGuiRenderer.h"
 #include "Launch/LaunchEngineLoop.h"
 #include "Render/Renderer.h"
+#include "Render/RenderingInfo.h"
+#include "Render/SceneView.h"
 #include "Render/RenderCommand.h"
 
 #include "GameFramework/Actor/StaticMeshActor.h"
@@ -314,6 +316,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		SCOPE_CYCLE_COUNTER(STAT_GatherTotal);
 		RenderQueue.Reset();
 		EditorWorld->GatherRenderPackets(RenderQueue, &LODView, &Frustum, Renderer);
+		RenderQueue.Sort();
 	}
 
 	GetEngineLoop().BeginBackbufferPass();
@@ -322,18 +325,23 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	const FVector CameraLocation = Camera->GetWorldLocation();
 	const FVector CameraForward = Camera->GetTransform().GetForward();
 
+	FSceneView BenchmarkView;
+	BenchmarkView.ViewProjectionMatrix = ViewProjection;
+	BenchmarkView.ViewLocation = CameraLocation;
+	BenchmarkView.ViewForward = CameraForward;
+	BenchmarkView.bIsWireframe = false;
+
 	// 반투명이 Grid 위에 합성되도록 불투명 → Grid → 반투명 순서로 그린다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_RenderOpaqueTotal);
-		Renderer->RenderQueueSorting(RenderQueue, ViewProjection);
-		Renderer->RenderOpaque(ViewProjection);
+		Renderer->RenderOpaque(BenchmarkView, RenderQueue);
 	}
 
 	// Grid가 깊이를 쓰기 전, 불투명만 그려진 깊이 버퍼로 측정한다.
 	if (bMeasureOcclusionRequested)
 	{
 		bMeasureOcclusionRequested = false;
-		LastOcclusionMeasure = Renderer->MeasureOpaqueOcclusion(ViewProjection);
+		LastOcclusionMeasure = Renderer->MeasureOpaqueOcclusion(ViewProjection, RenderQueue);
 	}
 
 	GridRenderer->OnRenderBatchGrid(
@@ -349,7 +357,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		// Grid 파이프라인이 바꾼 상태를 장면 기준으로 되돌린다.
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		Renderer->RenderTranslucent(ViewProjection);
+		Renderer->RenderTranslucent(BenchmarkView, RenderQueue);
 
 		DrawSelectionBounds(ViewProjection);
 

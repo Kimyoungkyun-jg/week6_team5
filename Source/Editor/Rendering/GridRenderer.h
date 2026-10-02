@@ -2,6 +2,7 @@
 
 #include <d3d11.h>
 #include "Render/Renderer.h"
+#include "Render/RenderingInfo.h"
 #include "Render/PipelineState.h"
 
 struct FPSGridData

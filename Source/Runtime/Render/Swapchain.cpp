@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "Swapchain.h"
+#include "Texture2D.h"
 
 #include "Core/Window.h"
 
@@ -67,9 +68,6 @@ FSwapchain::FSwapchain(FRenderDevice* InRenderDevice, FWindow* InWindow)
 		HTR_LOG(Info, "Swapchain created. Tearing {}", bAllowTearing ? "allowed" : "not allowed");
 
 	CreateBackbuffer();
-
-
-	ValidateRenderingInfo();
 }
 
 void FSwapchain::CreateBackbuffer()
@@ -107,8 +105,6 @@ void FSwapchain::Resize(int32 InWidth, int32 InHeight)
 	Swapchain->GetDesc(&Desc);
 
 	CreateBackbuffer();
-
-	ValidateRenderingInfo();
 }
 
 void FSwapchain::SwapBuffers(uint32 SyncInterval, uint32 Flags)
@@ -120,14 +116,3 @@ void FSwapchain::SwapBuffers(uint32 SyncInterval, uint32 Flags)
 	Swapchain->Present(SyncInterval, Flags);
 }
 
-void FSwapchain::ValidateRenderingInfo()
-{
-	RenderingInfo.ColorRenderTargets.Reset();
-	RenderingInfo.ViewportSetting.Width = Desc.BufferDesc.Width;
-	RenderingInfo.ViewportSetting.Height = Desc.BufferDesc.Height;
-
-	FRenderingDesc Desc{};
-	Desc.Texture = BackbufferTexture.get();
-
-	RenderingInfo.ColorRenderTargets.Add(Desc);
-}

@@ -170,7 +170,6 @@ void UWorld::ClearWorld()
 void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* View, const FFrustumPlanes* Frustum, FRenderer* Renderer)
 {
 
-
 	// 멤버로 두어 매 프레임 용량을 재사용한다.
 	RenderStats.Reset();
 	VisibleProxies.Reset();
@@ -700,6 +699,15 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 				{
 					UStaticMeshComponent* srcSMC = Cast<UStaticMeshComponent>(SrcActor->Components[i]);
 					newSMC->SetStaticMesh(srcSMC->GetStaticMesh());
+					// 머티리얼 복제
+					const int32 NumMats = srcSMC->GetNumMaterials();
+					for (int32 MatIdx = 0; MatIdx < NumMats; ++MatIdx)
+					{
+						if (UMaterial* Mat = srcSMC->GetOverrideMaterial(MatIdx))
+						{
+							newSMC->SetMaterial(MatIdx, Mat);
+						}
+					}
 				}
 				else if (UTextRenderComponent* newTRC = Cast<UTextRenderComponent>(NewActor->Components[i]))
 				{

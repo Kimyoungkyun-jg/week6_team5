@@ -195,39 +195,30 @@ void RenderCommand::BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShad
 	BindShaderResource(Slot, Texture2D->GetResource(), FlagBits);
 }
 
-void RenderCommand::BeginRenderPass(const FRenderingInfo& RenderingInfo)
+
+
+// 텍스처 기반 렌더 패스 시작
+void RenderCommand::BeginRenderPass(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height)
 {
-	TArray<ID3D11RenderTargetView*> RTVs;
-	for (const FRenderingDesc& RenderTargetDesc : RenderingInfo.ColorRenderTargets)
+	ID3D11RenderTargetView* RTV = ColorTarget ? ColorTarget->GetRTV() : nullptr;
+	ID3D11DepthStencilView* DSV = DepthTarget ? DepthTarget->GetDSV() : nullptr;
+
+	if (RTV)
 	{
-		FClearValue ClearValue = RenderTargetDesc.ClearValue;
-		if (RenderTargetDesc.LoadOp == ERenderTargetLoadOp::Clear)
-		{
-			RenderDevice->GetContext()->ClearRenderTargetView(RenderTargetDesc.Texture->GetRTV(), &RenderTargetDesc.ClearValue.ColorClearValue.V[0]);
-		}
-		RTVs.Add(RenderTargetDesc.Texture->GetRTV());
+		float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+		RenderDevice->GetContext()->ClearRenderTargetView(RTV, ClearColor);
+	}
+	if (DSV)
+	{
+		RenderDevice->GetContext()->ClearDepthStencilView(DSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	}
 
-	ID3D11DepthStencilView* DSV = nullptr;
-	if (RenderingInfo.DepthStencil.Texture != nullptr)
-	{
-		FClearValue dsvClearValue = RenderingInfo.DepthStencil.ClearValue;
-		DSV = RenderingInfo.DepthStencil.Texture->GetDSV();
-		if (RenderingInfo.DepthStencil.LoadOp == ERenderTargetLoadOp::Clear)
-		{
-			RenderDevice->GetContext()->ClearDepthStencilView(RenderingInfo.DepthStencil.Texture->GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, dsvClearValue.DepthClearValue, dsvClearValue.StencilClearValue);
-		}
-	}
-	RenderDevice->GetContext()->OMSetRenderTargets((uint32)RTVs.Num(), RTVs.GetData(), DSV);
-
-
-	SetViewport(RenderingInfo.ViewportSetting.StartX,
-		RenderingInfo.ViewportSetting.StartY,
-		RenderingInfo.ViewportSetting.Width,
-		RenderingInfo.ViewportSetting.Height);
+	RenderDevice->GetContext()->OMSetRenderTargets(RTV ? 1 : 0, RTV ? &RTV : nullptr, DSV);
+	SetViewport(0, 0, Width, Height);
 }
 
-void RenderCommand::EndRenderPass(const FRenderingInfo& RenderingInfo)
+// 렌더 패스 종료
+void RenderCommand::EndRenderPass()
 {
 	RenderDevice->GetContext()->OMSetRenderTargets(0, nullptr, nullptr);
 }

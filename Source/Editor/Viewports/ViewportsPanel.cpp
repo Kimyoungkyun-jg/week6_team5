@@ -1,7 +1,5 @@
 #include "EnginePCH.h"
 #include "Editor/Viewports/ViewportsPanel.h"
-#include "Editor/LevelEditor/MultipleViewports/Adapter/MultipleViewportsAdapter.h"
-
 
 #include "Core/StatOverlay.h"
 #include "Core/Stats/LightweightStats.h"
@@ -14,11 +12,11 @@
 #include "Core/Stats/EditorStats.h"
 
 namespace {
+constexpr float SplitterThickness = 6.0f;
 constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
 constexpr ImU32 SplitterHoverColor = IM_COL32(255, 192, 0, 255);
-constexpr const char *CameraPresetLabels[] = {
-    "Perspective", "Ortho (Current)", "Top", "Bottom", "Front", "Back", "Left",
-    "Right"};
+constexpr const char *ViewportTypeLabels[] = {
+    "Perspective", "Top", "Bottom", "Front", "Back", "Left", "Right"};
 
 // Stat Overlay
 constexpr float StatOverlayMargin = 8.0f;
@@ -30,9 +28,20 @@ constexpr ImU32 ValueColor = IM_COL32(235, 235, 235, 255);
 
 // 네 View의 렌더 타깃을 최소 크기로 초기화한다.
 bool FViewportsPanel::Init() {
-  for (FViewSlot &Slot : Slots)
-    ResizeSlot(Slot, 1, 1);
-  return true;
+    
+    for (int32 i = 0; i < 4; ++i) {
+        ViewportClients[i] = MakeUnique<FEditorViewportClient>();
+        ViewportClients[i]->SetViewIndex(i);
+        ViewportClients[i]->Resize(1, 1);
+    }
+
+    // 초기 시점 설정
+    ViewportClients[0]->SetViewportType(ELevelViewportType::Perspective);
+    ViewportClients[1]->SetViewportType(ELevelViewportType::Top);
+    ViewportClients[2]->SetViewportType(ELevelViewportType::Front);
+    ViewportClients[3]->SetViewportType(ELevelViewportType::Left);
+
+    return true;
 }
 
 // 패널의 프레임 갱신 인터페이스이며 별도 계산은 하지 않는다.
@@ -42,23 +51,20 @@ void FViewportsPanel::Tick(float DeltaTime) { (void)DeltaTime; }
 void FViewportsPanel::SetView(const int32 ViewIndex, const FRect &Rect,
                               const bool bActive) {
   assert(ViewIndex >= 0 && ViewIndex < 4);
-  FViewSlot &Slot = Slots[ViewIndex];
-  Slot.Rect = Rect;
-  Slot.bActive = bActive && Rect.Width > 0.0f && Rect.Height > 0.0f;
-  if (!Slot.bActive)
+  FEditorViewportClient *Client = ViewportClients[ViewIndex].get();
+  if (!Client)
+    return;
+
+  Client->SetRect(Rect);
+  const bool bSlotActive = bActive && Rect.Width > 0.0f && Rect.Height > 0.0f;
+  Client->SetActive(bSlotActive);
+  if (!bSlotActive)
     return;
 
   const uint32 Width = static_cast<uint32>(std::max(1.0f, Rect.Width));
   const uint32 Height = static_cast<uint32>(std::max(1.0f, Rect.Height));
-  if (Width != Slot.Width || Height != Slot.Height)
-    ResizeSlot(Slot, Width, Height);
-}
-
-// 인덱스를 검사해 해당 View의 렌더 정보를 반환한다.
-const FRenderingInfo &
-FViewportsPanel::GetRenderingInfo(const int32 ViewIndex) const {
-  assert(ViewIndex >= 0 && ViewIndex < 4);
-  return Slots[ViewIndex].RenderingInfo;
+  if (Width != Client->GetWidth() || Height != Client->GetHeight())
+    Client->Resize(Width, Height);
 }
 
 // 마우스 위치에서 패널 원점을 빼 로컬 좌표로 바꾼다.
@@ -94,16 +100,6 @@ float FViewportsPanel::ConsumeVerticalDrag() {
   return Result;
 }
 
-// Layout·Single 대상·Preset을 UI 표시와 동기화한다.
-void FViewportsPanel::SetControlState(
-    const ELayoutMode LayoutMode, const int32 SingleViewIndex,
-    const EMultipleViewportsCameraPreset CameraPresets[4]) {
-  CurrentLayoutMode = LayoutMode;
-  CurrentSingleViewIndex = SingleViewIndex;
-  for (int32 Index = 0; Index < 4; ++Index)
-    CurrentCameraPresets[Index] = CameraPresets[Index];
-}
-
 // 대기 Layout 요청을 한 번 반환하고 플래그를 지운다.
 bool FViewportsPanel::ConsumeLayoutRequest(ELayoutMode &OutMode,
                                            int32 &OutSingleViewIndex) {
@@ -111,18 +107,9 @@ bool FViewportsPanel::ConsumeLayoutRequest(ELayoutMode &OutMode,
     return false;
   OutMode = RequestedLayoutMode;
   OutSingleViewIndex = RequestedSingleViewIndex;
+  CurrentLayoutMode = RequestedLayoutMode;
+  CurrentSingleViewIndex = RequestedSingleViewIndex;
   bHasLayoutRequest = false;
-  return true;
-}
-
-// 대기 Preset 요청을 한 번 반환하고 지운다.
-bool FViewportsPanel::ConsumeCameraPresetRequest(
-    int32 &OutViewIndex, EMultipleViewportsCameraPreset &OutPreset) {
-  if (PendingCameraPresetViewIndex == InvalidViewIndex)
-    return false;
-  OutViewIndex = PendingCameraPresetViewIndex;
-  OutPreset = PendingCameraPreset;
-  PendingCameraPresetViewIndex = InvalidViewIndex;
   return true;
 }
 
@@ -150,24 +137,28 @@ void FViewportsPanel::OnRender() {
       ContentOrigin,
       {ContentOrigin.x + ContentSize.x, ContentOrigin.y + ContentSize.y}, true);
   for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex) {
-    const FViewSlot &Slot = Slots[ViewIndex];
-    if (!Slot.bActive || !Slot.ColorTarget)
+    FEditorViewportClient *Client = ViewportClients[ViewIndex].get();
+    if (!Client || !Client->IsActive() || !Client->GetColorTarget())
       continue;
 
-    const ImVec2 ViewMin{ContentOrigin.x + Slot.Rect.X,
-                         ContentOrigin.y + Slot.Rect.Y};
-    const ImVec2 ViewMax{ViewMin.x + Slot.Rect.Width,
-                         ViewMin.y + Slot.Rect.Height};
-    DrawList->AddImage(Slot.ColorTarget->GetSRV(), ViewMin, ViewMax);
+    const FRect &Rect = Client->GetRect();
+    const ImVec2 ViewMin{ContentOrigin.x + Rect.X,
+                         ContentOrigin.y + Rect.Y};
+    const ImVec2 ViewMax{ViewMin.x + Rect.Width,
+                         ViewMin.y + Rect.Height};
+    DrawList->AddImage(Client->GetColorTarget()->GetSRV(), ViewMin, ViewMax);
   }
   DrawList->PopClipRect();
 
-  if (Slots[1].bActive || Slots[2].bActive || Slots[3].bActive) {
-    // View Rect 사이에 비워 둔 gutter의 중앙에 Splitter 버튼을 배치한다.
+  if (CurrentLayoutMode == ELayoutMode::QuadSplit && ViewportClients[0] && ViewportClients[1] && ViewportClients[2]) {
+    const FRect &Rect0 = ViewportClients[0]->GetRect();
+    const FRect &Rect1 = ViewportClients[1]->GetRect();
+    const FRect &Rect2 = ViewportClients[2]->GetRect();
+    // 분할선 배치 계산
     const float SplitX =
-        (Slots[0].Rect.X + Slots[0].Rect.Width + Slots[1].Rect.X) * 0.5f;
+        (Rect0.X + Rect0.Width + Rect1.X) * 0.5f;
     const float SplitY =
-        (Slots[0].Rect.Y + Slots[0].Rect.Height + Slots[2].Rect.Y) * 0.5f;
+        (Rect0.Y + Rect0.Height + Rect2.Y) * 0.5f;
 
     const ImVec2 VerticalMin{
         ContentOrigin.x + SplitX - SplitterThickness * 0.5f, ContentOrigin.y};
@@ -226,30 +217,29 @@ void FViewportsPanel::OnRender() {
   }
 
   for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex) {
-    if (!Slots[ViewIndex].bActive)
+    FEditorViewportClient *Client = ViewportClients[ViewIndex].get();
+    if (!Client || !Client->IsActive())
       continue;
+    const FRect &Rect = Client->GetRect();
     ImGui::SetCursorScreenPos(
-        {ContentOrigin.x + Slots[ViewIndex].Rect.X + 8.0f,
-         ContentOrigin.y + Slots[ViewIndex].Rect.Y + 8.0f});
+        {ContentOrigin.x + Rect.X + 8.0f,
+         ContentOrigin.y + Rect.Y + 8.0f});
     ImGui::PushID(100 + ViewIndex);
-    int SelectedPreset = static_cast<int>(CurrentCameraPresets[ViewIndex]);
+    int SelectedType = static_cast<int>(Client->GetViewportType());
     ImGui::SetNextItemWidth(120.0f);
-    if (ImGui::Combo("##CameraPreset", &SelectedPreset, CameraPresetLabels,
-                     IM_ARRAYSIZE(CameraPresetLabels))) {
-      PendingCameraPresetViewIndex = ViewIndex;
-      PendingCameraPreset =
-          static_cast<EMultipleViewportsCameraPreset>(SelectedPreset);
+    if (ImGui::Combo("##ViewportType", &SelectedType, ViewportTypeLabels,
+                     IM_ARRAYSIZE(ViewportTypeLabels))) {
+      Client->SetViewportType(static_cast<ELevelViewportType>(SelectedType));
     }
     ImGui::SameLine();
-    // 레이아웃과 독립적으로 각 View의 장면 Fill Mode를 편집한다.
-    if (ViewportAdapter) {
-      int Mode = ViewportAdapter->IsViewWireframe(ViewIndex) ? 1 : 0;
-      const char *Labels[] = {"Solid", "Wireframe"};
-      ImGui::SetNextItemWidth(100.0f);
-      if (ImGui::Combo("##FillMode", &Mode, Labels, 2))
-        ViewportAdapter->SetViewWireframe(ViewIndex, Mode == 1);
-      ImGui::SameLine();
+    // 장면 채우기 모드 설정
+    int Mode = Client->IsWireframe() ? 1 : 0;
+    const char *Labels[] = {"Solid", "Wireframe"};
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::Combo("##FillMode", &Mode, Labels, 2)) {
+      Client->SetWireframe(Mode == 1);
     }
+    ImGui::SameLine();
     if (CurrentLayoutMode == ELayoutMode::QuadSplit) {
       if (ImGui::SmallButton("Single")) {
         RequestedLayoutMode = ELayoutMode::Single;
@@ -262,7 +252,7 @@ void FViewportsPanel::OnRender() {
       RequestedSingleViewIndex = ViewIndex;
       bHasLayoutRequest = true;
     }
-    if (ViewportAdapter && ViewIndex == ViewportAdapter->GetEditorViewIndex() &&
+    if (ViewIndex == ActiveViewIndex &&
         FStatOverlay::IsAnyEnabled() &&
         (FStatOverlay::IsEnabled(EStatFlags::Profile) ||
          FStatRegistry::Find(EditorStats::STAT_PickingTime))) {
@@ -470,12 +460,13 @@ void FViewportsPanel::OnRender() {
 
   // 마지막으로 선택된 뷰포트만 오버레이
   for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex) {
-    if (ViewIndex != ViewportAdapter->GetEditorViewIndex())
+    if (ViewIndex != ActiveViewIndex)
       continue;
-    if (!Slots[ViewIndex].bActive)
+    FEditorViewportClient *Client = ViewportClients[ViewIndex].get();
+    if (!Client || !Client->IsActive())
       continue;
-    DrawStatOverlay(DrawList, {ContentOrigin.x + Slots[ViewIndex].Rect.X,
-                               ContentOrigin.y + Slots[ViewIndex].Rect.Y});
+    DrawStatOverlay(DrawList, {ContentOrigin.x + Client->GetRect().X,
+                               ContentOrigin.y + Client->GetRect().Y});
   }
 
   ImGui::End();
@@ -621,33 +612,4 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList *DrawList,
                         Text.c_str());
     }
   }
-}
-
-// View 크기에 맞춰 Color·Depth Texture와 렌더 정보를 재생성한다.
-void FViewportsPanel::ResizeSlot(FViewSlot &Slot, const uint32 Width,
-                                 const uint32 Height) {
-  D3D11_TEXTURE2D_DESC Desc{};
-  Desc.Width = Width;
-  Desc.Height = Height;
-  Desc.MipLevels = 1;
-  Desc.ArraySize = 1;
-  Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-  Desc.SampleDesc.Count = 1;
-  Desc.Usage = D3D11_USAGE_DEFAULT;
-  Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-  Slot.ColorTarget = RenderCommand::CreateTexture2D(Desc);
-
-  Desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-  Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-  Slot.DepthTarget = RenderCommand::CreateTexture2D(Desc);
-
-  Slot.Width = Width;
-  Slot.Height = Height;
-  Slot.RenderingInfo.ColorRenderTargets.Reset();
-  Slot.RenderingInfo.ViewportSetting.Width = Width;
-  Slot.RenderingInfo.ViewportSetting.Height = Height;
-  FRenderingDesc ColorDesc{};
-  ColorDesc.Texture = Slot.ColorTarget.get();
-  Slot.RenderingInfo.ColorRenderTargets.Add(ColorDesc);
-  Slot.RenderingInfo.DepthStencil.Texture = Slot.DepthTarget.get();
 }

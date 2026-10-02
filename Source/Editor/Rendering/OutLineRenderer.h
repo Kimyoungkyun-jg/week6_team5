@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Render/Renderer.h"
+#include "Render/RenderingInfo.h"
 #include "Render/PipelineState.h"
 #include "Editor/Rendering/Outline.h"
 

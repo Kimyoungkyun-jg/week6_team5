@@ -6,6 +6,7 @@
 #include "Launch/LaunchEngineLoop.h"
 #include "Input/InputSystem.h"
 #include "Render/Renderer.h"
+#include "Render/SceneView.h"
 
 #include <commdlg.h>
 #include <filesystem>
@@ -163,9 +164,16 @@ void UObjViewerEngine::RenderFrame()
 
 	FRenderQueue RenderQueue;
 	BuildRenderQueue(RenderQueue);
+	RenderQueue.Sort();
+
+	FSceneView SceneView;
+	SceneView.ViewMatrix = View;
+	SceneView.ProjectionMatrix = Projection;
+	SceneView.ViewProjectionMatrix = View * Projection;
+	SceneView.ViewLocation = GetCameraEye();
 
 	GetEngineLoop().BeginBackbufferPass();
-	GetEngineLoop().GetRenderer()->RenderAll(RenderQueue, View * Projection);
+	GetEngineLoop().GetRenderer()->RenderAll(SceneView, RenderQueue);
 	GetEngineLoop().EndBackbufferPass();
 }
 

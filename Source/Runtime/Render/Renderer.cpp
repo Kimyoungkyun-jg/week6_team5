@@ -18,7 +18,6 @@
 #include <bit>
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
-DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
 DECLARE_CYCLE_STAT("Upload Per-Object CB", STAT_UploadPerObjectCB);
 
 namespace
@@ -33,19 +32,6 @@ namespace
 	{
 		if (Packet.Proxy) return Packet.Proxy->GetLocalToWorld();
 		return Packet.Model ? *Packet.Model : FMatrix::Identity;
-	}
-
-	uint64 MakeSortKey(const FRenderPacket& Packet)
-	{
-		if (Packet.Material->PSOType != EPSOType::StaticMesh_Opaque)
-		{
-			const uint32 DistanceBits = std::bit_cast<uint32>(Packet.CameraToParticleDistance);
-			return (1ull << 63) | static_cast<uint64>(~DistanceBits);
-		}
-
-		return (static_cast<uint64>(Packet.Material->SortID) << 47)
-			| (static_cast<uint64>(Packet.Mesh->SortID) << 31)
-			| (static_cast<uint64>(Packet.LODIndex & 0x3) << 29);
 	}
 
 	// 불투명 패킷과 같은 규칙의 키 (묶음은 전부 불투명)
@@ -90,11 +76,11 @@ void FRenderer::EnsurePerObjectSlotCapacity(uint32 SlotCount)
 }
 
 // 원래 패킷 순서로 World 행렬을 올린다. 정렬 목록은 원래 패킷 번호의 칸을 바인딩한다.
-void FRenderer::UploadPerObjectConstants()
+void FRenderer::UploadPerObjectConstants(const FRenderQueue& InQueue)
 {
 	SCOPE_CYCLE_COUNTER(STAT_UploadPerObjectCB);
 
-	const uint32 Count = static_cast<uint32>(RenderPackets.size());
+	const uint32 Count = static_cast<uint32>(InQueue.Num());
 	if (!bUsePerObjectSlots || Count == 0)
 		return;
 
@@ -115,49 +101,54 @@ void FRenderer::UploadPerObjectConstants()
 	// 매핑된 메모리는 write-combined라 순차 쓰기만 하고 읽지 않는다.
 	for (uint32 Index = 0; Index < Count; ++Index)
 	{
-		FRenderPacket& P = RenderPackets[Index];
+		const FRenderPacket& P = InQueue[Index];
 		const FMatrix& Model = GetPacketWorld(P);
 		std::memcpy(Dest + static_cast<size_t>(Index) * ObjectSlotBytes, &Model, sizeof(FMatrix));
-		P.Slot = Index;
 	}
 
 	RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
-// 카메라의 ViewProjection을 공통 렌더 경로로 전달한다.
-void FRenderer::RenderAll(FRenderQueue& InQueue, UCameraComponent* CameraComponent)
+// 시점 상수 버퍼 및 렌더링 상태 설정
+void FRenderer::SetupView(const FSceneView& View)
 {
-	RenderAll(InQueue, CameraComponent->GetViewProjectionMatrix());
+	bCurrentWireframe = View.bIsWireframe;
+	RenderCommand::UpdateBufferData(ViewCB.get(), &View.ViewProjectionMatrix);
 }
 
-// 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
-void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection)
+// 전체 렌더 큐 렌더링
+void FRenderer::RenderAll(const FSceneView& View, const FRenderQueue& InQueue)
 {
-	RenderQueueSorting(InQueue, ViewProjection);
-	RenderOpaque(ViewProjection);
-	RenderTranslucent(ViewProjection);
+	RenderOpaque(View, InQueue);
+	RenderTranslucent(View, InQueue);
 }
 
-void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
+// 불투명 요소 렌더링
+void FRenderer::RenderOpaque(const FSceneView& View, const FRenderQueue& InQueue)
 {
+	SetupView(View);
 	DrawStaticGroups();
-	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
+	DrawPackets(InQueue, 0, InQueue.GetFirstTranslucentIndex(), View.ViewProjectionMatrix);
 }
 
-// RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.
-void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
+// 반투명 요소 렌더링
+void FRenderer::RenderTranslucent(const FSceneView& View, const FRenderQueue& InQueue)
 {
-	DrawPackets(FirstTranslucentIndex, SortEntries.Num(), ViewProjection);
-	RenderPackets.Reset();
-	FirstTranslucentIndex = 0;
-	StaticGroups.clear();   // 묶음 메모리는 World 것이므로 이번 프레임이 끝나면 놓는다
+	SetupView(View);
+	DrawPackets(InQueue, InQueue.GetFirstTranslucentIndex(), InQueue.Num(), View.ViewProjectionMatrix);
+	StaticGroups.clear();
 }
 
-// 스태틱 메시 묶음을 정렬 키 순서로 그린다. 바인딩은 묶음마다 한 번, 항목마다는 칸 바인딩과 드로우만 한다.
+// 스태틱 메시 묶음을 그린다
 void FRenderer::DrawStaticGroups()
 {
 	if (StaticGroups.empty())
 		return;
+
+	// 스태틱 메시 묶음 정렬
+	std::erase_if(StaticGroups, [](const FStaticDrawGroup* Group) { return Group->Items.empty(); });
+	std::sort(StaticGroups.begin(), StaticGroups.end(),
+		[](const FStaticDrawGroup* A, const FStaticDrawGroup* B) { return MakeGroupKey(*A) < MakeGroupKey(*B); });
 
 	SCOPE_CYCLE_COUNTER(STAT_DrawRenderPackets);
 	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
@@ -169,8 +160,8 @@ void FRenderer::DrawStaticGroups()
 		if (Group->Material != BoundMaterial)
 		{
 			BoundMaterial = Group->Material;
-			BindMaterial(BoundMaterial);
-			FRenderPacket MaterialOnly;           // 머티리얼 파라미터 갱신은 패킷을 받으므로 머티리얼만 채워 넘긴다
+			BindMaterial(BoundMaterial, bCurrentWireframe);
+			FRenderPacket MaterialOnly;
 			MaterialOnly.Material = BoundMaterial;
 			UpdateMaterialParams(MaterialOnly);
 		}
@@ -190,52 +181,12 @@ void FRenderer::DrawStaticGroups()
 		}
 	}
 
-	// 뒤따르는 DrawPackets가 처음부터 다시 바인딩하도록 기록을 비운다.
 	LastMesh = nullptr;
 	LastMaterial = nullptr;
 }
 
-void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewProjection)
-{
-	RenderCommand::UpdateBufferData(ViewCB.get(), &ViewProjection);
-	{
-		SCOPE_CYCLE_COUNTER(STAT_RenderQueueSorting);
-
-		std::swap(RenderPackets, InQueue);
-		InQueue.Reset();
-
-		// ① 패킷을 한 번 훑으며 키를 만든다. 그릴 수 없는 패킷은 목록에 넣지 않는다.
-		SortEntries.Reset();
-		SortEntries.Reserve(RenderPackets.Num());
-		for (uint32 i = 0; i < RenderPackets.Num(); ++i)
-		{
-			const FRenderPacket& P = RenderPackets[i];
-			if (!P.Mesh || !P.Material) continue;
-			SortEntries.Add({ MakeSortKey(P), i });
-		}
-
-		// ② 16B 항목만 정렬
-		std::sort(SortEntries.begin(), SortEntries.end(),
-			[](const FSortEntry& A, const FSortEntry& B) { return A.Key < B.Key; });
-
-		// ③ 반투명 시작 위치 = 최상위 비트가 처음 1인 곳
-		FirstTranslucentIndex = 0;
-		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
-			++FirstTranslucentIndex;
-
-		// ④ 스태틱 메시 묶음: 빈 묶음을 빼고 키 순으로 정렬한다. 조각마다 같은 키 묶음이 있으므로 정렬하면 서로 붙는다.
-		std::erase_if(StaticGroups, [](const FStaticDrawGroup* Group) { return Group->Items.empty(); });
-		std::sort(StaticGroups.begin(), StaticGroups.end(),
-			[](const FStaticDrawGroup* A, const FStaticDrawGroup* B) { return MakeGroupKey(*A) < MakeGroupKey(*B); });
-	}
-	// Gather uploads group and packet slots together. Other queues need an upload here.
-	if (!bObjectConstantsPrepared)
-		UploadPerObjectConstants();
-	bObjectConstantsPrepared = false;
-}
-
-// 정렬된 패킷 중 [Begin, End) 범위를 View 행렬과 Section 범위로 그린다.
-void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProjection)
+// 정렬된 패킷 중 [Begin, End) 범위를 그린다
+void FRenderer::DrawPackets(const FRenderQueue& InQueue, uint32 Begin, uint32 End, const FMatrix& ViewProjection)
 {
 	SCOPE_CYCLE_COUNTER(STAT_DrawRenderPackets);
 
@@ -245,17 +196,14 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 
 	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
 
-
-	for (uint32 k = Begin; k < End; ++k)          // k = 정렬된 위치
+	for (uint32 k = Begin; k < End; ++k)
 	{
-		const uint32 PacketIndex = SortEntries[k].PacketIndex;
-		const FRenderPacket& RenderPacket = RenderPackets[PacketIndex];
-		//if (RenderPacket.Mesh == nullptr || RenderPacket.Material == nullptr) continue;
+		const FRenderPacket& RenderPacket = InQueue[k];
 		if (RenderPacket.Mesh != LastMesh || RenderPacket.LODIndex != LastLODIndex) {
 			RenderCommand::BindMesh(RenderPacket.Mesh, RenderPacket.LODIndex);
 		}
 		if (RenderPacket.Material != LastMaterial) {
-			BindMaterial(RenderPacket.Material);
+			BindMaterial(RenderPacket.Material, bCurrentWireframe);
 		}
 		if (RenderPacket.Material != LastMaterial || RenderPacket.MaterialParamData)
 			UpdateMaterialParams(RenderPacket);
@@ -279,7 +227,7 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 	}
 }
 
-FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewProjection)
+FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewProjection, const FRenderQueue& InQueue)
 {
 	FOcclusionMeasureResult Result;
 
@@ -302,9 +250,9 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 		for (const FStaticDrawItem& Item : Group->Items)
 			Draws.push_back({ Group->Mesh, Group->Material, Group->LODIndex, Item.Slot, Item.StartIndex, Item.IndexCount,
 				&Item.Proxy->GetLocalToWorld(), Item.Proxy, Item.bOccludedByGpu != 0, nullptr });
-	for (uint32 k = 0; k < FirstTranslucentIndex; ++k)
+	for (uint32 k = 0; k < InQueue.GetFirstTranslucentIndex(); ++k)
 	{
-		const FRenderPacket& Packet = RenderPackets[SortEntries[k].PacketIndex];
+		const FRenderPacket& Packet = InQueue[k];
 		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Packet.Mesh->GetIndexBuffer(Packet.LODIndex)->GetIndexCount();
 		// 프록시가 없는 패킷(빌보드 등)은 패킷 자체를 한 물체로 센다.
 		const void* Key = Packet.Proxy ? static_cast<const void*>(Packet.Proxy) : static_cast<const void*>(&Packet);
@@ -450,17 +398,23 @@ void FRenderer::EndObjectConstants()
 	}
 }
 
-// Material마다 Shader/Texture/Sampler/State 꽂기
-void FRenderer::BindMaterial(UMaterial* material)
+// 머티리얼 파이프라인 상태 및 텍스처 바인딩
+void FRenderer::BindMaterial(UMaterial* material, bool bInWireframe)
 {
-	if (FPipelineState* PSO = FRenderResourceManager::GetPSO(material->PSOType))
+	EPSOType PSOType = material->PSOType;
+	if (bInWireframe && PSOType == EPSOType::StaticMesh_Opaque)
+	{
+		PSOType = EPSOType::StaticMesh_Wireframe;
+	}
+
+	if (FPipelineState* PSO = FRenderResourceManager::GetPSO(PSOType))
 	{
 		RenderCommand::BindPipelineState(*PSO);
 	}
-	// 텍스처와 샘플러만 바인딩
-	for (int i = 0; i < material->Textures.size(); i++)
+	// 텍스처와 샘플러 바인딩
+	for (size_t i = 0; i < material->Textures.size(); i++)
 	{
-		RenderCommand::BindShaderResource(i, material->Textures[i], EShaderBindFlagBits::Pixel);
+		RenderCommand::BindShaderResource(static_cast<uint32>(i), material->Textures[i], EShaderBindFlagBits::Pixel);
 	}
 	RenderCommand::BindSamplerState(0, material->SamplerState, EShaderBindFlagBits::Pixel);
 }

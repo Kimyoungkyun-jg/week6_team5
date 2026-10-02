@@ -66,6 +66,11 @@ private:
 	FSwapchain* MainWindowSC = nullptr;
 	FRenderer* Renderer = nullptr;
 
+	TMap<UObject*, UObject*> OriginNewAnnotataion;
+	TMap<ULevel*,json> LeveljsonMap;
+	TMap<AActor*, json> ActorjsonMap;
+	TMap<UActorComponent*, json> ActorCompjsonMap;
+
 	TUniquePtr<FEditorUI> EditorUI;
 
 	TUniquePtr<FImGuiRenderer> ImGuiRenderer;
@@ -91,10 +96,17 @@ private:
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 
+	UWorld* EditorWorld;
+
 	void ResetSceneSelection();
 
 	void CreateNewScene();
 	void OpenScene();
 	void SaveCurrentScene();
 	void SaveSceneAs();
+
+	void CreatePIESession();
+	void StopPIESession();
+	void ResetPIEWorld();
+	UWorld* CreatePIEWorld();
 };

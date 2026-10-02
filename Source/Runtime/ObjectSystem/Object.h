@@ -96,6 +96,8 @@ public:
 
 	virtual void Serialize(json& Handle, bool bIsLoading);
 
+
+
 	void* operator new(uint64 Size)
 	{
 		void* Ptr = malloc(Size);

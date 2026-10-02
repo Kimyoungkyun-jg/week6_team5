@@ -79,6 +79,8 @@ bool UEditorEngine::Init()
 	EditorUI->SetOpenSceneCallback([this]() { OpenScene(); });
 	EditorUI->SetSaveSceneCallback([this]() { SaveCurrentScene(); });
 	EditorUI->SetSaveSceneAsCallback([this]() { SaveSceneAs(); });
+	EditorUI->SetCreatePIECallback([this]() { CreatePIESession(); });
+	EditorUI->SetStopPIECallback([this]() { StopPIESession(); });
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
@@ -586,4 +588,127 @@ void UEditorEngine::SaveCurrentScene()
 void UEditorEngine::SaveSceneAs()
 {
 	FEditorFileUtils::SaveSceneAs(World);
+}
+
+
+
+void UEditorEngine::CreatePIESession()
+{
+	ResetSceneSelection();
+	EditorWorld = World;
+	UWorld* CurrentWorld = CreatePIEWorld();
+	World = CurrentWorld;
+}
+
+void UEditorEngine::StopPIESession()
+{
+	ResetSceneSelection();
+	World = EditorWorld;
+}
+void UEditorEngine::ResetPIEWorld()
+{
+
+}
+
+UWorld* UEditorEngine::CreatePIEWorld()
+{
+	json WorldData;
+	UWorld* CurrentWorld = World;
+	UWorld* NewWorld = FObjectFactory::ConstructObject<UWorld>();
+	World->Serialize(WorldData, false);
+	NewWorld->Serialize(WorldData, true);
+	OriginNewAnnotataion.Reset();
+	OriginNewAnnotataion.Add(CurrentWorld, NewWorld);
+
+	for (int i = 0; i < World->GetLevel().Num();i++)
+	{
+		json LevelData;
+		World->GetLevel()[i]->Serialize(LevelData, false);
+		ULevel* NewLevel = Cast<ULevel>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetClass(), NewWorld));
+		NewLevel->Serialize(LevelData, true);
+		OriginNewAnnotataion.Add(World->GetLevel()[i], NewLevel);
+		for (int j = 0;j < World->GetLevel()[i]->GetActors().Num();j++)
+		{
+			json ActorData;
+			World->GetLevel()[i]->GetActors()[j]->Serialize(ActorData, false);
+			AActor* NewActor = Cast<AActor>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetActors()[j]->GetClass(), NewLevel));
+			NewActor->Serialize(ActorData, true);
+			OriginNewAnnotataion.Add(World->GetLevel()[i]->GetActors()[j], NewActor);
+			for (int k = 0;k < World->GetLevel()[i]->GetActors()[j]->GetComponents().Num();k++)
+			{
+				json ActorCompData;
+				UActorComponent* OriginalComp = World->GetLevel()[i]->GetActors()[j]->GetComponents()[k];
+				OriginalComp->Serialize(ActorCompData, false);
+				UActorComponent* NewActorComp = nullptr;
+				for (UActorComponent* DupComponents : NewActor->GetComponents())
+				{
+					if (DupComponents && DupComponents->GetFName() == OriginalComp->GetFName() && DupComponents->GetClass() == OriginalComp->GetClass())
+					{
+						NewActorComp = DupComponents;
+						break;
+					}
+				}
+				if (NewActorComp == nullptr)
+				{
+					NewActorComp = Cast<UActorComponent>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetActors()[j]->GetComponents()[k]->GetClass(), NewActor));
+					NewActor->AddComponents(NewActorComp);
+				}
+				NewActorComp->Serialize(ActorCompData, true);
+				OriginNewAnnotataion.Add(World->GetLevel()[i]->GetActors()[j]->GetComponents()[k], NewActorComp);
+			}
+		}
+	}
+
+	for (auto pair : OriginNewAnnotataion)
+	{
+		if (pair.second->IsA(ULevel::StaticClass()))
+		{
+			ULevel* OriginalLevel = Cast<ULevel>(pair.first);
+			ULevel* NewLevel = Cast<ULevel>(pair.second);
+			NewLevel->SetWorld(NewWorld);
+			NewWorld->AddLevel(NewLevel);
+		}
+		if (pair.second->IsA(AActor::StaticClass()))
+		{
+			AActor* OriginalActor = Cast<AActor>(pair.first);
+			AActor* NewActor = Cast<AActor>(pair.second);
+			NewActor->SetWorld(NewWorld);
+			NewActor->SetLevel(Cast<ULevel>(OriginNewAnnotataion[OriginalActor->GetLevel()]));
+			NewActor->GetLevel()->AddActor(NewActor);
+			USceneComponent* OriginalRoot = OriginalActor->GetRootComponent();
+			if (OriginalRoot == nullptr)
+			{
+				NewActor->SetRootComponent(nullptr);
+			}
+			else
+			{
+				NewActor->SetRootComponent(
+					Cast<USceneComponent>(OriginNewAnnotataion[OriginalRoot]));
+			}
+		}
+		if (pair.second->IsA(UActorComponent::StaticClass()))
+		{
+			UActorComponent* OriginalActorComp = Cast<UActorComponent>(pair.first);
+			UActorComponent* NewActorComp = Cast<UActorComponent>(pair.second);
+			NewActorComp->SetOwner(Cast<AActor>(OriginNewAnnotataion[OriginalActorComp->GetOwner()]));
+			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(NewActorComp))
+			{
+				NewWorld->GetScene().AddPrimitive(Primitive);
+			}
+			USceneComponent* SceneOrigin = Cast<USceneComponent>(OriginalActorComp);
+			USceneComponent* Scene = Cast<USceneComponent>(NewActorComp);
+			if (SceneOrigin != nullptr && Scene != nullptr)
+			{
+				if (SceneOrigin->GetAttachParent() == nullptr)
+				{
+					Scene->SetupAttachment(nullptr);
+				}
+				else Scene->SetupAttachment(Cast<USceneComponent>(OriginNewAnnotataion[SceneOrigin->GetAttachParent()]));
+			}
+		}
+	}
+	NewWorld->SetCurrentLevel(Cast<ULevel>(OriginNewAnnotataion[CurrentWorld->GetCurrentLevel()]));
+	NewWorld->SetPersistentLevel(Cast<ULevel>(OriginNewAnnotataion[CurrentWorld->GetPersistentLevel()]));
+	NewWorld->SetWorldType(PIE);
+	return NewWorld;
 }

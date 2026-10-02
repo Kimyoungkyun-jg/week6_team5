@@ -32,7 +32,13 @@ struct FRenderStats
 	void Reset() { *this = FRenderStats(); }
 };
 
-
+enum EWorldType
+{
+	Editor,
+	EditorPreview,
+	PIE,
+	Game
+};
 
 class UWorld : public UObject
 {
@@ -66,6 +72,8 @@ public:
 
 	// Level
 	ULevel* GetPersistentLevel() const { return PersistentLevel; }
+	TArray<ULevel*> GetLevel()  { return Levels; }
+	void AddLevel(ULevel* InLevel) { Levels.Add(InLevel); }
 	void SetPersistentLevel(ULevel* InLevel) { PersistentLevel = InLevel; }
 
 	ULevel* GetCurrentLevel() const { return CurrentLevel; }
@@ -90,6 +98,10 @@ public:
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
+
+	const EWorldType GetWorldType() const { return WorldType; }
+	void SetWorldType(EWorldType worldtype) { WorldType = worldtype; }
+
 private:
 	struct alignas(64) FGatherChunk
 	{
@@ -126,4 +138,6 @@ private:
     TArray<uint8> SelectedLODs;
 
 	FRenderStats RenderStats;
+
+	EWorldType WorldType;
 };

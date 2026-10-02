@@ -684,7 +684,7 @@ void UWorld::EndPlay()
 	bBegunPlay = false;
 }
 
-UWorld* UWorld::DuplicateWorld(UWorld* SourceWorld, UWorld* DestinationWorld = nullptr)
+UWorld* UWorld::DuplicateWorld(UWorld* SourceWorld, UWorld* DestinationWorld)
 {
 	if (!SourceWorld)
 		return nullptr;

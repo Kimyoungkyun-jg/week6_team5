@@ -22,6 +22,7 @@ void FEditorUI::Tick(float DeltaTime)
 void FEditorUI::OnRender()
 {
 	DrawMainMenuBar();
+	DrawMainToolBar();
 
 	if (bUseDockSpace)
 	{
@@ -39,8 +40,10 @@ void FEditorUI::OnRender()
 		if (optFullscreen)
 		{
 			const ImGuiViewport* viewport = ImGui::GetMainViewport();
-			ImGui::SetNextWindowPos(viewport->WorkPos);
-			ImGui::SetNextWindowSize(viewport->WorkSize);
+			const float ToolbarHeight = 40.0f;
+
+			ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + ToolbarHeight));
+			ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - ToolbarHeight));
 			ImGui::SetNextWindowViewport(viewport->ID);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -142,5 +145,51 @@ void FEditorUI::DrawMainMenuBar()
 
 		ImGui::EndMainMenuBar();
 	}
+	ImGui::PopStyleVar(2);
+}
+
+// 툴바를 그린다. Play, Pause, Stop 요청을 애플리케이션 콜백으로 호출한다.
+void FEditorUI::DrawMainToolBar()
+{
+	const ImGuiViewport* viewport = ImGui::GetMainViewport();
+	const float ToolbarHeight = 36.0f;
+
+	ImGui::SetNextWindowPos(viewport->WorkPos);
+	ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, ToolbarHeight));
+	ImGui::SetNextWindowViewport(viewport->ID);
+
+	ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoDocking;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+
+	if(ImGui::Begin("Toolbar", nullptr, flags))
+	{
+		const float ButtonWidth = 50.0f;
+		const float Spacing = ImGui::GetStyle().ItemSpacing.x;
+		const float TotalWidth = ButtonWidth * 3.0f + Spacing * 2.0f;
+
+		if (ImGui::Button("Play", ImVec2(ButtonWidth, 24.0f)))
+		{
+			if (PlayCallback) PlayCallback();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Pause", ImVec2(ButtonWidth, 24.0f)))
+		{
+			if (PauseCallback) PauseCallback();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Stop", ImVec2(ButtonWidth, 24.0f)))
+		{
+			if (StopCallback) StopCallback();
+		}
+		ImGui::End();
+	}
+
 	ImGui::PopStyleVar(2);
 }

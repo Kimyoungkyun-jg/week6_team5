@@ -79,6 +79,8 @@ bool UEditorEngine::Init()
 	EditorUI->SetOpenSceneCallback([this]() { OpenScene(); });
 	EditorUI->SetSaveSceneCallback([this]() { SaveCurrentScene(); });
 	EditorUI->SetSaveSceneAsCallback([this]() { SaveSceneAs(); });
+	EditorUI->SetPlayCallback([this]() { StartPIE(); });
+	EditorUI->SetStopCallback([this]() { EndPIE(); });
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
@@ -165,8 +167,6 @@ bool UEditorEngine::Init()
 	EditorControlsPanel->SetWorld(World);
 	EditorControlsPanel->SetGizmo(Gizmo.get());
 	EditorControlsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
-	EditorControlsPanel->SetPlayCallback([this]() { StartPIE(); });
-	EditorControlsPanel->SetStopCallback([this]() { EndPIE(); });
 
 	SettingsPanel->SetWorld(World);
 	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
@@ -602,8 +602,8 @@ void UEditorEngine::StartPIE()
 	if (!PIEWorldContext.World)
 		return;
 
-	FJsonArchive::SaveWorld(EditorContext->World, "Intermediate/PIE.scene");
-	FJsonArchive::LoadWorld(PIEWorldContext.World, "Intermediate/PIE.scene");
+	UWorld::DuplicateWorld(EditorContext->World, PIEWorldContext.World);
+
 	World = PIEWorldContext.World;
 	if (!World)
 		return;

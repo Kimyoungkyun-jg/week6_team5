@@ -43,17 +43,6 @@ void FEditorControlsPanel::OnRender()
 	ImGui::Begin("Editor Controls");
 	ImGui::Spacing();
 
-	if (ImGui::Button("Play"))
-	{
-		if (PlayCallback)
-			PlayCallback();
-	}
-	if(ImGui::Button("Stop"))
-	{
-		if (StopCallback)
-			StopCallback();
-	}
-
 	char FpsText[64];
 	std::snprintf(FpsText, sizeof(FpsText), "FPS %.1f   %.1f ms", 1.0f / DeltaTime, DeltaTime * 1000.0f);
 	float TextWidth = ImGui::CalcTextSize(FpsText).x;

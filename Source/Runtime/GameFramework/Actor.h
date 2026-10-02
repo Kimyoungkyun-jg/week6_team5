@@ -61,6 +61,7 @@ public:
 	// UE와 같이 기본값은 bCanEverTick = false. 생성자에서 Target = this
 	FActorTickFunction PrimaryActorTick;
 
+	virtual void DuplicateSubobjects(UObject* SourceObject) override;
 protected:
 	//TSet<TObjectPtr<UActorComponent>> OwnedComponents;
 	TArray<UActorComponent*> Components;

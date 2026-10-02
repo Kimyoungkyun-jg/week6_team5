@@ -111,7 +111,7 @@ bool UBenchmarkEngine::Init()
 	if (__argc > 1 && __argv[1] && __argv[1][0] != '\0')
 		ScenePath = __argv[1];
 	// 카메라 위치·회전·FOV·클립은 씬 파일의 PerspectiveCamera에서 읽는다.
-	if (!FJsonArchive::LoadWorld(World, ScenePath))
+	if (!FJsonArchive::LoadWorld(WorldEditor, ScenePath))
 		HTR_LOG(Warning, "Failed to load scene: {}", ScenePath);
 
 	InitEditorTools();
@@ -128,7 +128,7 @@ void UBenchmarkEngine::InitEditorTools()
 	GridRenderer->Init(Renderer);
 
 	LineBatcher = MakeUnique<FLineBatcher>();
-	LineBatcher->Init(Renderer, World);
+	LineBatcher->Init(Renderer, WorldEditor);
 
 	Gizmo = MakeUnique<FGizmo>();
 	GizmoRenderer = MakeUnique<FGizmoRenderer>();
@@ -146,26 +146,26 @@ void UBenchmarkEngine::InitEditorTools()
 	EditorUI->SetOpenSceneCallback([this]()
 		{
 			OutlinerPanel->SelectActor(nullptr);
-			FEditorFileUtils::LoadScene(World);
+			FEditorFileUtils::LoadScene(WorldEditor);
 		});
 	EditorUI->SetNewSceneCallback([this]()
 		{
 			OutlinerPanel->SelectActor(nullptr);
-			FEditorFileUtils::NewScene(World);
+			FEditorFileUtils::NewScene(WorldEditor);
 		});
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
 
 	DetailsPanel = EditorUI->AddEditorPanel<FDetailsPanel>();
-	DetailsPanel->SetWorld(World);
+	DetailsPanel->SetWorld(WorldEditor);
 
 	EditorControlsPanel = EditorUI->AddEditorPanel<FEditorControlsPanel>();
-	EditorControlsPanel->SetWorld(World);
+	EditorControlsPanel->SetWorld(WorldEditor);
 	EditorControlsPanel->SetGizmo(Gizmo.get());
 
 	OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
-	OutlinerPanel->SetWorld(World);
+	OutlinerPanel->SetWorld(WorldEditor);
 	OutlinerPanel->SetSelectionCallback(
 		[this](UPrimitiveComponent* Primitive) { SelectPrimitive(Primitive); });
 	OutlinerPanel->SetDeleteActorCallback(
@@ -174,7 +174,7 @@ void UBenchmarkEngine::InitEditorTools()
 			// 선택된 물체를 지우면 선택 표시(UUID·박스)가 해제된 포인터를 읽지 않도록 먼저 비운다.
 			if (UPrimitiveComponent* Selected = GetSelectedPrimitive(); Selected && Selected->GetOwner() == Actor)
 				SelectPrimitive(nullptr);
-			World->DestroyActor(Actor);
+			WorldEditor->DestroyActor(Actor);
 		});
 
 	HTR_LOG(Info, "Benchmark editor tools ready.");
@@ -234,7 +234,7 @@ void UBenchmarkEngine::UpdateGizmoAndPicking()
 	if (Width == 0 || Height == 0)
 		return;
 
-	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
+	UCameraComponent* Camera = WorldEditor->GetMainCamera()->GetCameraComponent();
 
 	const FVector2 MousePosition(
 		static_cast<float>(FInputSystem::GetMouseX()),
@@ -259,7 +259,7 @@ void UBenchmarkEngine::UpdateGizmoAndPicking()
 	{
 
 		FHitResult Hit;
-		SelectPrimitive(World->LineTraceSingle(Ray, Hit) ? Hit.HitComponent : nullptr);
+		SelectPrimitive(WorldEditor->LineTraceSingle(Ray, Hit) ? Hit.HitComponent : nullptr);
 	}
 }
 
@@ -272,13 +272,13 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	if (Width == 0 || Height == 0)
 		return;
 
-	UCameraComponent* Camera = World->GetMainCamera()->GetCameraComponent();
+	UCameraComponent* Camera = WorldEditor->GetMainCamera()->GetCameraComponent();
 	Camera->SetAspectRatio(static_cast<float>(Width) / Height);
 
-	// 기즈모 조작 결과가 같은 프레임의 UpdateAllTransforms에 반영되도록 World Tick보다 앞에 둔다.
+	// 기즈모 조작 결과가 같은 프레임의 UpdateAllTransforms에 반영되도록 WorldEditor Tick보다 앞에 둔다.
 	UpdateGizmoAndPicking();
 
-	World->Tick(DeltaTime);
+	WorldEditor->Tick(DeltaTime);
 
 	EditorControlsPanel->DeltaTime = DeltaTime;
 	EditorUI->Tick(DeltaTime);
@@ -311,7 +311,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		// 프러스텀 컬링 + GPU 오클루전 + Gather 전체
 		SCOPE_CYCLE_COUNTER(STAT_GatherTotal);
 		RenderQueue.Reset();
-		World->GatherRenderPackets(RenderQueue, &LODView, &Frustum, Renderer);
+		WorldEditor->GatherRenderPackets(RenderQueue, &LODView, &Frustum, Renderer);
 	}
 
 	GetEngineLoop().BeginBackbufferPass();
@@ -406,7 +406,7 @@ void UBenchmarkEngine::DrawProfileOverlay()
 		ImGui::Text("FPS: %.1f (%.2f ms)", Stats.AverageFPS, Stats.AverageFrameMs);
 		ImGui::Text("Frame Time: %.2f ms", Stats.AverageFrameMs);
 
-		const FRenderStats& RS = World->GetRenderStats();
+		const FRenderStats& RS = WorldEditor->GetRenderStats();
 		ImGui::Text("Primitives: %u / %u visible", RS.VisiblePrimitives, RS.TotalPrimitives);
 		ImGui::Text("Draw Calls: %u", RS.DrawCalls);
 		ImGui::Text("Triangles: %.2f M", RS.Triangles / 1'000'000.0);

@@ -120,7 +120,7 @@ bool UEditorEngine::Init()
 	TextRenderer->Init();
 
 	// 투영 행렬 생성 
-	MultipleViewportsAdapter.InitializeFromWorld(*World);
+	MultipleViewportsAdapter.InitializeFromWorld(*WorldEditor);
 	// 화면 나눔 비율 설정 가져오기
 	MultipleViewportsAdapter.SetSplitRatio({
 		SettingsPanel->GetSettings().MultipleViewportsHorizontal,
@@ -133,14 +133,14 @@ bool UEditorEngine::Init()
 		SettingsPanel->GetSettings().bMultipleViewportsSingle
 		? ELayoutMode::Single
 		: ELayoutMode::QuadSplit);
-	World->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
+	WorldEditor->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
 
 	/// 삭제 예정
 	//SceneManager = EditorUI->AddEditorPanel<FSceneManager>();
 	//SceneManager->SetWorld(World);
 
 	OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
-	OutlinerPanel->SetWorld(World);
+	OutlinerPanel->SetWorld(WorldEditor);
 	OutlinerPanel->SetSelectionCallback(
 		[this](UPrimitiveComponent* Primitive)
 		{
@@ -158,15 +158,15 @@ bool UEditorEngine::Init()
 	);
 
 	LineBatcher = MakeUnique<FLineBatcher>();
-	LineBatcher->Init(Renderer, World);
+	LineBatcher->Init(Renderer, WorldEditor);
 
-	DetailsPanel->SetWorld(World);
+	DetailsPanel->SetWorld(WorldEditor);
 
-	EditorControlsPanel->SetWorld(World);
+	EditorControlsPanel->SetWorld(WorldEditor);
 	EditorControlsPanel->SetGizmo(Gizmo.get());
 	EditorControlsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 
-	SettingsPanel->SetWorld(World);
+	SettingsPanel->SetWorld(WorldEditor);
 	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 	ViewportsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 
@@ -254,7 +254,7 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-		World->Tick(DeltaTime);
+		WorldEditor->Tick(DeltaTime);
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
@@ -262,7 +262,7 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
-		MultipleViewportsAdapter.CaptureWorld(*World);
+		MultipleViewportsAdapter.CaptureWorld(*WorldEditor);
 	}
 	UpdateGizmoAndPicking();
 }
@@ -342,7 +342,7 @@ void UEditorEngine::UpdateGizmoAndPicking()
 
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) && !Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
-		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *World);
+		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *WorldEditor);
 		MultipleViewportsAdapter.ApplyLastPickToOutliner(*OutlinerPanel);
 	}
 
@@ -361,7 +361,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		if (SettingsPanel->GetSettings().bDrawBoundingBox)
 		{
 			LineBatcher->BuildVertexBuffer();
-			World->GetPathTracker().OnRender(LineBatcher.get());
+			WorldEditor->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
 		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
@@ -474,7 +474,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
-		for (AActor* Actor : World->GetPersistentLevel()->GetActors())
+		for (AActor* Actor : WorldEditor->GetPersistentLevel()->GetActors())
 		{
 			if (!Actor)
 				continue;
@@ -561,7 +561,7 @@ void UEditorEngine::ResetSceneSelection()
 // 새 씬 생성이 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::CreateNewScene()
 {
-	if (!FEditorFileUtils::NewScene(World))
+	if (!FEditorFileUtils::NewScene(WorldEditor))
 		return;
 
 	ResetSceneSelection();
@@ -570,7 +570,7 @@ void UEditorEngine::CreateNewScene()
 // 씬 불러오기가 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::OpenScene()
 {
-	if (!FEditorFileUtils::LoadScene(World))
+	if (!FEditorFileUtils::LoadScene(WorldEditor))
 		return;
 
 	ResetSceneSelection();
@@ -579,11 +579,11 @@ void UEditorEngine::OpenScene()
 // 공통 파일 유틸리티로 현재 씬을 저장한다.
 void UEditorEngine::SaveCurrentScene()
 {
-	FEditorFileUtils::SaveScene(World);
+	FEditorFileUtils::SaveScene(WorldEditor);
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
 void UEditorEngine::SaveSceneAs()
 {
-	FEditorFileUtils::SaveSceneAs(World);
+	FEditorFileUtils::SaveSceneAs(WorldEditor);
 }

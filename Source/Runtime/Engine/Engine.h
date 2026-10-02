@@ -1,14 +1,8 @@
 #pragma once
 
+#include "Engine/World.h"
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Class.h"
-
-#include "Engine/World.h"
-
-enum class EWorldType
-{
-
-};
 
 class FEngineLoop;
 
@@ -42,14 +36,16 @@ public:
 	virtual void Tick(float DeltaTime) = 0;
 	virtual void OnResize(uint32 Width, uint32 Height) {}
 	// UObject 일괄 정리와 GPU 자원 해제 전에 호출된다.
-	virtual void PreExit() {};
+	virtual void PreExit() {}
 
-	UWorld* GetWorld() const { return World; }
+	UWorld* GetWorldEditor() const { return WorldEditor; }
+	UWorld* GetWorldPIE() const { return WorldPIE; }
 
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
-	UWorld* World = nullptr;
+	UWorld* WorldEditor = nullptr;
+	UWorld* WorldPIE = nullptr;
 private:
 	FEngineLoop* EngineLoop = nullptr;
 };

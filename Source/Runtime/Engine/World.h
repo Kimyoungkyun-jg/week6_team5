@@ -32,7 +32,11 @@ struct FRenderStats
 	void Reset() { *this = FRenderStats(); }
 };
 
-
+enum class EWorldType
+{
+	WorldEditor,
+	WorldPIE
+};
 
 class UWorld : public UObject
 {
@@ -42,7 +46,7 @@ public:
 	UWorld() = default;
 	virtual ~UWorld();
 
-	bool Init();
+	bool Init(EWorldType InputWorldType);
 	/*UPrimitiveComponent* SpawnPrimitive(FClass* Class);*/
 	AActor* SpawnActor(UClass* Class, FName InName = NAME_None, const FTransform* Transform = nullptr);
 
@@ -101,7 +105,7 @@ private:
 		uint32 LODCounts[4] = {};
 		uint64 LODTriangles[4] = {};
 	};
-
+	
 	TArray<FGatherChunk> GatherChunks;
 
 	// 등록된 Tick 함수만 실행한다. Actor보다 먼저 사라져도 남은 함수와의 연결을 스스로 끊는다.
@@ -113,6 +117,8 @@ private:
 	ACameraActor* MainCamera = nullptr;
 
 	FPathTracker PathTracker;
+
+	EWorldType WorldType;
 
 	ULevel* PersistentLevel = nullptr;
 	ULevel* CurrentLevel = nullptr;

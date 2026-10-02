@@ -40,8 +40,11 @@ UWorld::~UWorld()
 
 }
 
-bool  UWorld::Init()
+bool UWorld::Init(EWorldType InputWorldType)
 {
+	WorldType = InputWorldType;
+
+
 	// Spawn Actor로 카메라 생성하고 세팅하기
 	PersistentLevel = FObjectFactory::ConstructObject<ULevel>();
 

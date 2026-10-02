@@ -468,36 +468,38 @@ void FRenderer::BindMaterial(UMaterial* material)
 // b1 내용 채우고 꽂기
 void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 {
-	switch (RenderPacket.Material->ParamLayout)
-	{
-	case EMaterialParamLayout::StaticMesh:
-	{
-		break; // 라이팅 적용 시 제거
 
+	if (!RenderPacket.Material || !RenderPacket.Material->ParamBuffer)
+	{
+		return;
+	}
+
+	switch (RenderPacket.Material->PSOType)
+	{
+	case EPSOType::StaticMesh_Opaque:
+	case EPSOType::StaticMesh_Translucent:
+	case EPSOType::StaticMesh_Wireframe:
+	{
 		const float TotalTime = EngineTimer::GetTotalTime();
-
 		FStaticMeshMaterialParams Params{};
 		Params.BaseColor = RenderPacket.Material->BaseColor;
 		Params.UVOffset = RenderPacket.Material->UVScrollSpeed * TotalTime;
-		Params.bOpaque = (RenderPacket.Material->PSOType == EPSOType::StaticMesh_Opaque) ? 1.0f : 0.0f;
-
 		RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), &Params, sizeof(FStaticMeshMaterialParams));
 		RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
 		break;
 	}
-	case EMaterialParamLayout::ParticleSubUV:
+	case EPSOType::Particle_AlphaBlend:
+	case EPSOType::Particle_Additive:
 	{
-		if (RenderPacket.Material->ParamBuffer && RenderPacket.MaterialParamData != nullptr)
+		if (RenderPacket.MaterialParamData != nullptr)
 		{
 			RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), RenderPacket.MaterialParamData, RenderPacket.MaterialParamDataSize);
 			RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
 		}
 		break;
 	}
-	case EMaterialParamLayout::None:
-	{
+	default:
 		break;
-	}
 	}
 }
 

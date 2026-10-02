@@ -18,9 +18,9 @@ cbuffer MaterialParams : register(b1)
 
 struct VS_INPUT
 {
-    float3 p : POSITION; // Input position from vertex buffer
+    float3 p : POSITION;
     float3 n : NORMAL;
-    float4 c : COLOR; // Input color from vertex buffer
+    float4 c : COLOR;
     float2 t : TEXCOORD;
 };
 
@@ -35,7 +35,6 @@ struct PS_INPUT
 Texture2D g_txColor : register(t0);
 SamplerState g_Sample : register(s0);
 
-// 임시 하드코딩 Directional Light. 빛이 "향하는" 방향이다.
 static const float3 LightDir = normalize(float3(0.5f, 0.5f, -1.0f));
 static const float3 LightColor = float3(0.5f, 0.5f, 0.5f);
 static const float3 AmbientColor = float3(0.5f, 0.5f, 0.5f);
@@ -44,11 +43,10 @@ PS_INPUT mainVS(VS_INPUT input)
 {
     PS_INPUT output;
 
-    output.position = mul(mul(float4(input.p, 1.0f),World), VP);
-    // w=0으로 이동 성분을 빼고 월드 공간으로 보낸다. 비균등 스케일이면 역전치가 필요하다.
-    // output.normal = mul(float4(input.n, 0.0f), World).xyz;
+    output.position = mul(mul(float4(input.p, 1.0f), World), VP);
     output.color = input.c;
     output.uv = input.t;
+    output.normal = input.n;
     return output;
 }
 
@@ -58,11 +56,9 @@ float4 mainPS(PS_INPUT input) : SV_TARGET
     float4 texColor = g_txColor.Sample(g_Sample, input.uv + UVOffset);
     float4 albedo = texColor * BaseColor;
 
-    // 보간되면 길이가 틀어지므로 다시 정규화한다
     float3 N = normalize(input.normal);
     float NdotL = saturate(dot(N, -LightDir));
     float3 lighting = AmbientColor + LightColor * NdotL;
 
-
-    return float4(albedo.rgb * lighting, 1.0f);
+    return float4(albedo.rgb * lighting, albedo.a);
 }

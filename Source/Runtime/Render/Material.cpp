@@ -30,7 +30,6 @@ UMaterial* UMaterial::CreateInstance(const UMaterial* Source)
 
 	UMaterial* Instance = FObjectFactory::ConstructObject<UMaterial>();
 
-	Instance->ParamLayout = Source->ParamLayout;
 	Instance->Textures = Source->Textures;
 	Instance->BaseColor = Source->BaseColor;
 	Instance->UVScrollSpeed = Source->UVScrollSpeed;

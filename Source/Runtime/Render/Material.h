@@ -6,21 +6,11 @@
 
 class FShader;
 
-
-
-enum class EMaterialParamLayout
-{
-	None,
-	StaticMesh,
-	ParticleSubUV
-};
-
 struct FStaticMeshMaterialParams
 {
 	FVector4 BaseColor;
 	FVector2 UVOffset;
-	float bOpaque; // 1이면 PS가 알파를 1로 출력한다
-	float Padding;
+	FVector2 Padding;
 };
 
 class UMaterial : public UMaterialInterface
@@ -30,8 +20,6 @@ class UMaterial : public UMaterialInterface
 public:
 	UMaterial() :SortID(NextSortID++) {};
 	virtual ~UMaterial() override = default;
-
-	EMaterialParamLayout ParamLayout = EMaterialParamLayout::None;
 
 	TArray<UTexture2D*> Textures;
 	ESamplerState SamplerState = ESamplerState::LinearClamp;

@@ -280,7 +280,6 @@ void UAssetManager::CreateDefaultMaterial()
 	DefaultMat->PSOType = EPSOType::StaticMesh_Opaque;
 	DefaultMat->Textures.Add(GetAssetByPath<UTexture2D>("WhiteTexture"));
 
-	DefaultMat->ParamLayout = EMaterialParamLayout::StaticMesh;
 	DefaultMat->ParamBuffer = RenderCommand::CreateConstantBuffer(sizeof(FStaticMeshMaterialParams));
 	RegisterAsset("DefaultMaterial", DefaultMat);
 }
@@ -290,7 +289,6 @@ void UAssetManager::CreateParticleMaterial()
 	UMaterial* ParticleMat = FObjectFactory::ConstructObject<UMaterial>();
 	ParticleMat->PSOType = EPSOType::Particle_AlphaBlend;
 	ParticleMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/SubUV/StarParticle.png"));
-	ParticleMat->ParamLayout = EMaterialParamLayout::ParticleSubUV;
 	ParticleMat->ParamBuffer = RenderCommand::CreateConstantBuffer(256);
 	RegisterAsset("SubUVMaterial", ParticleMat);
 }

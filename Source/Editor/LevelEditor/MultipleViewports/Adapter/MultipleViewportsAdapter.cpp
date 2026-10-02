@@ -601,6 +601,37 @@ FMultipleViewportsAdapter::GetEngineCameraForward(const int32 ViewIndex) const {
       CameraForward(Views.Cameras[ViewIndex].Transform.Rotation));
 }
 
+// 빌보드 월드 행렬 계산
+FMatrix FMultipleViewportsAdapter::BuildEngineBillboardMatrix(const int32 ViewIndex, const FVector& WorldPosition, const float Width, const float Height) const
+{
+  assert(ViewIndex >= 0 && ViewIndex < 4);
+  const FViewCamera& ViewCamera = Views.Cameras[ViewIndex];
+  if (ViewCamera.Projection.Mode == EProjectionMode::Orthographic)
+  {
+    const FVector Facing = NormalizedOrZero(CameraForward(ViewCamera.Transform.Rotation)) * -1.0f;
+    const FVector Right = NormalizedOrZero(CameraRight(ViewCamera.Transform.Rotation));
+    const FVector Up = NormalizedOrZero(CameraUp(ViewCamera.Transform.Rotation));
+
+    FMatrix EngineMatrix;
+    EngineMatrix.SetIdentity();
+    EngineMatrix.M[0][0] = Facing.X; EngineMatrix.M[0][1] = Facing.Y; EngineMatrix.M[0][2] = Facing.Z;
+    EngineMatrix.M[1][0] = Right.X * Width; EngineMatrix.M[1][1] = Right.Y * Width; EngineMatrix.M[1][2] = Right.Z * Width;
+    EngineMatrix.M[2][0] = Up.X * Height; EngineMatrix.M[2][1] = Up.Y * Height; EngineMatrix.M[2][2] = Up.Z * Height;
+    EngineMatrix.M[3][0] = WorldPosition.X; EngineMatrix.M[3][1] = WorldPosition.Y; EngineMatrix.M[3][2] = WorldPosition.Z;
+    return EngineMatrix;
+  }
+
+  const FBillboardTransform Result = ComputeBillboardTransform(
+      {WorldPosition, {Width, Height}},
+      ViewCamera.Transform);
+  FMatrix EngineMatrix = Result.WorldMatrix;
+
+  EngineMatrix.M[1][0] = -EngineMatrix.M[1][0];
+  EngineMatrix.M[1][1] = -EngineMatrix.M[1][1];
+  EngineMatrix.M[1][2] = -EngineMatrix.M[1][2];
+  return EngineMatrix;
+}
+
 // 지정 View 카메라의 투영 모드가 Orthographic인지 검사한다.
 bool FMultipleViewportsAdapter::IsOrthographic(const int32 ViewIndex) const {
   assert(ViewIndex >= 0 && ViewIndex < 4);
@@ -649,8 +680,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex,
 
   const FRect &Rect = GetViewRect(ViewIndex);
   const FViewCamera &ViewCamera = Views.Cameras[ViewIndex];
-  const FMatrix Projection =
-      BuildProjectionMatrix(ViewCamera.Projection, Rect.Width / Rect.Height);
+  const FMatrix Projection = BuildProjectionMatrix(ViewCamera.Projection, Rect.Width / Rect.Height);
   const float ScaleX = Projection.M[1][0];
   const float ScaleY = Projection.M[2][1];
 
@@ -661,11 +691,9 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex,
   ViewContext.CameraPosition = GetEngineCameraLocation(ViewIndex);
   ViewContext.CameraForward = GetEngineCameraForward(ViewIndex);
   ViewContext.ViewProjection = GetEngineViewProjection(ViewIndex);
-  ViewContext.ProjectionScaleSquared =
-      std::max(ScaleX * ScaleX, ScaleY * ScaleY);
+  ViewContext.ProjectionScaleSquared = std::max(ScaleX * ScaleX, ScaleY * ScaleY);
   ViewContext.NearZ = ViewCamera.Projection.NearClip;
-  ViewContext.bOrthographic =
-      ViewCamera.Projection.Mode == EProjectionMode::Orthographic;
+  ViewContext.bOrthographic = ViewCamera.Projection.Mode == EProjectionMode::Orthographic;
   ViewContext.Prepare();
 
   for (const ObjectId Id : VisibleIds[ViewIndex]) {
@@ -689,25 +717,14 @@ FMultipleViewportsAdapter::PickActiveView(const FVector2 LocalMousePosition,
   if (!TryGetActiveViewRay(LocalMousePosition, Ray))
     return LastPick;
 
-  // 피킹 광선과 교차 검사용 Billboard 행렬 계산
+  // 피킹 광선과 교차 검사용 빌보드 행렬 계산
   const auto ResolveBillboardTransform =
       [](const UBillboardComponent &Billboard, const void *Context) -> FMatrix {
     const auto &Adapter =
         *static_cast<const FMultipleViewportsAdapter *>(Context);
-    const int32 ViewIdx = Adapter.GetActiveViewIndex();
     const FVector Scale = Billboard.GetWorldScale3D();
-    const FVector WorldPos = Billboard.GetWorldLocation();
-    const FVector CameraForward = Adapter.GetEngineCameraForward(ViewIdx);
-    const FVector Facing = CameraForward * -1.0f;
-    const FVector Up = FVector(0.0f, 0.0f, 1.0f);
-    const FVector Right = FVector::Cross(Up, Facing).Normalized();
-    const FVector RealUp = FVector::Cross(Facing, Right).Normalized();
-    FMatrix Matrix = FMatrix::Identity;
-    Matrix.M[0][0] = Facing.X; Matrix.M[0][1] = Facing.Y; Matrix.M[0][2] = Facing.Z;
-    Matrix.M[1][0] = Right.X * Scale.Y; Matrix.M[1][1] = Right.Y * Scale.Y; Matrix.M[1][2] = Right.Z * Scale.Y;
-    Matrix.M[2][0] = RealUp.X * Scale.Z; Matrix.M[2][1] = RealUp.Y * Scale.Z; Matrix.M[2][2] = RealUp.Z * Scale.Z;
-    Matrix.M[3][0] = WorldPos.X; Matrix.M[3][1] = WorldPos.Y; Matrix.M[3][2] = WorldPos.Z;
-    return Matrix;
+    return Adapter.BuildEngineBillboardMatrix(Adapter.GetActiveViewIndex(),
+        Billboard.GetWorldLocation(), Scale.Y, Scale.Z);
   };
   FHitResult Hit;
   if (World.LineTraceSingle(Ray, Hit, ResolveBillboardTransform, this)) {

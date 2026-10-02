@@ -614,47 +614,47 @@ UWorld* UEditorEngine::CreatePIEWorld()
 {
 	json WorldData;
 	UWorld* CurrentWorld = World;
-	UWorld* NewWorld = FObjectFactory::ConstructObject<UWorld>();
+	UWorld* NewWorld = FObjectFactory::ConstructObject<UWorld>();  // PIE용 월드 생성
 	World->Serialize(WorldData, false);
-	NewWorld->Serialize(WorldData, true);
-	OriginNewAnnotataion.Reset();
-	OriginNewAnnotataion.Add(CurrentWorld, NewWorld);
+	NewWorld->Serialize(WorldData, true); // PIE용 월드에 Editor World Deserialize로 복사
+	OriginNewAnnotataion.Reset(); // 연결 나타내는 AnnotationMap 리셋
+	OriginNewAnnotataion.Add(CurrentWorld, NewWorld); // Editor월드 - PIE월드간 Annotation 기록
 
-	for (int i = 0; i < World->GetLevel().Num();i++)
+	for (int i = 0; i < World->GetLevel().Num();i++) // EditorWorld의 Level 순회
 	{
-		json LevelData;
-		World->GetLevel()[i]->Serialize(LevelData, false);
-		ULevel* NewLevel = Cast<ULevel>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetClass(), NewWorld));
-		NewLevel->Serialize(LevelData, true);
-		OriginNewAnnotataion.Add(World->GetLevel()[i], NewLevel);
+		json LevelData; 
+		World->GetLevel()[i]->Serialize(LevelData, false); 
+		ULevel* NewLevel = Cast<ULevel>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetClass(), NewWorld));  
+		NewLevel->Serialize(LevelData, true);												// LevelData 복사해서 NewLevel에 다 Deserialize
+		OriginNewAnnotataion.Add(World->GetLevel()[i], NewLevel);							// Editor레벨 - PIE레벨간 Annotation 기록
 		for (int j = 0;j < World->GetLevel()[i]->GetActors().Num();j++)
 		{
 			json ActorData;
 			World->GetLevel()[i]->GetActors()[j]->Serialize(ActorData, false);
-			AActor* NewActor = Cast<AActor>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetActors()[j]->GetClass(), NewLevel));
-			NewActor->Serialize(ActorData, true);
-			OriginNewAnnotataion.Add(World->GetLevel()[i]->GetActors()[j], NewActor);
+			AActor* NewActor = Cast<AActor>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetActors()[j]->GetClass(), NewLevel)); 
+			NewActor->Serialize(ActorData, true);											// ActorData 복사해서 NewActor에 다 Deserialize
+			OriginNewAnnotataion.Add(World->GetLevel()[i]->GetActors()[j], NewActor);		// Editor액터 - PIE액터간 Annotation 기록
 			for (int k = 0;k < World->GetLevel()[i]->GetActors()[j]->GetComponents().Num();k++)
 			{
 				json ActorCompData;
 				UActorComponent* OriginalComp = World->GetLevel()[i]->GetActors()[j]->GetComponents()[k];
 				OriginalComp->Serialize(ActorCompData, false);
 				UActorComponent* NewActorComp = nullptr;
-				for (UActorComponent* DupComponents : NewActor->GetComponents())
+				for (UActorComponent* DupComponents : NewActor->GetComponents()) // NewActor 생성과정에서 발생한 Component를 체크
 				{
 					if (DupComponents && DupComponents->GetFName() == OriginalComp->GetFName() && DupComponents->GetClass() == OriginalComp->GetClass())
 					{
-						NewActorComp = DupComponents;
+						NewActorComp = DupComponents; // Actor 생성자에서 Component가 생성되는 경우, 해당 Component로 인해 Component를 더 읽어 추가 생성되는 문제 방지
 						break;
 					}
 				}
-				if (NewActorComp == nullptr)
+				if (NewActorComp == nullptr)  // 추가 생성된 Component가 존재하는 형태가 아닐경우에만 실행
 				{
 					NewActorComp = Cast<UActorComponent>(FObjectFactory::ConstructObject(World->GetLevel()[i]->GetActors()[j]->GetComponents()[k]->GetClass(), NewActor));
 					NewActor->AddComponents(NewActorComp);
 				}
-				NewActorComp->Serialize(ActorCompData, true);
-				OriginNewAnnotataion.Add(World->GetLevel()[i]->GetActors()[j]->GetComponents()[k], NewActorComp);
+				NewActorComp->Serialize(ActorCompData, true);								// ActorCompData 복사해서 NewActorComp에 다 Deserialize
+				OriginNewAnnotataion.Add(World->GetLevel()[i]->GetActors()[j]->GetComponents()[k], NewActorComp); // Editor액터컴포 - PIE액터컴포간 Annotation 기록
 			}
 		}
 	}

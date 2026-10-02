@@ -111,6 +111,8 @@ public:
 	bool IsEditorWorld() const { return WorldType == EWorldType::WorldType_Editor; }
 	bool IsPIEWorld() const { return WorldType == EWorldType::WorldType_PIE; }
 	bool IsGameWorld() const { return WorldType == EWorldType::WorldType_Game; }
+
+	static UWorld* DuplicateWorld(UWorld* SourceWorld, UWorld* DestinationWorld = nullptr);
 private:
 	struct alignas(64) FGatherChunk
 	{

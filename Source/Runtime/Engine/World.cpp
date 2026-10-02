@@ -683,3 +683,80 @@ void UWorld::EndPlay()
 {
 	bBegunPlay = false;
 }
+
+UWorld* UWorld::DuplicateWorld(UWorld* SourceWorld, UWorld* DestinationWorld = nullptr)
+{
+	if (!SourceWorld)
+		return nullptr;
+
+	UWorld* PIEWorld = DestinationWorld;
+	if (!PIEWorld)
+	{
+		PIEWorld = FObjectFactory::ConstructObject<UWorld>();
+		if (!PIEWorld)
+		{
+			HTR_LOG(Error, "DuplicateWorld : Failed to create PIEWorld");
+			return nullptr;
+		}
+
+		PIEWorld->Init();
+	}
+
+	PIEWorld->SetWorldType(EWorldType::WorldType_PIE);
+
+	ULevel* SrcLevel = SourceWorld->GetPersistentLevel();
+	ULevel* DstLevel = PIEWorld->GetPersistentLevel();
+	if(!SrcLevel || !DstLevel)
+	{
+		HTR_LOG(Error, "DuplicateWorld : Failed to get level");
+		return PIEWorld;
+	}
+
+	DstLevel->ClearActors();
+	PIEWorld->GetScene().RemoveAllPrimitives();
+
+	// 에디터 월드의 모든 액터를 순회하며 복제
+	for(AActor* SourceActor : SrcLevel->GetActors())
+	{
+		// 액터가 없거나 투명이면 건너뛴다
+		if(!SourceActor || SourceActor->HasAnyFlags(EObjectFlags::RF_Transient)) continue;
+
+		// Actor::Duplicate 호출
+		AActor* DstActor = Cast<AActor>(SourceActor->Duplicate(DstLevel));
+		if(!DstActor)
+		{
+			HTR_LOG(Error, "DuplicateWorld : Failed to duplicate actor");
+			continue;
+		}
+
+		// 액터에 새 월드 및 레벨 연결
+		DstActor->World = PIEWorld;
+		DstActor->Level = DstLevel;
+
+		// 레벨 액터 목록에 등록
+		DstLevel->AddActor(DstActor);
+
+		// 프리미티브 컴포넌트들을 새 월드의 씬에 등록
+		for(UActorComponent* PrimitiveComponent : DstActor->GetComponents())
+		{
+			if(UPrimitiveComponent* PrimComp = Cast<UPrimitiveComponent>(PrimitiveComponent))
+			{
+				PIEWorld->GetScene().AddPrimitive(PrimComp);
+			}
+		}
+	}
+
+	// 카메라 위치 및 회전 동기화
+	if (SourceWorld->GetMainCamera() && PIEWorld->GetMainCamera())
+	{
+		UCameraComponent* SourceCameraComp = SourceWorld->GetMainCamera()->GetCameraComponent();
+		UCameraComponent* DstCameraComp = PIEWorld->GetMainCamera()->GetCameraComponent();
+
+		if(!SourceCameraComp || !DstCameraComp) return PIEWorld;
+
+		DstCameraComp->SetRelativeLocation(SourceCameraComp->GetRelativeLocation());
+		DstCameraComp->SetRelativeRotation(SourceCameraComp->GetRelativeRotation());
+	}
+
+	return PIEWorld;
+}

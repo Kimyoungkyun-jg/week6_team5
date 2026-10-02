@@ -98,7 +98,8 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 	PersistentLevel->AddActor(NewActor);
 
 	// 5. PlayList에 추가
-	BeginPlayList.Enqueue(NewActor);
+	if (bBegunPlay)
+		BeginPlayList.Enqueue(NewActor);
 
 	return NewActor;
 }
@@ -667,8 +668,18 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 void UWorld::BeginPlay()
 {
+	if(!PersistentLevel)
+		return;
+
+	bBegunPlay = true;
+
+	for(AActor* Actor : PersistentLevel->GetActors())
+	{
+		Actor->BeginPlay();
+	}
 }
 
 void UWorld::EndPlay()
 {
+	bBegunPlay = false;
 }

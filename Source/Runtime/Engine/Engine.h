@@ -5,11 +5,6 @@
 
 #include "Engine/World.h"
 
-enum class EWorldType
-{
-
-};
-
 class FEngineLoop;
 
 // 엔진 모드별 실행 설정. UE에서는 ini가 맡는 부분이다.
@@ -46,9 +41,14 @@ public:
 
 	UWorld* GetWorld() const { return World; }
 
+	FWorldContext& CreateNewWorldContext(EWorldType WorldType);
+	FWorldContext* GetWorldContextFromType(EWorldType WorldType) const;
+	void DestroyWorldContext(EWorldType WorldType);
+
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
+	TArray<FWorldContext> WorldContexts;
 	UWorld* World = nullptr;
 private:
 	FEngineLoop* EngineLoop = nullptr;

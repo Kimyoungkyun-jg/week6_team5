@@ -165,6 +165,8 @@ bool UEditorEngine::Init()
 	EditorControlsPanel->SetWorld(World);
 	EditorControlsPanel->SetGizmo(Gizmo.get());
 	EditorControlsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+	EditorControlsPanel->SetPlayCallback([this]() { StartPIE(); });
+	EditorControlsPanel->SetStopCallback([this]() { EndPIE(); });
 
 	SettingsPanel->SetWorld(World);
 	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
@@ -586,4 +588,62 @@ void UEditorEngine::SaveCurrentScene()
 void UEditorEngine::SaveSceneAs()
 {
 	FEditorFileUtils::SaveSceneAs(World);
+}
+
+void UEditorEngine::StartPIE()
+{
+	if (GetWorldContextFromType(EWorldType::WorldType_PIE) != nullptr) return;
+
+	FWorldContext* EditorContext = GetWorldContextFromType(EWorldType::WorldType_Editor);
+	if (!EditorContext || !EditorContext->World)
+		return;
+
+	FWorldContext& PIEWorldContext = CreateNewWorldContext(EWorldType::WorldType_PIE);
+	if (!PIEWorldContext.World)
+		return;
+
+	FJsonArchive::SaveWorld(EditorContext->World, "Intermediate/PIE.scene");
+	FJsonArchive::LoadWorld(PIEWorldContext.World, "Intermediate/PIE.scene");
+	World = PIEWorldContext.World;
+	if (!World)
+		return;
+
+	Gizmo->SetTarget(nullptr);
+	Outline->SetTarget(nullptr);
+	DetailsPanel->SetTarget(nullptr);
+
+	OutlinerPanel->SetWorld(World);
+	DetailsPanel->SetWorld(World);
+
+	EditorControlsPanel->SetWorld(World);
+	EditorControlsPanel->SetGizmo(Gizmo.get());
+	EditorControlsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+
+	SettingsPanel->SetWorld(World);
+	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+	ViewportsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+
+	PIEWorldContext.World->BeginPlay();
+}
+
+void UEditorEngine::EndPIE()
+{
+	FWorldContext* PIEWorldContext = GetWorldContextFromType(EWorldType::WorldType_PIE);
+	if(!PIEWorldContext || !PIEWorldContext->World)
+		return;
+
+	PIEWorldContext->World->EndPlay();
+
+	FWorldContext* EditorWorldContext = GetWorldContextFromType(EWorldType::WorldType_Editor);
+	if(EditorWorldContext && EditorWorldContext->World)
+		World = EditorWorldContext->World;
+
+	ResetSceneSelection();
+
+	OutlinerPanel->SetWorld(World);
+	DetailsPanel->SetWorld(World);
+	EditorControlsPanel->SetWorld(World);
+	SettingsPanel->SetWorld(World);
+
+	DestroyWorldContext(EWorldType::WorldType_PIE);
 }

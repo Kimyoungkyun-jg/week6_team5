@@ -47,6 +47,8 @@ public:
 
     void SetViewportAdapter(FMultipleViewportsAdapter* InAdapter) { ViewportAdapter = InAdapter; }
 
+	void SetPlayCallback(std::function<void()> Callback) { PlayCallback = Callback; }
+	void SetStopCallback(std::function<void()> Callback) { StopCallback = Callback; }
 private:
 	static constexpr float SectionGap = 10.0f;
 	static constexpr float SubsectionGap = 4.0f;
@@ -54,4 +56,6 @@ private:
     void DrawCameraProperties();
     FMultipleViewportsAdapter* ViewportAdapter = nullptr;
 
+	std::function<void()> PlayCallback;
+	std::function<void()> StopCallback;
 };

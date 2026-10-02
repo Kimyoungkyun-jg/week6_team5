@@ -32,6 +32,21 @@ struct FRenderStats
 	void Reset() { *this = FRenderStats(); }
 };
 
+enum class EWorldType
+{
+	WorldType_None,
+	WorldType_Editor,	// 에디터 모드
+	WorldType_PIE,		// Play In Editor 모드
+	WorldType_Game		// Standalone 게임 모드
+};
+
+struct FWorldContext
+{
+	EWorldType WorldType = EWorldType::WorldType_None;
+	UWorld* World = nullptr;
+};
+
+
 
 
 class UWorld : public UObject
@@ -90,6 +105,12 @@ public:
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
+
+	void SetWorldType(EWorldType InWorldType) { WorldType = InWorldType; }
+	const EWorldType GetWorldType() const { return WorldType; }
+	bool IsEditorWorld() const { return WorldType == EWorldType::WorldType_Editor; }
+	bool IsPIEWorld() const { return WorldType == EWorldType::WorldType_PIE; }
+	bool IsGameWorld() const { return WorldType == EWorldType::WorldType_Game; }
 private:
 	struct alignas(64) FGatherChunk
 	{
@@ -117,6 +138,8 @@ private:
 	ULevel* PersistentLevel = nullptr;
 	ULevel* CurrentLevel = nullptr;
 	TArray<ULevel*> Levels;
+	EWorldType WorldType = EWorldType::WorldType_None;
+	bool bBegunPlay = false;
 
 	FScene Scene;
 

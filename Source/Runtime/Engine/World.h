@@ -20,6 +20,13 @@ class UBillboardComponent;
 
 struct FLODViewContext;
 
+
+enum EWorldType
+{
+	Editor,
+	PIE,
+};
+
 struct FRenderStats
 {
 	uint32 TotalPrimitives = 0;
@@ -31,8 +38,6 @@ struct FRenderStats
 
 	void Reset() { *this = FRenderStats(); }
 };
-
-
 
 class UWorld : public UObject
 {
@@ -90,6 +95,13 @@ public:
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
+
+	const EWorldType GetWorldType() const { return worldType; }
+	void SetWorldType(EWorldType type) { worldType = type; }
+
+	void DuplicateWorld(UWorld* SrcWorld);
+
+	bool& GetbIsTickEnable() { return bIsTickEnable; }
 private:
 	struct alignas(64) FGatherChunk
 	{
@@ -126,4 +138,8 @@ private:
     TArray<uint8> SelectedLODs;
 
 	FRenderStats RenderStats;
+
+	EWorldType worldType = EWorldType::Editor;
+
+	bool bIsTickEnable = true;
 };

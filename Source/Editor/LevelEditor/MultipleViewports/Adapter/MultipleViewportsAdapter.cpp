@@ -443,6 +443,7 @@ void FMultipleViewportsAdapter::UpdateInput(
 // 현재 World의 가시 컴포넌트에서 경계만 캡처한다. Mesh·삼각형은 복사하지 않는다.
 void FMultipleViewportsAdapter::CaptureWorld(UWorld& World)
 {
+
     RenderObjects.Reset();
     for (auto& Entry : PrimitiveById) Entry.second.bCaptured = false;
     bCapturedBillboard = false;
@@ -450,21 +451,25 @@ void FMultipleViewportsAdapter::CaptureWorld(UWorld& World)
 
     const FScene& Scene = World.GetScene();
     const int32 Count = Scene.Proxies.Num();
+    
     for (int32 i = 0; i < Count;++i)
     {
         if (!Scene.PrimitiveFlags[i]) continue;
         UPrimitiveComponent* Primitive = Scene.Proxies[i]->GetComponent();
         if (!Primitive || !Primitive->IsVisible() || !Primitive->GetOwner() ||
             Primitive->GetOwner()->GetWorld() != &World) continue;
+        
         const ObjectId Id = Primitive->GetUUID();
+        
         if (Id == InvalidObjectId) continue;
 
         FRenderableObject RenderObject{};
         RenderObject.Id = Id;
         const FPrimitiveSceneProxy* Proxy = Primitive->GetSceneProxy();
-        RenderObject.WorldBounds = Proxy && Proxy->GetMesh()
-            ? Proxy->GetBounds() : MakeWorldBounds(Primitive->CalcBounds());
+        
+        RenderObject.WorldBounds = Proxy && Proxy->GetMesh() ? Proxy->GetBounds() : MakeWorldBounds(Primitive->CalcBounds());
         RenderObjects.Add(RenderObject);
+        
         PrimitiveSnapshot& Snapshot = PrimitiveById[Id];
         Snapshot.Primitive = Primitive;
         Snapshot.bCaptured = true;
@@ -630,6 +635,7 @@ void FMultipleViewportsAdapter::BuildRenderQueue(const int32 ViewIndex, FRenderQ
     {
         CullForView(RenderObjects, PrepareView(ViewIndex).Frustum, VisibleIds[ViewIndex]);
     }
+
     const FRect& Rect = GetViewRect(ViewIndex);
     const FViewCamera& ViewCamera = Views.Cameras[ViewIndex];
     const FMatrix Projection = BuildProjectionMatrix(

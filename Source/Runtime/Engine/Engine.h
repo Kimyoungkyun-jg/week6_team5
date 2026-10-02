@@ -5,10 +5,7 @@
 
 #include "Engine/World.h"
 
-enum class EWorldType
-{
 
-};
 
 class FEngineLoop;
 
@@ -44,12 +41,16 @@ public:
 	// UObject 일괄 정리와 GPU 자원 해제 전에 호출된다.
 	virtual void PreExit() {};
 
-	UWorld* GetWorld() const { return World; }
+	bool IsPlaying() const { return PlayWorld != nullptr; }
 
+	UWorld* GetEditorWorld() const { return EditorWorld; }
+	UWorld* GetPlayWorld() const { return PlayWorld; }
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
-	UWorld* World = nullptr;
+	UWorld* EditorWorld = nullptr;
+	UWorld* PlayWorld = nullptr;
+
 private:
 	FEngineLoop* EngineLoop = nullptr;
 };

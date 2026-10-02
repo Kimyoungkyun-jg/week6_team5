@@ -65,11 +65,14 @@ void UStaticMesh::RebuildRenderData()
 TSharedPtr<const FMeshRenderState> UStaticMesh::GetRenderState(const std::vector<UMaterial*>& Materials)
 {
     auto& WeakState = RenderStates[Materials];
+    
     if (auto State = WeakState.lock()) return State;
     auto State = MakeShared<FMeshRenderState>();
     State->LODCount = static_cast<uint8>(std::min(GetLODCount(), 4u));
+    
     for (uint32 I = 0; I < 3; ++I)
         State->LODThresholdSq[I] = ScreenThresholds[I] * ScreenThresholds[I];
+    
     for (uint32 LOD = 0; LOD < State->LODCount; ++LOD)
     {
         auto& Range = State->LODs[LOD];

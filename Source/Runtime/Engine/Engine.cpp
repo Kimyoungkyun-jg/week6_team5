@@ -5,9 +5,9 @@ UEngine* GEngine = nullptr;
 
 bool UEngine::Init()
 {
-	World = FObjectFactory::ConstructObject<UWorld>();
+	EditorWorld = FObjectFactory::ConstructObject<UWorld>();
 	
-	if (!World || !World->Init()) return false;
+	if (!EditorWorld || !EditorWorld->Init()) return false;
 
  	return true;
 }

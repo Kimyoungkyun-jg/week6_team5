@@ -44,7 +44,9 @@ public:
 	// Active View의 입력과 Picking 결과만 Gizmo 및 선택 상태에 반영한다.
 	void UpdateGizmoAndPicking();
 	// View 하나의 Scene·Grid·Gizmo·텍스트를 해당 ViewProjection으로 렌더한다.
-	void RenderFrame(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue);
+	void RenderFrame(int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue, const bool bIsPIE);
+
+
 	// 네 View 결과와 ImGui를 메인 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
 	void PresentFrame();
 	void DeleteActor(AActor* Actor);
@@ -55,7 +57,7 @@ private:
 	// 패널 요청과 입력을 Core Adapter에 전달해 레이아웃·카메라 상태를 갱신한다.
 	void UpdateMultipleViewportState(float DeltaTime);
 	// 월드를 정확히 한 번 Tick·Capture한 뒤 에디터 상호작용을 갱신한다.
-	void TickWorldAndEditor(float DeltaTime);
+	void TickWorld(float DeltaTime);
 	// 한 번 캡처한 월드 결과를 재사용해 현재 레이아웃의 각 View를 렌더한다.
 	void RenderMultipleViewports();
 	// 화면 합성과 View 설정 보관으로 프레임을 마무리한다.
@@ -90,6 +92,9 @@ private:
 	FRenderQueue RenderQueue;
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
+
+
+	bool bIsStep = false;
 
 	void ResetSceneSelection();
 

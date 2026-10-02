@@ -105,22 +105,25 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 
 void UWorld::Tick(float DeltaTime)
 {
-	while (!BeginPlayList.IsEmpty())
-	{
-		BeginPlayList.Peek()->BeginPlay();
-		BeginPlayList.Dequeue();
-	}
+	if (!bIsTickEnable) return;
 
+
+	if (worldType == EWorldType::PIE)
 	{
+		while (!BeginPlayList.IsEmpty())
+		{
+			BeginPlayList.Peek()->BeginPlay();
+			BeginPlayList.Dequeue();
+		}
+
 		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
-		// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
 		TickTaskManager.RunAllTickGroups(DeltaTime);
-
 		for (ULevel* Level : Levels)
 		{
 			PathTracker.Tick(Level->GetActors(), DeltaTime);
 		}
 	}
+
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
@@ -671,4 +674,51 @@ void UWorld::BeginPlay()
 
 void UWorld::EndPlay()
 {
+}
+
+void UWorld::DuplicateWorld(UWorld* SrcWorld)
+{
+	if (!SrcWorld)
+	{
+		HTR_LOG(Error, "Fail to Duplicate EditorWorld...");
+	}
+	
+	Init();
+	worldType = EWorldType::PIE;
+
+	if (SrcWorld->GetMainCamera() && MainCamera)
+	{
+		MainCamera->GetRootComponent()->SetTransform(
+			SrcWorld->GetMainCamera()->GetRootComponent()->GetTransform()
+		);
+	}
+
+	if (ULevel* SrcLevel = SrcWorld->GetPersistentLevel())
+	{
+		for (AActor* SrcActor : SrcLevel->GetActors())
+		{
+			if (!SrcActor || SrcActor->IsA<ACameraActor>())
+				continue; 
+
+			// 기존 액터의 위치/회전/스케일 가져오기
+			const FTransform ActorTransform = SrcActor->GetRootComponent()
+				? SrcActor->GetRootComponent()->GetTransform()
+				: FTransform::Identity;
+
+			// 새 액터 스폰
+			AActor* NewActor = SpawnActor(SrcActor->GetClass(), NAME_None, &ActorTransform);
+			
+			for (int i = 0; i < NewActor->Components.size(); i++)
+			{
+				UStaticMeshComponent* newSMC = Cast<UStaticMeshComponent>(NewActor->Components[i]);
+				UStaticMeshComponent* srcSMC = Cast<UStaticMeshComponent>(SrcActor->Components[i]);
+				if (newSMC && srcSMC)
+				{
+					newSMC->SetStaticMesh(srcSMC->GetStaticMesh());
+				}
+			}
+
+		}
+	}
+
 }

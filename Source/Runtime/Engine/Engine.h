@@ -26,6 +26,7 @@ struct FEngineConfig
 
 
 class UGameInstance;
+class FGameViewportClient;
 
 // 월드 컨텍스트 정보
 struct FWorldContext
@@ -36,6 +37,9 @@ struct FWorldContext
 	UGameInstance* OwningGameInstance = nullptr;
 
 	int32 PIEInstance = -1;
+
+	// 게임 뷰포트 클라이언트 참조
+	TSharedPtr<FGameViewportClient> GameViewport;
 
 	// 현재 월드 인스턴스 반환
 	inline UWorld* World() const

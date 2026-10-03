@@ -16,6 +16,7 @@
 #include "Engine/Level.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
+#include "Engine/GameViewportClient.h"
 
 
 #include "Render/Renderer.h"
@@ -220,13 +221,19 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 	// PIE 액션 처리
 	switch (ViewportsPanel->ConsumePIEAction()) {
 	case EPIEAction::Play:
+
+		// Context 생성
+		CreateNewWorldContext(EWorldType::PIE); 
+
 		GameInstance = FObjectFactory::ConstructObject<UGameInstance>();
 
 		// 월드 복제 및 컨텍스트 바인딩
-		GameInstance->InitializeForPlayInEditor(0);
+		GameInstance->InitializeForPlayInEditor(WorldContextlist.size()-1);
 
 		// BeginPlay 호출 및 플레이 시작
 		GameInstance->StartPlayInEditorGameInstance();
+
+
 		PIEState = EPIEState::Playing;
 		break;
 	case EPIEAction::Pause:
@@ -248,6 +255,7 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 		}
 		break;
 	case EPIEAction::Stop:
+		
 		if (GameInstance) {
 			GameInstance->Shutdown(); // 게임 세션 및 컨텍스트 정리
 			
@@ -357,28 +365,34 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 
 // 월드를 한 번 Tick·Capture한 뒤 에디터와 피킹을 갱신한다.
 void UEditorEngine::TickWorld(const float DeltaTime) {
-	
-	//for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx)
-	//{
-	//	FWorldContext& Context = WorldContextlist[WorldIdx];
-	//	if (Context.WorldType == EWorldType::PIE && Context.World())
-	//	{
-	//		// 각 PIE 월드 틱 (액터, 물리, 컴포넌트 등)
-	//		Context.World()->Tick(LEVELTICK_All, DeltaSeconds);
-	//	}
-	//}
-	
-	
-	if (PlayWorld) // PIE모드 일대
-	{
+	if (PlayWorld) {
 		{
 			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 
-			PlayWorld->Tick(DeltaTime);
+			// PIE 모드 월드 틱 순회
+			bool bTicked = false;
+			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
+				FWorldContext &Context = WorldContextlist[WorldIdx];
+				if (Context.WorldType == EWorldType::PIE && Context.World()) {
+					Context.World()->Tick(DeltaTime);
+					bTicked = true;
+				}
+			}
+			if (!bTicked && PlayWorld) {
+				PlayWorld->Tick(DeltaTime);
+			}
 
-			if (bIsStep) // 딱 한프레임만 실행
-			{
-				PlayWorld->GetbIsTickEnable() = false;
+			// 단일 프레임 진행 후 일시정지 복구
+			if (bIsStep) {
+				for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
+					FWorldContext &Context = WorldContextlist[WorldIdx];
+					if (Context.WorldType == EWorldType::PIE && Context.World()) {
+						Context.World()->GetbIsTickEnable() = false;
+					}
+				}
+				if (PlayWorld) {
+					PlayWorld->GetbIsTickEnable() = false;
+				}
 				bIsStep = false;
 			}
 		}
@@ -387,10 +401,10 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			EditorUI->Tick(DeltaTime);
 		}
 	} else {
-
 		{
 			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 
+			// 에디터 모드 월드 틱
 			EditorWorld->Tick(DeltaTime);
 		}
 		{
@@ -405,6 +419,8 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 // 뷰포트 클라이언트를 순회하며 씬 렌더러를 통해 렌더링한다
 void UEditorEngine::RenderViewports() {
 	for (int32 ViewIndex = 0; ViewIndex < AllViewportClients.Num(); ++ViewIndex) {
+		
+		
 		FEditorViewportClient *ViewClient = AllViewportClients[ViewIndex];
 		if (!ViewClient || !ViewClient->IsActive())
 			continue;
@@ -413,12 +429,29 @@ void UEditorEngine::RenderViewports() {
 		if (ViewRect.Width <= 0.0f || ViewRect.Height <= 0.0f)
 			continue;
 
-		// 뷰 사각형과 시점 정보 생성
-
-		const FSceneView SceneView = ViewClient->CalcSceneView(ViewRect);
-
 		const bool bIsPIE = PlayWorld != nullptr;
 		UWorld *CurrentWorld = bIsPIE ? PlayWorld : EditorWorld;
+
+		// 뷰 사각형과 시점 정보 생성
+		FSceneView SceneView;
+		if (bIsPIE && ViewIndex == 0) {
+			FGameViewportClient *GameClient = nullptr;
+			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
+				if (WorldContextlist[WorldIdx].WorldType == EWorldType::PIE &&
+						WorldContextlist[WorldIdx].GameViewport) {
+					GameClient = WorldContextlist[WorldIdx].GameViewport.get();
+					break;
+				}
+			}
+			if (GameClient) {
+				// 플레이 모드 게임 뷰포트 시점 계산
+				SceneView = GameClient->CalcSceneView(ViewRect);
+			} else {
+				SceneView = ViewClient->CalcSceneView(ViewRect);
+			}
+		} else {
+			SceneView = ViewClient->CalcSceneView(ViewRect);
+		}
 
 		// 씬 렌더러 생성
 		FSceneRenderer SceneRenderer(CurrentWorld, SceneView);

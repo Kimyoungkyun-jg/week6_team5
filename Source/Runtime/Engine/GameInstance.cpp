@@ -2,6 +2,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
+#include "Engine/GameViewportClient.h"
 #include "ObjectSystem/ObjectFactory.h"
 
 void UGameInstance::Init()
@@ -14,6 +15,8 @@ void UGameInstance::Shutdown()
 	// 세션 정리 작업 수행
 	if (WorldContext)
 	{
+		// 게임 뷰포트 클라이언트 해제
+		WorldContext->GameViewport->Reset();
 		WorldContext->OwningGameInstance = nullptr;
 		WorldContext = nullptr;
 	}
@@ -78,6 +81,13 @@ bool UGameInstance::StartPlayInEditorGameInstance()
 	if (UEngine* Engine = GetEngine())
 	{
 		Engine->SetPlayWorld(*PlayWorld);
+	}
+
+	// 게임 뷰포트 클라이언트 생성 및 초기화
+	if (WorldContext)
+	{
+		WorldContext->GameViewport = MakeShared<FGameViewportClient>();
+		WorldContext->GameViewport->Init(*WorldContext, GetEngine());
 	}
 
 	// 월드 재생 시작

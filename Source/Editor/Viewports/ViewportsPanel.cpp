@@ -16,7 +16,7 @@ constexpr float SplitterThickness = 6.0f;
 constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
 constexpr ImU32 SplitterHoverColor = IM_COL32(255, 192, 0, 255);
 constexpr const char *ViewportTypeLabels[] = {
-		"Perspective", "Top", "Bottom", "Front", "Back", "Left", "Right"};
+		"Perspective", "Top", "Front", "Right"};
 
 // Stat Overlay
 constexpr float StatOverlayMargin = 8.0f;

@@ -266,6 +266,11 @@ void FEditorViewportClient::Resize(const uint32 InWidth,
   if (Height > 0) {
     SetAspectRatio(static_cast<float>(Width) / static_cast<float>(Height));
   }
+
+  if (!bIsPerspective && OldWidth > 1 && Width > 1) {
+    // 화면 크기 변경 시 직교 배율 유지
+    OrthoWidth *= static_cast<float>(Width) / static_cast<float>(OldWidth);
+  }
 }
 
 // 뷰포트 시점 설정
@@ -284,13 +289,13 @@ void FEditorViewportClient::SetViewportType(const ELevelViewportType InType) {
     break;
   case ELevelViewportType::Front:
     bIsPerspective = false;
-    ViewLocation = FVector(0.0f, -20.0f, 0.0f);
-    ViewRotation = FRotator(0.0f, 90.0f, 0.0f);
+    ViewLocation = FVector(20.0f, 0.0f, 0.0f);
+    ViewRotation = FRotator(0.0f, 180.0f, 0.0f);
     break;
   case ELevelViewportType::Right:
     bIsPerspective = false;
-    ViewLocation = FVector(20.0f, 0.0f, 0.0f);
-    ViewRotation = FRotator(0.0f, 180.0f, 0.0f);
+    ViewLocation = FVector(0.0f, 20.0f, 0.0f);
+    ViewRotation = FRotator(0.0f, -90.0f, 0.0f);
     break;
   }
 }

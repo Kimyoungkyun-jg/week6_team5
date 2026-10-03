@@ -17,6 +17,8 @@ public:
 	UActorComponent() { PrimaryComponentTick.Target = this; }
 	virtual ~UActorComponent() override;
 
+	virtual void InitializeComponent();
+
 	virtual void BeginPlay() {};
 	virtual void TickComponent(float DeltaTime) {};
 
@@ -28,4 +30,5 @@ public:
 
 private:
 	AActor* Owner = nullptr;
+	bool bIsInitialized = false;
 };

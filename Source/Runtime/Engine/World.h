@@ -40,6 +40,14 @@ enum class EWorldType
 	Game		// Standalone 게임 모드
 };
 
+enum class EWorldTick : uint8
+{
+	TimeOnly,
+	ViewportsOnly,
+	PauseTick,
+	All,
+};
+
 struct FWorldContext
 {
 	EWorldType WorldType = EWorldType::None;
@@ -67,7 +75,7 @@ public:
 		return CastChecked<T>(SpawnActor(T::StaticClass(), InName, Transform));
 	}
 
-	void Tick(float DeltaTime);
+	void Tick(EWorldTick TickType, float DeltaTime);
 
 	void ClearWorld();
 
@@ -111,6 +119,8 @@ public:
 	bool IsEditorWorld() const { return WorldType == EWorldType::Editor; }
 	bool IsPIEWorld() const { return WorldType == EWorldType::PIE; }
 	bool IsGameWorld() const { return WorldType == EWorldType::Game; }
+	const bool IsPaused() const { return bIsPaused; }
+	void SetPaused(bool InPaused) { bIsPaused = InPaused; }
 
 	static UWorld* DuplicateWorld(UWorld* SourceWorld, UWorld* DestinationWorld = nullptr);
 private:
@@ -141,7 +151,9 @@ private:
 	ULevel* CurrentLevel = nullptr;
 	TArray<ULevel*> Levels;
 	EWorldType WorldType = EWorldType::None;
+	EWorldTick CurrentTickType = EWorldTick::All;
 	bool bBegunPlay = false;
+	bool bIsPaused = false;
 
 	FScene Scene;
 

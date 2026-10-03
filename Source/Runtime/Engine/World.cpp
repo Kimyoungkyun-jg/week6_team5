@@ -37,17 +37,6 @@ DECLARE_CYCLE_STAT("Gather - Submit", STAT_GatherSubmit);
 
 UWorld::~UWorld()
 {
-	ClearWorld();
-	for(ULevel* Level : Levels)
-	{
-		if(Level)
-		{
-			delete Level;
-		}
-	}
-	Levels.Reset();
-	PersistentLevel = nullptr;
-	CurrentLevel = nullptr;
 }
 
 bool  UWorld::Init()
@@ -109,27 +98,35 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 
 	// 5. PlayList에 추가
 	if (bBegunPlay)
-		BeginPlayList.Enqueue(NewActor);
+		NewActor->BeginPlay();
 
 	return NewActor;
 }
 
-void UWorld::Tick(float DeltaTime)
+void UWorld::Tick(EWorldTick TickType, float DeltaTime)
 {
-	while (!BeginPlayList.IsEmpty())
-	{
-		BeginPlayList.Peek()->BeginPlay();
-		BeginPlayList.Dequeue();
-	}
+	CurrentTickType = TickType;
 
+	if (CurrentTickType == EWorldTick::All)
 	{
-		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
-		// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
-		TickTaskManager.RunAllTickGroups(DeltaTime);
-
-		for (ULevel* Level : Levels)
+		while (!BeginPlayList.IsEmpty())
 		{
-			PathTracker.Tick(Level->GetActors(), DeltaTime);
+			BeginPlayList.Peek()->BeginPlay();
+			BeginPlayList.Dequeue();
+		}
+
+		if (!bIsPaused)
+		{
+			{
+				SCOPE_CYCLE_COUNTER(STAT_ActorTick);
+				// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
+				TickTaskManager.RunAllTickGroups(DeltaTime);
+
+				for (ULevel* Level : Levels)
+				{
+					PathTracker.Tick(Level->GetActors(), DeltaTime);
+				}
+			}
 		}
 	}
 

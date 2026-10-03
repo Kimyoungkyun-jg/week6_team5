@@ -286,7 +286,24 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-		World->Tick(DeltaTime);
+		// 모든 월드를 Tick하고 PIE는 Editor World와 구분해 Tick한다.
+		for(FWorldContext& Context : WorldContexts)
+		{
+			UWorld* TargetWorld = Context.World;
+
+			// Editor World는 ViewportsOnly, PIE는 PauseTick/All로 Tick한다.
+			if(TargetWorld->GetWorldType() == EWorldType::Editor)
+			{
+				TargetWorld->Tick(EWorldTick::ViewportsOnly, DeltaTime);
+			}
+			else if(TargetWorld->GetWorldType() == EWorldType::Game || TargetWorld->GetWorldType() == EWorldType::PIE)
+			{
+				if(TargetWorld->IsPaused())
+					TargetWorld->Tick(EWorldTick::PauseTick, DeltaTime);
+				else
+					TargetWorld->Tick(EWorldTick::All, DeltaTime);
+			}	
+		}
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
@@ -314,7 +331,22 @@ void UEditorEngine::RenderMultipleViewports()
 			MultipleViewportsAdapter.BuildRenderQueue(ViewIndex, RenderQueue);
 		}
 
+		UWorld* TargetWorld = World;
+		FWorldContext* PIEContext = GetWorldContextFromType(EWorldType::PIE);
+		if (PIEContext != nullptr)
+		{
+			if (ViewIndex == PIEViewIndex)
+			{
+				TargetWorld = PIEContext->World;
+			}
+			else
+			{
+				TargetWorld = GetWorldContextFromType(EWorldType::Editor)->World;
+			}
+		}
+
 		RenderFrame(
+			TargetWorld,
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
 			MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
@@ -381,32 +413,35 @@ void UEditorEngine::UpdateGizmoAndPicking()
 }
 
 // View 행렬로 Scene·Grid·Gizmo·텍스트·Outline을 렌더한다.
-void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue)
+void UEditorEngine::RenderFrame(UWorld* TargetWorld, const int32 ViewIndex, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue)
 {
 	RenderCommand::BeginRenderPass(ViewRenderingInfo);
-	if (SettingsPanel->GetSettings().bDrawBatchLine)
+	if (TargetWorld->IsEditorWorld())
 	{
-		// 라인 배처는 매 프레임 한 번만 비우고 한 번만 그린다.
-		// 바운딩박스는 그 안에 쌓이는 여러 항목 중 하나일 뿐이다.
-		LineBatcher->BeginFrame();
-
-		if (SettingsPanel->GetSettings().bDrawBoundingBox)
+		if (SettingsPanel->GetSettings().bDrawBatchLine)
 		{
-			LineBatcher->BuildVertexBuffer();
-			World->GetPathTracker().OnRender(LineBatcher.get());
-		}
+			// 라인 배처는 매 프레임 한 번만 비우고 한 번만 그린다.
+			// 바운딩박스는 그 안에 쌓이는 여러 항목 중 하나일 뿐이다.
+			LineBatcher->BeginFrame();
 
-		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
-		if (Gizmo->GetTarget())
-		{
-			if (ALightActor* LightActor = Cast<ALightActor>(Gizmo->GetTarget()->GetOwner()))
+			if (SettingsPanel->GetSettings().bDrawBoundingBox)
 			{
-				LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
+				LineBatcher->BuildVertexBuffer();
+				TargetWorld->GetPathTracker().OnRender(LineBatcher.get());
 			}
+
+			// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
+			if (Gizmo->GetTarget())
+			{
+				if (ALightActor* LightActor = Cast<ALightActor>(Gizmo->GetTarget()->GetOwner()))
+				{
+					LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
+				}
+			}
+
+			LineBatcher->OnRender(ViewProjection);
+
 		}
-
-		LineBatcher->OnRender(ViewProjection);
-
 	}
 
 	const bool bDrawPrimitives = SettingsPanel->GetSettings().bDrawPrimitives;
@@ -430,28 +465,31 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
-	if (SettingsPanel->GetSettings().bDrawBatchLine)
+	if (TargetWorld->IsEditorWorld())
 	{
-		const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
+		if (SettingsPanel->GetSettings().bDrawBatchLine)
+		{
+			const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
 
-		if (SettingsPanel->GetSettings().bDrawPSGrid && !MultipleViewportsAdapter.IsOrthographic(ViewIndex))
-		{
-			GridRenderer->OnRenderPSGrid(
-				ViewProjection, ViewCameraLocation, SettingsPanel->GetSettings(), ViewRenderingInfo.ViewportSetting
-			);
-		}
-		else
-		{
-			GridRenderer->OnRenderBatchGrid(
-				ViewProjection,
-				ViewCameraLocation,
-				ViewCameraForward,
-				GridPlane,
-				static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
-				!MultipleViewportsAdapter.IsOrthographic(ViewIndex) ||
-				MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
-				ViewRenderingInfo.ViewportSetting
-			);
+			if (SettingsPanel->GetSettings().bDrawPSGrid && !MultipleViewportsAdapter.IsOrthographic(ViewIndex))
+			{
+				GridRenderer->OnRenderPSGrid(
+					ViewProjection, ViewCameraLocation, SettingsPanel->GetSettings(), ViewRenderingInfo.ViewportSetting
+				);
+			}
+			else
+			{
+				GridRenderer->OnRenderBatchGrid(
+					ViewProjection,
+					ViewCameraLocation,
+					ViewCameraForward,
+					GridPlane,
+					static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
+					!MultipleViewportsAdapter.IsOrthographic(ViewIndex) ||
+					MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
+					ViewRenderingInfo.ViewportSetting
+				);
+			}
 		}
 	}
 
@@ -482,12 +520,12 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 	}
 
 	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (Outline->GetTarget())
+	if (TargetWorld->IsEditorWorld() && Outline->GetTarget())
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, ViewRenderingInfo.ViewportSetting);
 	}
 
-	if (Gizmo->GetTarget())
+	if (TargetWorld->IsEditorWorld() && Gizmo->GetTarget())
 	{
 		auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
 
@@ -504,9 +542,9 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 	RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
-	if (SettingsPanel->GetSettings().bShowUUID)
+	if (TargetWorld->IsEditorWorld() && SettingsPanel->GetSettings().bShowUUID)
 	{
-		for (AActor* Actor : World->GetPersistentLevel()->GetActors())
+		for (AActor* Actor : TargetWorld->GetPersistentLevel()->GetActors())
 		{
 			if (!Actor)
 				continue;
@@ -624,6 +662,10 @@ void UEditorEngine::StartPIE()
 {
 	if (GetWorldContextFromType(EWorldType::PIE) != nullptr) return;
 
+	PIEViewIndex = MultipleViewportsAdapter.GetActiveViewIndex();
+
+	if (PIEViewIndex == InvalidViewIndex) PIEViewIndex = 0;
+
 	FWorldContext* EditorContext = GetWorldContextFromType(EWorldType::Editor);
 	if (!EditorContext || !EditorContext->World)
 		return;
@@ -674,6 +716,8 @@ void UEditorEngine::EndPIE()
 	DetailsPanel->SetWorld(World);
 	EditorControlsPanel->SetWorld(World);
 	SettingsPanel->SetWorld(World);
+
+	// 에디터 카메라로 돌아오는 로직 필요
 
 	DestroyWorldContext(EWorldType::PIE);
 }

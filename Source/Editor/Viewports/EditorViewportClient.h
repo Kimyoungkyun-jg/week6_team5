@@ -108,6 +108,7 @@ public:
 
   bool IsWireframe() const { return ViewportMode == EViewportMode::Wireframe; }
   bool IsSceneDepth() const { return ViewportMode == EViewportMode::SceneDepth; }
+  EViewportMode GetViewportMode() const { return ViewportMode; }
   void SetViewportMode(const EViewportMode InViewportMode) { ViewportMode = InViewportMode; }
   float GetMaxRange() const { return MaxRange; }
 
@@ -136,5 +137,5 @@ protected:
   float NearClip = 0.1f;
   float FarClip = 10000.0f;
   float OrthoWidth = 10.0f;
-  float MaxRange = 1000.0f;
+  float MaxRange = 50.0f;
 };

@@ -48,7 +48,7 @@ float4 mainPS(VSOutput Input) : SV_Target
 
     if (DeviceZ >= 1.0f)
     {
-        return float4(1, 1, 1, 1);
+        return float4(0, 0, 0, 0);
     }
 
     float ViewDepth = ConvertFromDeviceZ(DeviceZ);

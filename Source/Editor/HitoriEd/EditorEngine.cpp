@@ -240,7 +240,32 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 		SettingsPanel->GetMutableSettings().MultipleViewportsVertical = Ratio.Vertical;
 	}
 
-	if (World && World->IsPIEWorld() && !bIsSimulatingInEditor)
+	int32 HoveredView = MultipleViewportsAdapter.GetViewAtPosition(LocalMousePosition);
+
+	int32 TargetViewIndex = MultipleViewportsAdapter.GetCapturedViewIndex();
+	if(TargetViewIndex == InvalidViewIndex)
+	{
+		TargetViewIndex = HoveredView;
+	}
+
+	if (World && World->IsPIEWorld()&&  TargetViewIndex == PIEViewIndex && !bIsSimulatingInEditor)
+	{
+		ViewportsPanel->SetShowNoCamera(false);
+		if (PIEPlayerController)
+		{
+			PIEPlayerController->ProcessPlayerInput(DeltaTime);
+		}
+	}
+	else
+	{
+		MultipleViewportsAdapter.UpdateInput(
+			DeltaTime,
+			LocalMousePosition,
+			SettingsPanel->GetSettings().CameraSpeed,
+			SettingsPanel->GetSettings().MouseSensitivity);
+	}
+
+/*	if (World && World->IsPIEWorld() && !bIsSimulatingInEditor)
 	{
 		// 플레이어 컨트롤러가 살아있으면 정상 뷰포트로 표시!
 		if (PIEPlayerController)
@@ -259,7 +284,7 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 			LocalMousePosition,
 			SettingsPanel->GetSettings().CameraSpeed,
 			SettingsPanel->GetSettings().MouseSensitivity);
-	}
+	}*/
 
 	// 겹친 창은 Hover 선택에서 제외하고 우클릭 Capture를 우선한다.
 	if (ViewportsPanel->IsHovered() || MultipleViewportsAdapter.GetCapturedViewIndex() != InvalidViewIndex)

@@ -103,6 +103,12 @@ public:
     // 현재 가로·세로 Split 비율을 반환한다.
     const FSplitRatio& GetSplitRatio() const { return SplitRatio; }
 
+    int32 GetViewAtPosition(const FVector2 Point) const
+    {
+        const int32 Hovered = DetermineHoveredView(Point, ViewRects);
+        return (Hovered != InvalidViewIndex && IsViewActive(Hovered)) ? Hovered : InvalidViewIndex;
+    }
+
 private:
     // 직교 View의 논리 위치는 유지하고 렌더·컬링·피킹용 깊이 범위만 확장한다.
     FViewCamera GetRenderCamera(int32 ViewIndex) const;

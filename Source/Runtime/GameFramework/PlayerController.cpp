@@ -10,7 +10,7 @@ APlayerController::APlayerController()
 
 void APlayerController::GetPlayerViewCamera(FVector& OutLocation, FRotator& OutRotation) const
 {
-	if(PossessedPawn)
+	if (PossessedPawn)
 	{
 		OutLocation = PossessedPawn->GetActorLocation();
 		OutRotation = PossessedPawn->GetActorRotation();
@@ -30,23 +30,35 @@ void APlayerController::BeginPlay()
 void APlayerController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	if (bIsIgnoreInput) return;
+	// 카메라 시점 업데이트
+	if (PossessedPawn)
+	{
+		CameraLocation = PossessedPawn->GetActorLocation();
+		CameraRotation = PossessedPawn->GetActorRotation();
+	}
+}
+
+void APlayerController::ProcessPlayerInput(float DeltaTime)
+{
+	if (bIsIgnoreInput) return;
 	// 입력 처리 및 카메라 시점 업데이트
 	float ForwardInput = 0.0f;
 	float RightInput = 0.0f;
 
-	if(FInputSystem::IsKeyDown(EKeyCode::W))
+	if (FInputSystem::IsKeyDown(EKeyCode::W))
 	{
 		ForwardInput = 1.0f;
 	}
-	if(FInputSystem::IsKeyDown(EKeyCode::S))
+	if (FInputSystem::IsKeyDown(EKeyCode::S))
 	{
 		ForwardInput = -1.0f;
 	}
-	if(FInputSystem::IsKeyDown(EKeyCode::A))
+	if (FInputSystem::IsKeyDown(EKeyCode::A))
 	{
 		RightInput = -1.0f;
 	}
-	if(FInputSystem::IsKeyDown(EKeyCode::D))
+	if (FInputSystem::IsKeyDown(EKeyCode::D))
 	{
 		RightInput = 1.0f;
 	}
@@ -54,43 +66,30 @@ void APlayerController::Tick(float DeltaTime)
 	float YawDelta = FInputSystem::GetMouseDeltaX() * LookSensitivity;
 	float PitchDelta = FInputSystem::GetMouseDeltaY() * LookSensitivity;
 
-	if (FInputSystem::IsMouseDown(EMouseButton::Right))
+	if (PossessedPawn)
 	{
-		if (PossessedPawn)
+		if (FInputSystem::IsMouseDown(EMouseButton::Right))
 		{
 			PossessedPawn->AddControllerYawInput(YawDelta);
 			PossessedPawn->AddControllerPitchInput(PitchDelta);
 		}
-	}
 
-	if(PossessedPawn)
-	{
 		FRotator CurrentRotation = PossessedPawn->GetActorRotation();
 		FVector Forward = CurrentRotation.Quaternion().GetForwardVector();
 		FVector Right = CurrentRotation.Quaternion().GetRightVector();
-		if(ForwardInput != 0.0f)
+		if (ForwardInput != 0.0f)
 		{
 			PossessedPawn->AddMovementInput(Forward, ForwardInput * DeltaTime);
 		}
-		if(RightInput != 0.0f)
+		if (RightInput != 0.0f)
 		{
 			PossessedPawn->AddMovementInput(Right, RightInput * DeltaTime);
 		}
 
 		CameraLocation = PossessedPawn->GetActorLocation();
+		CameraRotation = CurrentRotation;
 	}
-	else
-	{
-		// 폰이 없으면 카메라 위치와 회전을 업데이트
-		FVector Forward = CameraRotation.Vector();
-		FVector Right = FVector::Cross(FVector(0.0f, 0.0f, 1.0f), Forward).Normalized();
-		FVector Up = FVector::Cross(Forward, Right).Normalized();
-		
-		CameraLocation += (Forward * ForwardInput + Right * RightInput) * DeltaTime;
-		CameraRotation.Pitch += PitchDelta;
-		CameraRotation.Yaw += YawDelta;
-	}
-}	
+}
 
 void APlayerController::Possess(APawn* InPawn)
 {

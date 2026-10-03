@@ -13,6 +13,8 @@
 #include "Render/GeometryGenerator.h"
 
 #include "Engine/World.h"
+#include "Engine/GameInstance.h"
+#include "Engine/ScopedConditionalWorldSwitcher.h"
 #include "Engine/Level.h"
 
 #include "Render/Renderer.h"
@@ -67,6 +69,10 @@ bool UEditorEngine::Init()
 	if (!Super::Init())
 		return false;
 
+	EditorWorld = GetWorld();
+	FWorldContext& Context = CreateNewWorldContext(EWorldType::WorldEditor);
+	Context.SetCurrentWorld(EditorWorld);
+
 	MainWindow = GetEngineLoop().GetMainWindow();
 	MainWindowSC = GetEngineLoop().GetSwapchain();
 	Renderer = GetEngineLoop().GetRenderer();
@@ -120,7 +126,7 @@ bool UEditorEngine::Init()
 	TextRenderer->Init();
 
 	// 투영 행렬 생성 
-	MultipleViewportsAdapter.InitializeFromWorld(*WorldEditor);
+	MultipleViewportsAdapter.InitializeFromWorld(*EditorWorld);
 	// 화면 나눔 비율 설정 가져오기
 	MultipleViewportsAdapter.SetSplitRatio({
 		SettingsPanel->GetSettings().MultipleViewportsHorizontal,
@@ -133,14 +139,14 @@ bool UEditorEngine::Init()
 		SettingsPanel->GetSettings().bMultipleViewportsSingle
 		? ELayoutMode::Single
 		: ELayoutMode::QuadSplit);
-	WorldEditor->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
+	EditorWorld->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
 
 	/// 삭제 예정
 	//SceneManager = EditorUI->AddEditorPanel<FSceneManager>();
 	//SceneManager->SetWorld(World);
 
 	OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
-	OutlinerPanel->SetWorld(WorldEditor);
+	OutlinerPanel->SetWorld(EditorWorld);
 	OutlinerPanel->SetSelectionCallback(
 		[this](UPrimitiveComponent* Primitive)
 		{
@@ -158,15 +164,15 @@ bool UEditorEngine::Init()
 	);
 
 	LineBatcher = MakeUnique<FLineBatcher>();
-	LineBatcher->Init(Renderer, WorldEditor);
+	LineBatcher->Init(Renderer, EditorWorld);
 
-	DetailsPanel->SetWorld(WorldEditor);
+	DetailsPanel->SetWorld(EditorWorld);
 
-	EditorControlsPanel->SetWorld(WorldEditor);
+	EditorControlsPanel->SetWorld(EditorWorld);
 	EditorControlsPanel->SetGizmo(Gizmo.get());
 	EditorControlsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 
-	SettingsPanel->SetWorld(WorldEditor);
+	SettingsPanel->SetWorld(EditorWorld);
 	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 	ViewportsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 
@@ -180,6 +186,7 @@ bool UEditorEngine::Init()
 // 입력·창 메시지는 FEngineLoop가 먼저 처리하고 Present는 호출 직후에 한다.
 void UEditorEngine::Tick(const float DeltaTime)
 {
+	ProcessPlaySessionRequest();
 	BeginFrame(DeltaTime);
 	UpdateMultipleViewportState(DeltaTime);
 	TickWorldAndEditor(DeltaTime);
@@ -254,7 +261,12 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	// 월드 상태는 프레임마다 정확히 한 번 갱신하고 캡처한다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
-		WorldEditor->Tick(DeltaTime);
+		// todo
+		// 현재는 둘중 하나만 tick을 돌지만, 추후 multiple viewport에 대한 처리가 된다면
+		// 동시에 tick을 처리하는게 가능해짐
+		UWorld* TickWorld = PlayWorld ? PlayWorld : EditorWorld;
+		FScopedConditionalWorldSwitcher WorldSwitcher(TickWorld);
+		TickWorld->Tick(DeltaTime);
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
@@ -262,7 +274,7 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_CaptureWorld);
-		MultipleViewportsAdapter.CaptureWorld(*WorldEditor);
+		MultipleViewportsAdapter.CaptureWorld(*EditorWorld);
 	}
 	UpdateGizmoAndPicking();
 }
@@ -342,7 +354,7 @@ void UEditorEngine::UpdateGizmoAndPicking()
 
 	if (FInputSystem::IsMousePressed(EMouseButton::Left) && !Gizmo->IsUsing() && Gizmo->GetHoveredAxis() < 0)
 	{
-		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *WorldEditor);
+		MultipleViewportsAdapter.PickActiveView(LocalMousePosition, *EditorWorld);
 		MultipleViewportsAdapter.ApplyLastPickToOutliner(*OutlinerPanel);
 	}
 
@@ -361,7 +373,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 		if (SettingsPanel->GetSettings().bDrawBoundingBox)
 		{
 			LineBatcher->BuildVertexBuffer();
-			WorldEditor->GetPathTracker().OnRender(LineBatcher.get());
+			EditorWorld->GetPathTracker().OnRender(LineBatcher.get());
 		}
 
 		// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
@@ -474,7 +486,7 @@ void UEditorEngine::RenderFrame(const int32 ViewIndex, const FRenderingInfo& Vie
 
 	if (SettingsPanel->GetSettings().bShowUUID)
 	{
-		for (AActor* Actor : WorldEditor->GetPersistentLevel()->GetActors())
+		for (AActor* Actor : EditorWorld->GetPersistentLevel()->GetActors())
 		{
 			if (!Actor)
 				continue;
@@ -535,7 +547,10 @@ void UEditorEngine::PresentFrame()
 // ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
 void UEditorEngine::PreExit()
 {
-	ImGuiRenderer->Shutdown();
+	StopPlayInEditorSession();
+	if (ImGuiRenderer) ImGuiRenderer->Shutdown();
+	EditorWorld = nullptr;
+	Super::PreExit();
 }
 
 // 선택과 Gizmo 참조를 정리한 뒤 Actor를 삭제한다.
@@ -561,7 +576,7 @@ void UEditorEngine::ResetSceneSelection()
 // 새 씬 생성이 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::CreateNewScene()
 {
-	if (!FEditorFileUtils::NewScene(WorldEditor))
+	if (!FEditorFileUtils::NewScene(EditorWorld))
 		return;
 
 	ResetSceneSelection();
@@ -570,7 +585,7 @@ void UEditorEngine::CreateNewScene()
 // 씬 불러오기가 성공하면 에디터 선택 상태를 초기화한다.
 void UEditorEngine::OpenScene()
 {
-	if (!FEditorFileUtils::LoadScene(WorldEditor))
+	if (!FEditorFileUtils::LoadScene(EditorWorld))
 		return;
 
 	ResetSceneSelection();
@@ -579,11 +594,163 @@ void UEditorEngine::OpenScene()
 // 공통 파일 유틸리티로 현재 씬을 저장한다.
 void UEditorEngine::SaveCurrentScene()
 {
-	FEditorFileUtils::SaveScene(WorldEditor);
+	FEditorFileUtils::SaveScene(EditorWorld);
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
 void UEditorEngine::SaveSceneAs()
 {
-	FEditorFileUtils::SaveSceneAs(WorldEditor);
+	FEditorFileUtils::SaveSceneAs(EditorWorld);
+}
+
+
+bool UEditorEngine::RequestPlaySession(int32 ViewportSlot)
+{
+	if (PIEState != EPIESessionState::Stopped || bPendingEndPlay ||
+		!EditorWorld || PlayWorld || PIEContext || PendingPlayViewportSlot != -1 ||
+		ViewportSlot < 0 || ViewportSlot >= 4 || !MultipleViewportsAdapter.IsViewActive(ViewportSlot))
+		return false;
+	PendingPlayViewportSlot = ViewportSlot;
+	return true;
+}
+
+void UEditorEngine::ProcessPlaySessionRequest()
+{
+	if (bPendingEndPlay)
+	{
+		StopPlayInEditorSession();
+		return;
+	}
+	if (bPendingPause && PlayWorld)
+	{
+		PlayWorld->SetDebugPauseExecution(bRequestedPause);
+		PIEState = bRequestedPause ? EPIESessionState::Paused : EPIESessionState::Running;
+	}
+	bPendingPause = false;
+	if (PendingPlayViewportSlot == -1) return;
+	const int32 ViewportSlot = PendingPlayViewportSlot;
+	PendingPlayViewportSlot = -1; // 실패 후 재요청할 수 있도록 먼저 소비한다.
+	if (!StartPlayInEditorSession(ViewportSlot))
+		HTR_LOG(Info, "PIE start failed: duplication/play initialization is incomplete, or target is unavailable.");
+}
+
+void UEditorEngine::RequestEndPlayMap()
+{
+	PendingPlayViewportSlot = -1;
+	bPendingEndPlay = true;
+}
+
+// Context -> GI -> 복제 World 순서로 준비한다. UI 콜백이 아니라 Tick 시작에서만 호출한다.
+bool UEditorEngine::StartPlayInEditorSession(int32 ViewportSlot)
+{
+	if (!EditorWorld || PlayWorld || PIEContext || !MultipleViewportsAdapter.IsViewActive(ViewportSlot))
+		return false;
+
+	PIEState = EPIESessionState::Starting;
+	PIEContext = &CreateNewWorldContext(EWorldType::WorldPIE);
+	PIEContext->SetViewportTarget(this, ViewportSlot);
+	PlayGameInstance = Cast<UGameInstance>(FObjectFactory::ConstructObject(UGameInstance::StaticClass(), this));
+	if (!PlayGameInstance)
+	{
+		ReleasePIEContext();
+		return false;
+	}
+	PlayGameInstance->SetWorldContext(PIEContext);
+	PIEContext->SetGameInstance(PlayGameInstance);
+
+	UWorld* NewPlayWorld = CreatePIEWorldByDuplication();
+	if (NewPlayWorld == nullptr)
+	{
+		ReleasePIEContext();
+		return false;
+	}
+	PIEContext->SetCurrentWorld(NewPlayWorld);
+	NewPlayWorld->SetGameInstance(PlayGameInstance);
+
+	bool bStarted = false;
+	{
+		FScopedConditionalWorldSwitcher WorldSwitcher(NewPlayWorld);
+		PlayGameInstance->Init();
+		bGameInstanceInitialized = true;
+		bStarted = PlayGameInstance->StartPlayInEditorGameInstance();
+	}
+	if (!bStarted)
+	{
+		StopPlayInEditorSession();
+		return false;
+	}
+	PlayWorld = NewPlayWorld;
+	PIEState = EPIESessionState::Running;
+	return true;
+}
+
+// 목표 pause 상태를 예약한다. 실제 Tick/입력 차단은 실행·뷰포트 단계에서 연결한다.
+bool UEditorEngine::SetPIEWorldPaused(bool bPaused)
+{
+	if (PlayWorld == nullptr)
+		return false;
+
+	bRequestedPause = bPaused;
+	bPendingPause = true;
+	return true;
+}
+
+UWorld* UEditorEngine::CreatePIEWorldByDuplication()
+{
+	if (EditorWorld == nullptr || PlayWorld != nullptr)
+		return nullptr;
+
+	// 다음 학습 범위: StaticDuplicateObjectEx와 메모리 JSON Archive 서브클래스.
+	// 포인터 대응표를 사용해 복제하고 실패 시 부분 생성 객체까지 정리해야 한다.
+	// 빈 World를 성공으로 반환하면 안 된다. 복제 구현 전에는 항상 실패한다.
+	return nullptr;
+}
+
+void UEditorEngine::ReleasePIEContext()
+{
+	// 초기화 전 실패 또는 Stop의 마지막 단계다. Shutdown 필요 여부는 호출자가 처리한다.
+	if (PIEContext)
+	{
+		PIEContext->SetCurrentWorld(nullptr);
+		PIEContext->SetGameInstance(nullptr);
+		PIEContext->SetViewportTarget(nullptr, -1);
+	}
+	if (PlayGameInstance)
+	{
+		PlayGameInstance->SetWorldContext(nullptr);
+		delete PlayGameInstance;
+		PlayGameInstance = nullptr;
+	}
+	if (PIEContext)
+	{
+		DestroyWorldContext(*PIEContext);
+		PIEContext = nullptr;
+	}
+	PIEState = EPIESessionState::Stopped;
+}
+
+
+// PIE World를 소멸하여, PIE 세션을 종료한다.
+void UEditorEngine::StopPlayInEditorSession()
+{
+	PendingPlayViewportSlot = -1;
+	bPendingEndPlay = false;
+	bPendingPause = false;
+	const bool bWasRunning = PIEState == EPIESessionState::Running || PIEState == EPIESessionState::Paused;
+	PIEState = EPIESessionState::Stopping;
+	UWorld* WorldToDestroy = PIEContext ? PIEContext->GetWorld() : PlayWorld;
+	PlayWorld = nullptr;
+	if (WorldToDestroy)
+	{
+		{
+			FScopedConditionalWorldSwitcher WorldSwitcher(WorldToDestroy);
+			if (bWasRunning) WorldToDestroy->EndPlay();
+			if (bGameInstanceInitialized) PlayGameInstance->Shutdown();
+			WorldToDestroy->CleanupWorld();
+		}
+		if (PIEContext) PIEContext->SetCurrentWorld(nullptr);
+		delete WorldToDestroy; // GWorld 가드가 복원된 뒤 삭제한다.
+	}
+	bGameInstanceInitialized = false;
+	ReleasePIEContext();
 }

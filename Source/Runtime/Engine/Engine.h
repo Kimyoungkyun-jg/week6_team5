@@ -3,6 +3,7 @@
 #include "Engine/World.h"
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Class.h"
+#include "WorldContext.h"
 
 class FEngineLoop;
 
@@ -36,16 +37,17 @@ public:
 	virtual void Tick(float DeltaTime) = 0;
 	virtual void OnResize(uint32 Width, uint32 Height) {}
 	// UObject 일괄 정리와 GPU 자원 해제 전에 호출된다.
-	virtual void PreExit() {}
+	virtual void PreExit();
 
-	UWorld* GetWorldEditor() const { return WorldEditor; }
-	UWorld* GetWorldPIE() const { return WorldPIE; }
-
+	FWorldContext& CreateNewWorldContext(EWorldType InWorldType);
+	void DestroyWorldContext(FWorldContext& TargetContext);
+	FWorldContext* GetWorldContextFromWorld(const UWorld* InWorld) const;
+	UWorld* GetWorld() const { return World; }
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 
-	UWorld* WorldEditor = nullptr;
-	UWorld* WorldPIE = nullptr;
+	TArray<TUniquePtr<FWorldContext>> WorldList;
+	UWorld* World = nullptr;
 private:
 	FEngineLoop* EngineLoop = nullptr;
 };

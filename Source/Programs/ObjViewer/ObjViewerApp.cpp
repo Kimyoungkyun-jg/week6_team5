@@ -116,6 +116,7 @@ void UObjViewerEngine::Tick(float DeltaTime)
 void UObjViewerEngine::PreExit()
 {
 	Mesh = nullptr;
+	Super::PreExit();
 }
 
 void UObjViewerEngine::HandleShortcuts()

@@ -40,11 +40,8 @@ UWorld::~UWorld()
 
 }
 
-bool UWorld::Init(EWorldType InputWorldType)
+bool UWorld::Init()
 {
-	WorldType = InputWorldType;
-
-
 	// Spawn Actor로 카메라 생성하고 세팅하기
 	PersistentLevel = FObjectFactory::ConstructObject<ULevel>();
 
@@ -153,7 +150,38 @@ void UWorld::ClearWorld()
 				Actor->RegisterAllActorTickFunctions(false);
 		Level->ClearActors();
 	}
-	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
+	if (PersistentLevel)
+		HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
+}
+
+void UWorld::CleanupWorld()
+{
+	// 카메라가 Level 소속이면 ClearWorld가 삭제한다. 별도 생성 카메라만 직접 삭제한다.
+	ACameraActor* StandaloneCamera = MainCamera;
+	for (ULevel* Level : Levels)
+		for (AActor* Actor : Level->GetActors())
+			if (Actor == StandaloneCamera) StandaloneCamera = nullptr;
+	MainCamera = nullptr;
+	ClearWorld();
+	if (StandaloneCamera)
+	{
+		StandaloneCamera->RegisterAllActorTickFunctions(false);
+		delete StandaloneCamera;
+	}
+	for (ULevel* Level : Levels)
+	{
+		Level->SetWorld(nullptr);
+		delete Level;
+	}
+	Levels.Reset();
+	PersistentLevel = nullptr;
+	CurrentLevel = nullptr;
+	OwningGameInstance = nullptr;
+	VisibleProxies.Reset();
+	LODInputs.Reset();
+	SelectedLODs.Reset();
+	GatherChunks.Reset();
+	bDebugPauseExecution = false;
 }
 
 void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContext* LODView, const FFrustumPlanes* Frustum, FRenderer* Renderer)

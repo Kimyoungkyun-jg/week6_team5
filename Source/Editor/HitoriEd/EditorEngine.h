@@ -31,6 +31,8 @@
 #include "Text/Font.h"
 #include "Text/TextRenderer.h"
 
+enum class EPIESessionState { Stopped, Starting, Running, Paused, Stopping };
+
 class UEditorEngine : public UEngine
 {
 	DECLARE_CLASS(UEditorEngine, UEngine)
@@ -41,6 +43,14 @@ public:
 	void Tick(float DeltaTime) override;
 	void PreExit() override;
 
+	UWorld* CreatePIEWorldByDuplication();
+	// true는 요청 접수 의미다. 실제 시작 결과는 다음 Tick에서 결정된다.
+	bool RequestPlaySession(int32 ViewportSlot);
+	void RequestEndPlayMap();
+	EPIESessionState GetPIESessionState() const { return PIEState; }
+	bool SetPIEWorldPaused(bool bPaused);
+	void StopPlayInEditorSession();
+
 	// Active View의 입력과 Picking 결과만 Gizmo 및 선택 상태에 반영한다.
 	void UpdateGizmoAndPicking();
 	// View 하나의 Scene·Grid·Gizmo·텍스트를 해당 ViewProjection으로 렌더한다.
@@ -49,7 +59,22 @@ public:
 	void PresentFrame();
 	void DeleteActor(AActor* Actor);
 
+	UWorld* GetEditorWorld() const { return EditorWorld; }
+	UWorld* GetPlayWorld() const { return PlayWorld; }
+
 private:
+	void ProcessPlaySessionRequest();
+	bool StartPlayInEditorSession(int32 ViewportSlot);
+	void ReleasePIEContext();
+	int32 PendingPlayViewportSlot = -1;
+	bool bPendingEndPlay = false;
+	bool bPendingPause = false;
+	bool bRequestedPause = false;
+	bool bGameInstanceInitialized = false;
+	EPIESessionState PIEState = EPIESessionState::Stopped;
+	FWorldContext* PIEContext = nullptr; // UEngine::WorldList 소유
+	UGameInstance* PlayGameInstance = nullptr; // 명시적으로 생성/삭제한다. Outer는 소유권이 아니다.
+
 	// 이번 프레임 DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
 	void BeginFrame(float DeltaTime);
 	// 패널 요청과 입력을 Core Adapter에 전달해 레이아웃·카메라 상태를 갱신한다.
@@ -90,6 +115,11 @@ private:
 	FRenderQueue RenderQueue;
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
+
+
+	UWorld* EditorWorld = nullptr;
+	UWorld* PlayWorld = nullptr;
+
 
 	void ResetSceneSelection();
 

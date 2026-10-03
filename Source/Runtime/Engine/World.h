@@ -1,5 +1,7 @@
 #pragma once
 
+class UGameInstance;
+
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Class.h"
 #include "GameFramework/Actor.h"
@@ -32,21 +34,17 @@ struct FRenderStats
 	void Reset() { *this = FRenderStats(); }
 };
 
-enum class EWorldType
-{
-	WorldEditor,
-	WorldPIE
-};
-
 class UWorld : public UObject
 {
 	DECLARE_CLASS(UWorld, UObject)
 
 public:
+	void SetGameInstance(UGameInstance* InGameInstance) { OwningGameInstance = InGameInstance; }
+	UGameInstance* GetGameInstance() const { return OwningGameInstance; }
 	UWorld() = default;
 	virtual ~UWorld();
 
-	bool Init(EWorldType InputWorldType);
+	bool Init();
 	/*UPrimitiveComponent* SpawnPrimitive(FClass* Class);*/
 	AActor* SpawnActor(UClass* Class, FName InName = NAME_None, const FTransform* Transform = nullptr);
 
@@ -89,12 +87,21 @@ public:
 
 	void BeginPlay();
 	void EndPlay();
+	// 세션 소유자가 World 삭제 전에 호출한다. 반복 호출 가능하며 공유 에셋은 삭제하지 않는다.
+	// 소멸자에서는 호출하지 않는다: 앱 종료의 UObject 일괄 삭제와 중복될 수 있다.
+	void CleanupWorld();
+
+	void SetDebugPauseExecution(bool bPaused) { bDebugPauseExecution = bPaused; }
+	bool IsDebugPauseExecution() const { return bDebugPauseExecution; }
+
 
 	FScene& GetScene() { return Scene; }
 	FTickTaskManager& GetTickTaskManager() { return TickTaskManager; }
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
 private:
+	// 세션 소유자는 EditorEngine이다. World는 GI를 삭제하지 않는다.
+	UGameInstance* OwningGameInstance = nullptr;
 	struct alignas(64) FGatherChunk
 	{
 		TArray<FRenderPacket> Packets;              // 스태틱 묶음에 못 들어가는 것 (반투명 섹션, Renderer 없는 호출)
@@ -118,7 +125,7 @@ private:
 
 	FPathTracker PathTracker;
 
-	EWorldType WorldType;
+	bool bDebugPauseExecution = false;
 
 	ULevel* PersistentLevel = nullptr;
 	ULevel* CurrentLevel = nullptr;

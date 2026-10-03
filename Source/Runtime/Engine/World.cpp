@@ -109,7 +109,7 @@ void UWorld::Tick(float DeltaTime)
 	if (!bIsTickEnable) return;
 
 
-	if (worldType == EWorldType::PIE)
+	if (WorldType == EWorldType::PIE)
 	{
 		while (!BeginPlayList.IsEmpty())
 		{
@@ -124,7 +124,7 @@ void UWorld::Tick(float DeltaTime)
 			PathTracker.Tick(Level->GetActors(), DeltaTime);
 		}
 	}
-	else if(worldType == EWorldType::Editor)
+	else if(WorldType == EWorldType::Editor)
 	{
 
 		for (TObjectIterator<UParticleSubUVComponent> Comp; Comp; ++Comp)
@@ -178,7 +178,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 		// 컬링 단계에서는 프록시 포인터만 모으고, 컴포넌트 역참조(가시성 확인)는 어차피 컴포넌트를 읽는 Gather로 미룬다.
 		const auto Visit = [&](FPrimitiveSceneProxy* Proxy) { VisibleProxies.Add(Proxy); };
 
-		if (Frustum)
+		if (Frustum) 
 		{
 			Scene.BVH.QueryCull(
 				FrustumAllPlanesMask,
@@ -676,7 +676,7 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 	}
 	
 	Init();
-	worldType = EWorldType::PIE;
+
 
 	if (ULevel* SrcLevel = SrcWorld->GetPersistentLevel())
 	{

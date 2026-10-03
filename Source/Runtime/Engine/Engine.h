@@ -23,6 +23,50 @@ struct FEngineConfig
 	const char* SplashImage = nullptr;
 };
 
+
+
+class UGameInstance;
+
+// 월드 컨텍스트 정보
+struct FWorldContext
+{
+	EWorldType WorldType = EWorldType::None;
+
+	// 게임 인스턴스 참조
+	UGameInstance* OwningGameInstance = nullptr;
+
+	int32 PIEInstance = -1;
+
+	// 현재 월드 인스턴스 반환
+	inline UWorld* World() const
+	{
+		return ThisCurrentWorld;
+	}
+
+	// 현재 월드 인스턴스 설정
+	inline void SetCurrentWorld(UWorld* InWorld)
+	{
+		ThisCurrentWorld = InWorld;
+	}
+
+	FWorldContext()
+		: WorldType(EWorldType::None)
+		, ThisCurrentWorld(nullptr)
+	{
+	}
+
+	FWorldContext(EWorldType InWorldType, UWorld* InWorld = nullptr)
+		: WorldType(InWorldType)
+		, ThisCurrentWorld(InWorld)
+	{
+	}
+
+private:
+	UWorld* ThisCurrentWorld = nullptr;
+};
+
+
+
 // 모든 엔진 모드의 베이스. 플랫폼·루프·Present는 FEngineLoop가 맡고,
 // 서브클래스(Game, Editor)는 Tick에서 한 프레임의 갱신과 렌더를 채운다.
 class UEngine : public UObject
@@ -45,6 +89,20 @@ public:
 
 	UWorld* GetEditorWorld() const { return EditorWorld; }
 	UWorld* GetPlayWorld() const { return PlayWorld; }
+
+	// 월드 컨텍스트 관리
+	FWorldContext* GetWorldContextFromPIEInstance(int32 PIEInstanceIndex);
+	UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld);
+	FWorldContext& CreateNewWorldContext(EWorldType InWorldType);
+
+	// 관리 중인 월드 컨텍스트 목록
+	TArray<FWorldContext> WorldContextlist;
+
+	void SetPlayWorld(UWorld& playWorld)
+	{
+		PlayWorld = &playWorld;
+	}
+
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 

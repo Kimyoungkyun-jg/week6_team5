@@ -36,3 +36,11 @@ struct FVector2
 	FVector2 operator*(const float Scalar) { return FVector2(X * Scalar, Y * Scalar); }
 	FVector2 operator*(const float Scalar) const { return FVector2(X * Scalar, Y * Scalar); }
 };
+
+struct FRect
+{
+	float X = 0.0f;
+	float Y = 0.0f;
+	float Width = 0.0f;
+	float Height = 0.0f;
+};

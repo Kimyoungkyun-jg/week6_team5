@@ -20,12 +20,14 @@ class UBillboardComponent;
 
 struct FViewContext;
 
-
 enum EWorldType
 {
+	None,
 	Editor,
 	PIE,
 };
+
+class UWorld;
 
 struct FRenderStats
 {
@@ -96,8 +98,8 @@ public:
 
 	const FRenderStats& GetRenderStats() const { return RenderStats; }
 
-	const EWorldType GetWorldType() const { return worldType; }
-	void SetWorldType(EWorldType type) { worldType = type; }
+	EWorldType& GetWorldType() { return WorldType; }
+
 
 	void DuplicateWorld(UWorld* SrcWorld);
 
@@ -139,7 +141,8 @@ private:
 
 	FRenderStats RenderStats;
 
-	EWorldType worldType = EWorldType::Editor;
-
 	bool bIsTickEnable = true;
+
+	EWorldType WorldType;
+
 };

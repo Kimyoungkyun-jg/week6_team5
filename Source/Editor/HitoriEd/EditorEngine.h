@@ -18,7 +18,7 @@
 #include "Editor/EditorControls/EditorControlsPanel.h"
 #include "Editor/Settings/SettingsPanel.h"
 #include "Editor/Viewports/ViewportsPanel.h"
-#include "Editor/LevelEditor/MultipleViewports/Core/MultipleViewports.h"
+#include "Editor/Viewports/ViewportLayout.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
 
 #include "Editor/Rendering/Outline.h"
@@ -55,17 +55,22 @@ public:
 	void PresentFrame();
 	void DeleteActor(AActor* Actor);
 
+	EPIEState GetPIEState() const { return PIEState; }
+
 private:
 	// 이번 프레임 DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
 	void BeginFrame(float DeltaTime);
 	// 패널 요청과 입력을 Core Adapter에 전달해 레이아웃·카메라 상태를 갱신한다.
-	void UpdateMultipleViewportState(float DeltaTime);
+	void UpdateViewportState(float DeltaTime);
 	// 월드를 정확히 한 번 Tick·Capture한 뒤 에디터 상호작용을 갱신한다.
 	void TickWorld(float DeltaTime);
 	// 한 번 캡처한 월드 결과를 재사용해 현재 레이아웃의 각 View를 렌더한다.
-	void RenderMultipleViewports();
+	void RenderViewports();
 	// 화면 합성과 View 설정 보관으로 프레임을 마무리한다.
 	void EndFrame();
+
+	
+
 
 	// FEngineLoop 소유. OnInit에서 받아 둔다.
 	FWindow* MainWindow = nullptr;
@@ -101,6 +106,9 @@ private:
 
 	TArray<FEditorViewportClient*> AllViewportClients;
 
+	UGameInstance* GameInstance = nullptr;
+
+	EPIEState PIEState = EPIEState::Stopped;
 	bool bIsStep = false;
 
 	void ResetSceneSelection();

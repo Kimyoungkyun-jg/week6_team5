@@ -10,10 +10,7 @@ enum class ELevelViewportType : uint8
 {
 	Perspective,
 	Top,
-	Bottom,
 	Front,
-	Back,
-	Left,
 	Right
 };
 

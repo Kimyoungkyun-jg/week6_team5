@@ -11,6 +11,8 @@
 class FPrimitiveSceneProxy;
 inline constexpr uint32 InvalidObjectSlot = ~0u;
 
+
+
 struct FRenderPacket
 {
     const FPrimitiveSceneProxy* Proxy = nullptr;

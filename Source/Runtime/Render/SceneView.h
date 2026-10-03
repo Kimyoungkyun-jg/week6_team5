@@ -5,16 +5,10 @@
 #include "Math/Rotator.h"
 #include "Math/Matrix.h"
 #include "Math/Frustum.h"
+
 #include "Render/RenderPacket.h"
 
-// 화면 사각형 구조체
-struct FViewRect
-{
-	float X = 0.0f;
-	float Y = 0.0f;
-	float Width = 0.0f;
-	float Height = 0.0f;
-};
+
 
 // 씬 렌더링 시점 정보
 struct FSceneView
@@ -36,7 +30,7 @@ struct FSceneView
 	FFrustumPlanes Frustum{};
 
 	// 화면 영역
-	FViewRect ViewRect{};
+	FRect ViewRect{};
 
 	// 카메라 속성
 	float FieldOfView = 60.0f;

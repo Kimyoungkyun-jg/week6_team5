@@ -30,6 +30,7 @@ void APlayerController::BeginPlay()
 void APlayerController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	ProcessPlayerInput(DeltaTime);
 	// 카메라 시점 업데이트
 	if (PossessedPawn)
 	{
@@ -40,6 +41,12 @@ void APlayerController::Tick(float DeltaTime)
 
 void APlayerController::ProcessPlayerInput(float DeltaTime)
 {
+	// 입력 허용 검사
+	if (!bInputEnabled)
+	{
+		return;
+	}
+
 	// 입력 처리
 	float ForwardInput = 0.0f;
 	float RightInput = 0.0f;

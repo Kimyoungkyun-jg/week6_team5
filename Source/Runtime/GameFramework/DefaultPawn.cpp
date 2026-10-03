@@ -1,10 +1,25 @@
 #include "EnginePCH.h"
-#include "Component/SceneComponent.h"
+#include "Camera/CameraComponent.h"
+#include "Component/StaticMeshComponent.h"
+#include "Asset/AssetManager.h"
+#include "ObjectSystem/ObjectFactory.h"
 #include "DefaultPawn.h"
 
 ADefaultPawn::ADefaultPawn()
 {
+	CameraComponent = CreateDefaultSubobject<UCameraComponent>("CameraComponent");
+	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("StaticMeshComponent");
+	SetRootComponent(StaticMeshComponent);
+
+	StaticMeshComponent->SetStaticMesh(UAssetManager::GetMesh("Hitori"));
+	CameraComponent->SetupAttachment(StaticMeshComponent);
+
+	CameraComponent->SetRelativeLocation({ -5,0,8 });
+	CameraComponent->SetRelativeRotation({ 45,0,0 });
+	CameraComponent->SetExternalInputManaged(true);
 }
+
+
 
 void ADefaultPawn::AddMovementInput(const FVector& WorldDirection, float ScaleValue)
 {

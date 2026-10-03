@@ -3,9 +3,12 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/DefaultPawn.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Math/Frustum.h"
+#include "Render/RenderCommand.h"
 
 FGameViewportClient::FGameViewportClient()
 {
@@ -57,18 +60,39 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 	const float Aspect = Width / Height;
 
 
-	// 메인 카메라 유효성 검사 후 컴포넌트 획득
-	if (CameraComponent == nullptr && World && World->GetMainCamera())
+	// 카메라 컴포넌트 획득
+	if (CameraComponent == nullptr && World)
 	{
-		CameraComponent = World->GetMainCamera()->GetCameraComponent();
+		if (APawn* Pawn = World->GetPlayerPawn())
+		{
+			if (ADefaultPawn* DefPawn = Cast<ADefaultPawn>(Pawn))
+			{
+				CameraComponent = DefPawn->GetCameraComponent();
+			}
+			if (CameraComponent == nullptr)
+			{
+				for (UActorComponent* Comp : Pawn->GetComponents())
+				{
+					if (UCameraComponent* Cam = Cast<UCameraComponent>(Comp))
+					{
+						CameraComponent = Cam;
+						break;
+					}
+				}
+			}
+		}
+		if (CameraComponent == nullptr && World->GetMainCamera())
+		{
+			CameraComponent = World->GetMainCamera()->GetCameraComponent();
+		}
 	}
 
 	if (CameraComponent)
 	{
 		CameraComponent->SetAspectRatio(Aspect);
 
-		OutView.ViewLocation = CameraComponent->GetRelativeLocation();
-		OutView.ViewRotation = CameraComponent->GetRelativeRotation();
+		OutView.ViewLocation = CameraComponent->GetWorldLocation();
+		OutView.ViewRotation = CameraComponent->GetWorldRotation();
 		OutView.ViewForward = OutView.ViewRotation.Quaternion().GetForwardVector();
 		OutView.ViewMatrix = CameraComponent->GetViewMatrix();
 		OutView.ProjectionMatrix = CameraComponent->GetProjectionMatrix();
@@ -101,9 +125,41 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 	return OutView;
 }
 
-void FGameViewportClient::SetCameraComponent(UCameraComponent& CameraComp)
+void FGameViewportClient::SetCameraComponent(UCameraComponent* InCameraComponent)
 {
-	CameraComponent = &CameraComp;
+	CameraComponent = InCameraComponent;
+}
+
+// 뷰포트 크기 변경 및 타깃 생성
+void FGameViewportClient::Resize(uint32 InWidth, uint32 InHeight)
+{
+	if (Width == InWidth && Height == InHeight && ColorTarget && DepthTarget)
+	{
+		return;
+	}
+
+	Width = InWidth;
+	Height = InHeight;
+
+	if (Width == 0 || Height == 0)
+	{
+		return;
+	}
+
+	D3D11_TEXTURE2D_DESC Desc{};
+	Desc.Width = Width;
+	Desc.Height = Height;
+	Desc.MipLevels = 1;
+	Desc.ArraySize = 1;
+	Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	Desc.SampleDesc.Count = 1;
+	Desc.Usage = D3D11_USAGE_DEFAULT;
+	Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	ColorTarget = RenderCommand::CreateTexture2D(Desc);
+
+	Desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+	DepthTarget = RenderCommand::CreateTexture2D(Desc);
 }
 
 void FGameViewportClient::Reset()
@@ -112,4 +168,10 @@ void FGameViewportClient::Reset()
 	GameInstance = nullptr;
 	Engine = nullptr;
 	CameraComponent = nullptr;
+
+	// 타깃 버퍼 정리
+	ColorTarget.reset();
+	DepthTarget.reset();
+	Width = 0;
+	Height = 0;
 }

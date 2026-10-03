@@ -86,6 +86,7 @@ UWorld* UEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld
 	WorldContext.SetCurrentWorld(NewPIEWorld);
 	WorldContext.WorldType = EWorldType::PIE;
 
+
 	HTR_LOG(Info, "PIE: Created PIE world by copying editor world ({:.4f}s)", FPlatformTime::Seconds() - StartTime);
 	return NewPIEWorld;
 }
@@ -94,6 +95,7 @@ FWorldContext& UEngine::CreateNewWorldContext(EWorldType InWorldType)
 {
 	// 신규 컨텍스트 등록
 	WorldContextlist.Add(FWorldContext(InWorldType));
-	return WorldContextlist.Last();
+	FWorldContext& Context = WorldContextlist.Last();
+	return Context;
 }
 

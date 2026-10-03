@@ -49,11 +49,10 @@ void UGameInstance::InitializeForPlayInEditor(int32 PIEInstanceIndex)
 	}
 
 	// 기존 컨텍스트 검색 또는 신규 생성
-	WorldContext = Engine->GetWorldContextFromPIEInstance(PIEInstanceIndex);
+	WorldContext = Engine->GetWorldContextFromPIEInstance(PIEInstanceIndex); 
 	if (!WorldContext)
 	{
-		WorldContext = &Engine->CreateNewWorldContext(EWorldType::PIE);
-		WorldContext->PIEInstance = PIEInstanceIndex;
+		return;
 	}
 	WorldContext->OwningGameInstance = this;
 
@@ -92,6 +91,7 @@ bool UGameInstance::StartPlayInEditorGameInstance()
 	{
 		WorldContext->GameViewport = MakeShared<FGameViewportClient>();
 		WorldContext->GameViewport->Init(*WorldContext, GetEngine());
+		
 	}
 
 	// 월드 재생 시작

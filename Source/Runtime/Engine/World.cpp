@@ -97,9 +97,11 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 	// 4. Level->Actors에 등록
 	PersistentLevel->AddActor(NewActor);
 
-	// 5. PlayList에 추가
+	// 재생 중 스폰 시 대기 목록 추가
 	if (bBegunPlay)
-		NewActor->BeginPlay();
+	{
+		BeginPlayList.Enqueue(NewActor);
+	}
 
 	return NewActor;
 }
@@ -170,6 +172,8 @@ void UWorld::ClearWorld()
 				Actor->RegisterAllActorTickFunctions(false);
 		Level->ClearActors();
 	}
+	PlayerPawn = nullptr;
+	PlayerController = nullptr;
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
@@ -668,6 +672,54 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 void UWorld::BeginPlay()
 {
+	// 플레이 모드 폰 및 컨트롤러 준비
+	if (WorldType == EWorldType::PIE)
+	{
+		if (!PlayerPawn)
+		{
+			for (ULevel* Level : Levels)
+			{
+				if (Level)
+				{
+					for (AActor* Actor : Level->GetActors())
+					{
+						if (APawn* ExistingPawn = Cast<APawn>(Actor))
+						{
+							PlayerPawn = ExistingPawn;
+							break;
+						}
+					}
+					if (PlayerPawn)
+					{
+						break;
+					}
+				}
+			}
+		}
+
+		if (!PlayerPawn)
+		{
+			const FTransform* SpawnTransform = nullptr;
+			FTransform TempTransform;
+			if (MainCamera)
+			{
+				TempTransform = MainCamera->GetActorTransform();
+				SpawnTransform = &TempTransform;
+			}
+			PlayerPawn = SpawnActor<ADefaultPawn>(NAME_None, SpawnTransform);
+		}
+
+		if (!PlayerController)
+		{
+			PlayerController = SpawnActor<APlayerController>();
+		}
+
+		if (PlayerController && PlayerPawn && !PlayerController->GetPawn())
+		{
+			PlayerController->Possess(PlayerPawn);
+		}
+	}
+
 	// 레벨 액터 재생 시작
 	for (ULevel* Level : Levels)
 	{
@@ -682,6 +734,9 @@ void UWorld::BeginPlay()
 			}
 		}
 	}
+
+	// 재생 상태 설정
+	bBegunPlay = true;
 
 	// 대기열 액터 재생 시작
 	while (!BeginPlayList.IsEmpty())

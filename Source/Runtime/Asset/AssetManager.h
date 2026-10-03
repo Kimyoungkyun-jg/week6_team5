@@ -55,8 +55,7 @@ public:
 
 	void RegisterAsset(const FString& Key, URenderAsset* Asset);
 
-	//UStaticMesh* GetMesh(FString InName);
-	//UStaticMesh* GetMesh(EPrimitiveType Type); // 오버로드(수정 중)
+	static UStaticMesh* GetMesh(const FString& InName);
 
 	UTexture2D* LoadTexture(const FString& InPath, bool bGenerateMips = true);
 	UFont* LoadFontAtlas(const FString& JsonPath, const FString& AtlasTexturePath);

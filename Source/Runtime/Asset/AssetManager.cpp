@@ -356,6 +356,30 @@ UFont* UAssetManager::LoadFontAtlas(const FString& JsonPath, const FString& Atla
 	return Font;
 }
 
+UStaticMesh* UAssetManager::GetMesh(const FString& InName)
+{
+	// 기본 키 검색
+	if (UStaticMesh* Mesh = GetAssetByPath<UStaticMesh>(InName))
+	{
+		return Mesh;
+	}
+
+	// 파일 이름 또는 경로 검색
+	for (auto& [Key, Asset] : Get().AssetMap)
+	{
+		if (Asset && Asset->IsA<UStaticMesh>())
+		{
+			fs::path FilePath(Key);
+			if (FilePath.stem().string() == InName || FilePath.filename().string() == InName)
+			{
+				return Cast<UStaticMesh>(Asset);
+			}
+		}
+	}
+
+	return nullptr;
+}
+
 UStaticMesh* UAssetManager::LoadObjStaticMesh(const FString& Path)
 {
 	const FString Key = MakeAssetKey(Path);

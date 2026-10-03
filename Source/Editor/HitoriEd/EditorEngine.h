@@ -35,6 +35,7 @@
 #include <Container\Array.h>
 
 class FSceneRenderer;
+class FGameViewportClient;
 
 class UEditorEngine : public UEngine
 {
@@ -50,6 +51,8 @@ public:
 	void UpdateGizmoAndPicking();
 	// 뷰포트 하나의 씬과 에디터 요소를 렌더링한다.
 	void RenderFrame(FEditorViewportClient* ViewClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer, const bool bIsPIE);
+	// 게임 뷰포트 화면을 렌더링한다.
+	void RenderGameFrame(FGameViewportClient* GameClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer);
 
 
 	// 네 View 결과와 ImGui를 메인 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
@@ -113,9 +116,12 @@ private:
 	TArray<FEditorViewportClient*> AllViewportClients;
 
 	UGameInstance* GameInstance = nullptr;
+	TArray<UGameInstance*> PIEGameInstances;
 
 	EPIEState PIEState = EPIEState::Stopped;
 	bool bIsStep = false;
+	// 피아이이 시작 뷰포트 인덱스
+	int32 PIEStartViewportIndex = 0;
 
 	void ResetSceneSelection();
 
@@ -128,7 +134,9 @@ private:
 	void RenderActorUUIDs(const FSceneView& View);
 	void CreatePIESession();
 	void StopPIESession();
-	UWorld* CreatePIEWorld();
+	void DrawPIEWindows();
+	//UWorld* CreatePIEWorld();
+	
 	virtual UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld) override;
 	void SerializeWorldForPIE(UWorld* editorWorld, UWorld* PIEWorld);
 	UWorld* RecoverPIEWorldReferences(UWorld* editorWorlds, UWorld* PIEWorld);

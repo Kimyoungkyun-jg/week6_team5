@@ -32,6 +32,10 @@ public:
     void UnPossess();
     APawn* GetPawn() const { return PossessedPawn; }
 
+	// 입력 활성화 설정
+	void SetInputEnabled(bool bInEnabled) { bInputEnabled = bInEnabled; }
+	bool IsInputEnabled() const { return bInputEnabled; }
+
 	virtual void DuplicateSubobjects(UObject* SourceObject) override;
 
 protected:
@@ -45,4 +49,7 @@ protected:
 
     // 현재 조종 중인 대상
     APawn* PossessedPawn = nullptr;
+
+	// 입력 허용 여부
+	bool bInputEnabled = true;
 };

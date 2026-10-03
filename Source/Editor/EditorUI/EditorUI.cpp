@@ -178,7 +178,7 @@ void FEditorUI::DrawMainToolBar()
 		const float BarPaddingX = 6.0f;
 		const float BarPaddingY = 3.0f;
 		const float BarHeight = ButtonHeight + BarPaddingY * 2.0f;
-		const float TotalWidth = BarPaddingX * 2.0f + ButtonWidth * 3.0f + ButtonSpacing * 2.0f;
+		const float TotalWidth = BarPaddingX * 2.0f + ButtonWidth * 3.0f + ButtonSpacing * 2.0f + 270.0f;
 
 		const float StartX = viewport->WorkPos.x + 8.0f;
 		const float StartY = viewport->WorkPos.y + (ToolbarHeight - BarHeight) * 0.5f;
@@ -397,6 +397,49 @@ void FEditorUI::DrawMainToolBar()
 			const float HalfSize = 5.0f;
 
 			DrawList->AddRectFilled({CenterX - HalfSize, CenterY - HalfSize}, {CenterX + HalfSize, CenterY + HalfSize}, StopColor, 1.5f);
+		}
+
+		CurrentX += ButtonWidth + 8.0f;
+
+		// 구분선
+		const float SepHeight = 16.0f;
+		const float SepY = StartY + (BarHeight - SepHeight) * 0.5f;
+		DrawList->AddLine({CurrentX, SepY}, {CurrentX, SepY + SepHeight}, IM_COL32(80, 80, 80, 200), 1.0f);
+		CurrentX += 8.0f;
+
+		// 실행 대상 모드 선택
+		const bool bCanChangeSettings = (CurrentPIEState == EPIEState::Stopped);
+		if (!bCanChangeSettings)
+		{
+			ImGui::BeginDisabled();
+		}
+
+		ImGui::SetCursorScreenPos({CurrentX, StartY + (BarHeight - 20.0f) * 0.5f});
+		int CurrentModeIndex = static_cast<int>(PIEMode);
+		const char* ModeLabels[] = {"Selected Viewport", "New Window"};
+		ImGui::SetNextItemWidth(135.0f);
+		if (ImGui::Combo("##PIEMode", &CurrentModeIndex, ModeLabels, IM_ARRAYSIZE(ModeLabels)))
+		{
+			PIEMode = static_cast<EPIEMode>(CurrentModeIndex);
+		}
+
+		CurrentX += 142.0f;
+
+		// 플레이어 수 설정
+		ImGui::SetCursorScreenPos({CurrentX, StartY + (BarHeight - 16.0f) * 0.5f});
+		ImGui::Text("Players");
+		CurrentX += 54.0f;
+
+		ImGui::SetCursorScreenPos({CurrentX, StartY + (BarHeight - 20.0f) * 0.5f});
+		ImGui::SetNextItemWidth(45.0f);
+		if (ImGui::DragInt("##PIEPlayerCount", &PIEPlayerCount, 0.1f, 1, 16))
+		{
+			PIEPlayerCount = std::clamp(PIEPlayerCount, 1, 16);
+		}
+
+		if (!bCanChangeSettings)
+		{
+			ImGui::EndDisabled();
 		}
 
 		ImGui::End();

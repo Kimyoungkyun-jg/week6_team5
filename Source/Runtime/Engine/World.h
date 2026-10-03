@@ -88,6 +88,12 @@ public:
 	void SetMainCamera(ACameraActor* Camera);
 	ACameraActor* GetMainCamera() const { return MainCamera; }
 
+	// 플레이어 폰 및 컨트롤러
+	void SetPlayerPawn(APawn* InPawn) { PlayerPawn = InPawn; }
+	APawn* GetPlayerPawn() const { return PlayerPawn; }
+	void SetPlayerController(APlayerController* InController) { PlayerController = InController; }
+	APlayerController* GetPlayerController() const { return PlayerController; }
+
 	// Level
 	ULevel* GetPersistentLevel() const { return PersistentLevel; }
 	TArray<ULevel*> GetLevel()  { return Levels; }
@@ -119,10 +125,10 @@ public:
 
 	EWorldType& GetWorldType() { return WorldType; }
 
+	bool& GetbIsPause() { return bIsPaused; }
 
 	void DuplicateWorld(UWorld* SrcWorld);
 
-	bool& GetbIsTickEnable() { return bIsTickEnable; }
 private:
 	struct alignas(64) FGatherChunk
 	{
@@ -145,6 +151,10 @@ private:
 	//메인 카메라 
 	ACameraActor* MainCamera = nullptr;
 
+	// 플레이어 폰 및 컨트롤러
+	APawn* PlayerPawn = nullptr;
+	APlayerController* PlayerController = nullptr;
+
 	FPathTracker PathTracker;
 
 	ULevel* PersistentLevel = nullptr;
@@ -164,5 +174,4 @@ private:
 
 	FRenderStats RenderStats;
 
-	bool bIsTickEnable = true;
 };

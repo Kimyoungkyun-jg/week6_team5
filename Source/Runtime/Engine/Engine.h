@@ -36,7 +36,7 @@ struct FWorldContext
 	// 게임 인스턴스 참조
 	UGameInstance* OwningGameInstance = nullptr;
 
-	int32 PIEInstance = -1;
+	int32 PIEInstance = 0;
 
 	// 게임 뷰포트 클라이언트 참조
 	TSharedPtr<FGameViewportClient> GameViewport;
@@ -63,6 +63,10 @@ struct FWorldContext
 		: WorldType(InWorldType)
 		, ThisCurrentWorld(InWorld)
 	{
+		if (WorldType == EWorldType::PIE)
+		{
+			PIEInstance = 0;
+		}
 	}
 
 private:

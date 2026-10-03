@@ -85,28 +85,37 @@ bool UEditorEngine::Init() {
 	EditorUI->SetCreatePIECallback([this]() { CreatePIESession(); });
 	EditorUI->SetStopPIECallback([this]() { StopPIESession(); });
 	EditorUI->SetPIEStateGetter([this]() { return PIEState; });
+
 	EditorUI->SetPIEActionCallback([this](EPIEAction Action) {
 		switch (Action) {
 		case EPIEAction::Play:
 			CreatePIESession();
 			break;
 		case EPIEAction::Pause:
-			if (PlayWorld) {
-				PlayWorld->GetbIsTickEnable() = false;
+			if (PIEState == EPIEState::Playing) {
+				for (auto Worldctx : WorldContextlist)
+				{
+					Worldctx.World()->GetbIsPause() = true;
+				}
+
 				PIEState = EPIEState::Paused;
 			}
 			break;
 		case EPIEAction::Resume:
-			if (PlayWorld) {
-				PlayWorld->GetbIsTickEnable() = true;
-				PIEState = EPIEState::Playing;
+			for (auto Worldctx : WorldContextlist)
+			{
+				Worldctx.World()->GetbIsPause() = false;
 			}
+
+			PIEState = EPIEState::Playing;
 			break;
 		case EPIEAction::Step:
-			if (PlayWorld) {
+			for (auto Worldctx : WorldContextlist)
+			{
 				bIsStep = true;
-				PlayWorld->GetbIsTickEnable() = true;
+				Worldctx.World()->GetbIsPause() = false;
 			}
+
 			break;
 		case EPIEAction::Stop:
 			StopPIESession();
@@ -251,38 +260,6 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 		Settings.MultipleViewportsSingleViewIndex = RequestedSingleViewIndex;
 	}
 
-	// PIE 액션 처리
-	switch (ViewportsPanel->ConsumePIEAction()) {
-	case EPIEAction::Play:
-		// 피아이이 세션 생성
-		CreatePIESession();
-		break;
-	case EPIEAction::Pause:
-		if (PlayWorld) {
-			PlayWorld->GetbIsTickEnable() = false;
-			PIEState = EPIEState::Paused;
-		}
-		break;
-	case EPIEAction::Resume:
-		if (PlayWorld) {
-			PlayWorld->GetbIsTickEnable() = true;
-			PIEState = EPIEState::Playing;
-		}
-		break;
-	case EPIEAction::Step:
-		if (PlayWorld) {
-			bIsStep = true;
-			PlayWorld->GetbIsTickEnable() = true;
-		}
-		break;
-	case EPIEAction::Stop:
-		// 피아이이 세션 정리
-		StopPIESession();
-		break;
-	default:
-		break;
-	}
-
 	const float HorizontalDrag = ViewportsPanel->ConsumeHorizontalDrag();
 	const float VerticalDrag = ViewportsPanel->ConsumeVerticalDrag();
 	if (HorizontalDrag != 0.0f)
@@ -380,10 +357,29 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 
 			// PIE 모드 월드 틱 순회
+			const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
+			const int32 NumPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
+			const int32 ActiveIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : 0;
+
 			bool bTicked = false;
 			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
 				FWorldContext &Context = WorldContextlist[WorldIdx];
 				if (Context.WorldType == EWorldType::PIE && Context.World()) {
+					if (Mode == EPIEMode::SelectedViewport)
+					{
+						// 활성 뷰포트 플레이어만 입력 활성화
+						if (APlayerController* PC = Context.World()->GetPlayerController())
+						{
+							if (NumPlayers == 1)
+							{
+								PC->SetInputEnabled(ActiveIndex == PIEStartViewportIndex);
+							}
+							else
+							{
+								PC->SetInputEnabled(Context.PIEInstance == ActiveIndex);
+							}
+						}
+					}
 					Context.World()->Tick(EWorldTick::All, DeltaTime);
 					bTicked = true;
 				}
@@ -397,11 +393,11 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 				for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
 					FWorldContext &Context = WorldContextlist[WorldIdx];
 					if (Context.WorldType == EWorldType::PIE && Context.World()) {
-						Context.World()->GetbIsTickEnable() = false;
+						Context.World()->GetbIsPause() = true;
 					}
 				}
 				if (PlayWorld) {
-					PlayWorld->GetbIsTickEnable() = false;
+					PlayWorld->GetbIsPause() = true;
 				}
 				bIsStep = false;
 			}
@@ -430,9 +426,12 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 
 // 뷰포트 클라이언트를 순회하며 씬 렌더러를 통해 렌더링한다
 void UEditorEngine::RenderViewports() {
+	const bool bIsPIE = (PlayWorld != nullptr);
+	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
+	const int32 NumPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
+	const int32 ActiveIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : 0;
+
 	for (int32 ViewIndex = 0; ViewIndex < AllViewportClients.Num(); ++ViewIndex) {
-		
-		
 		FEditorViewportClient *ViewClient = AllViewportClients[ViewIndex];
 		if (!ViewClient || !ViewClient->IsActive())
 			continue;
@@ -441,27 +440,61 @@ void UEditorEngine::RenderViewports() {
 		if (ViewRect.Width <= 0.0f || ViewRect.Height <= 0.0f)
 			continue;
 
-		const bool bIsPIE = PlayWorld != nullptr;
-		UWorld *CurrentWorld = bIsPIE ? PlayWorld : EditorWorld;
+		bool bIsGameView = false;
+		int32 TargetPlayerIndex = -1;
 
-		// 뷰 사각형과 시점 정보 생성
+		if (bIsPIE && Mode == EPIEMode::SelectedViewport)
+		{
+			if (NumPlayers == 1)
+			{
+				if (ViewIndex == PIEStartViewportIndex)
+				{
+					bIsGameView = true;
+					TargetPlayerIndex = 0;
+				}
+			}
+			else
+			{
+				if (ViewIndex < NumPlayers)
+				{
+					bIsGameView = true;
+					TargetPlayerIndex = ViewIndex;
+				}
+			}
+		}
+
+		UWorld *CurrentWorld = (bIsPIE && PlayWorld) ? PlayWorld : EditorWorld;
 		FSceneView SceneView;
-		if (bIsPIE && ViewIndex == 0) {
+
+		if (bIsGameView && TargetPlayerIndex >= 0)
+		{
 			FGameViewportClient *GameClient = nullptr;
-			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
+			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx)
+			{
 				if (WorldContextlist[WorldIdx].WorldType == EWorldType::PIE &&
-						WorldContextlist[WorldIdx].GameViewport) {
+					WorldContextlist[WorldIdx].PIEInstance == TargetPlayerIndex &&
+					WorldContextlist[WorldIdx].GameViewport)
+				{
 					GameClient = WorldContextlist[WorldIdx].GameViewport.get();
+					if (WorldContextlist[WorldIdx].World())
+					{
+						CurrentWorld = WorldContextlist[WorldIdx].World();
+					}
 					break;
 				}
 			}
-			if (GameClient) {
-				// 플레이 모드 게임 뷰포트 시점 계산
+
+			if (GameClient)
+			{
 				SceneView = GameClient->CalcSceneView(ViewRect);
-			} else {
+			}
+			else
+			{
 				SceneView = ViewClient->CalcSceneView(ViewRect);
 			}
-		} else {
+		}
+		else
+		{
 			SceneView = ViewClient->CalcSceneView(ViewRect);
 		}
 
@@ -470,7 +503,123 @@ void UEditorEngine::RenderViewports() {
 		SceneRenderer.InitViews(Renderer);
 
 		// 프레임 렌더링
-		RenderFrame(ViewClient, SceneView, SceneRenderer, bIsPIE);
+		RenderFrame(ViewClient, SceneView, SceneRenderer, bIsGameView);
+	}
+
+	// 새 창 모드일 때 게임 뷰포트 렌더링
+	if (bIsPIE && Mode == EPIEMode::NewWindow)
+	{
+		for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx)
+		{
+			FWorldContext& Context = WorldContextlist[WorldIdx];
+			if (Context.WorldType == EWorldType::PIE && Context.GameViewport && Context.World())
+			{
+				FGameViewportClient* GameClient = Context.GameViewport.get();
+				const uint32 Width = GameClient->GetWidth();
+				const uint32 Height = GameClient->GetHeight();
+				if (Width > 0 && Height > 0)
+				{
+					FRect ViewRect{0.0f, 0.0f, static_cast<float>(Width), static_cast<float>(Height)};
+					FSceneView SceneView = GameClient->CalcSceneView(ViewRect);
+					FSceneRenderer SceneRenderer(Context.World(), SceneView);
+					SceneRenderer.InitViews(Renderer);
+					RenderGameFrame(GameClient, SceneView, SceneRenderer);
+				}
+			}
+		}
+	}
+}
+
+// 게임 뷰포트 화면을 렌더링한다
+void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer)
+{
+	if (!GameClient) return;
+
+	FTexture2D* ColorTarget = GameClient->GetColorTarget();
+	FTexture2D* DepthTarget = GameClient->GetDepthTarget();
+	const uint32 Width = GameClient->GetWidth();
+	const uint32 Height = GameClient->GetHeight();
+	if (!ColorTarget || !DepthTarget || Width == 0 || Height == 0) return;
+
+	RenderCommand::BeginRenderPass(ColorTarget, DepthTarget, Width, Height);
+
+	// 스카이박스 렌더링
+	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix, SceneView.ViewLocation);
+
+	// 불투명 메시 렌더링
+	SceneRenderer.RenderOpaque(Renderer);
+
+	// 반투명 메시 렌더링
+	SceneRenderer.RenderTranslucent(Renderer);
+
+	// 텍스트 컴포넌트 렌더링
+	UWorld* TargetWorld = GameClient->GetWorld();
+	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent) {
+		if (!TextComponent || !TextComponent->GetFont() || !TextComponent->IsVisible()) continue;
+		if (TextComponent->GetOwner() && TextComponent->GetOwner()->GetWorld() != TargetWorld) continue;
+		TextRenderer->OnRender(TextComponent->GetText(), TextComponent->GetWorldMatrix(), TextComponent->GetTextSize(), *TextComponent->GetFont(), SceneView.ViewProjectionMatrix);
+	}
+
+	RenderCommand::EndRenderPass();
+}
+
+// 새 창 모드의 피아이이 윈도우 UI를 그린다
+void UEditorEngine::DrawPIEWindows()
+{
+	const bool bIsPIE = (PlayWorld != nullptr);
+	if (!bIsPIE)
+		return;
+
+	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
+	if (Mode != EPIEMode::NewWindow)
+		return;
+
+	for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx)
+	{
+		FWorldContext& Context = WorldContextlist[WorldIdx];
+		if (Context.WorldType == EWorldType::PIE && Context.GameViewport)
+		{
+			FGameViewportClient* GameClient = Context.GameViewport.get();
+			FString WindowTitle = std::format("Game (PIE) - Player {}", Context.PIEInstance + 1).c_str();
+			bool bOpen = true;
+
+			ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
+			if (ImGui::Begin(WindowTitle.c_str(), &bOpen))
+			{
+				// 포커스된 창의 플레이어만 입력 활성화
+				const bool bFocused = ImGui::IsWindowFocused();
+				if (Context.World())
+				{
+					if (APlayerController* PC = Context.World()->GetPlayerController())
+					{
+						PC->SetInputEnabled(bFocused);
+					}
+				}
+
+				ImVec2 ContentSize = ImGui::GetContentRegionAvail();
+				if (ContentSize.x > 1.0f && ContentSize.y > 1.0f)
+				{
+					const uint32 DesiredW = static_cast<uint32>(ContentSize.x);
+					const uint32 DesiredH = static_cast<uint32>(ContentSize.y);
+					if (DesiredW != GameClient->GetWidth() || DesiredH != GameClient->GetHeight())
+					{
+						GameClient->Resize(DesiredW, DesiredH);
+					}
+
+					if (GameClient->GetColorTarget() && GameClient->GetColorTarget()->GetSRV())
+					{
+						ImGui::Image(GameClient->GetColorTarget()->GetSRV(), ContentSize);
+					}
+				}
+			}
+			ImGui::End();
+
+			if (!bOpen)
+			{
+				StopPIESession();
+				break;
+			}
+		}
 	}
 }
 
@@ -520,7 +669,7 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	RenderCommand::BeginRenderPass(ColorTarget, DepthTarget, Width, Height);
 
 	// 라인 배처 렌더링
-	if ((!bIsPIE || ViewIndex != 0) &&
+	if (!bIsPIE &&
 			SettingsPanel->GetSettings().bDrawBatchLine) {
 		LineBatcher->BeginFrame();
 
@@ -552,7 +701,7 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	}
 
 	// 에디터 그리드 렌더링
-	if ((!bIsPIE || ViewIndex != 0) &&
+	if (!bIsPIE &&
 			SettingsPanel->GetSettings().bDrawBatchLine) {
 		EGridPlane GridPlane = EGridPlane::XY;
 		if (ViewClient) {
@@ -611,7 +760,7 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	}
 
 	// 에디터 오버레이 렌더링
-	if (!bIsPIE || ViewIndex != 0) {
+	if (!bIsPIE) {
 		// 활성 뷰포트에만 아웃라인과 기즈모 렌더링
 		const bool bIsActiveViewport = (ViewportsPanel && ViewIndex == ViewportsPanel->GetActiveViewIndex());
 		if (Outline->GetTarget() && bIsActiveViewport) {
@@ -650,6 +799,7 @@ void UEditorEngine::PresentFrame() {
 		ImGuiRenderer->Begin();
 
 		EditorUI->OnRender();
+		DrawPIEWindows();
 
 		ImGuiRenderer->End();
 	}
@@ -766,16 +916,48 @@ void UEditorEngine::CreatePIESession()
 	ResetSceneSelection();
 	PIEState = EPIEState::Playing;
 
-	// 게임 인스턴스 생성 및 초기화
-	GameInstance = FObjectFactory::ConstructObject<UGameInstance>();
-	FWorldContext* Worldctx = &CreateNewWorldContext(EWorldType::PIE);		 // worldcontext 만들기
+	// 피아이이 시작 뷰포트 지정
+	PIEStartViewportIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : 0;
 
-	if (GameInstance)
+	PIEGameInstances.Reset();
+
+	const int32 NumPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
+	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
+
+	// 컨텍스트 배열 재할당 방지
+	WorldContextlist.Reserve(WorldContextlist.Num() + NumPlayers + 4);
+
+	// 게임 세션 생성
+	for (int32 i = 0; i < NumPlayers; ++i)
 	{
-		GameInstance->InitializeForPlayInEditor(WorldContextlist.size()-1); 
-		GameInstance->StartPlayInEditorGameInstance();
-		PlayWorld = GameInstance->GetWorld();
+		// 피아이이용 월드 컨텍스트 생성
+		FWorldContext& Context = CreateNewWorldContext(EWorldType::PIE);
+		Context.PIEInstance = i;
+
+		UGameInstance* GI = FObjectFactory::ConstructObject<UGameInstance>();
+		GI->InitializeForPlayInEditor(i);
+		GI->StartPlayInEditorGameInstance();
+
+		PIEGameInstances.Add(GI);
+
+		if (i == 0)
+		{
+			// 패널용 대표 월드 지정
+			GameInstance = GI;
+			PlayWorld = GI->GetWorld();
+		}
+
+		if (Mode == EPIEMode::NewWindow || (NumPlayers >= 2 && i==2))
+		{
+			// 새 창 모드 뷰포트 크기 설정
+			if (Context.GameViewport)
+			{
+				Context.GameViewport->Resize(800, 600);
+			}
+		}
 	}
+
+	
 
 	// 패널 월드 설정
 	if (PlayWorld)
@@ -794,35 +976,34 @@ void UEditorEngine::StopPIESession()
 	// 선택 해제
 	ResetSceneSelection();
 
-	// 게임 세션 종료
-	if (PlayWorld)
+	// 게임 세션 종료 먼저 수행
+	for (UGameInstance* GI : PIEGameInstances)
 	{
-		PlayWorld->EndPlay();
-	}
-
-	if (GameInstance)
-	{
-		GameInstance->Shutdown();
-		GameInstance = nullptr;
-	}
-
-	// 플레이 월드 자원 해제
-	if (PlayWorld)
-	{
-		PlayWorld->ClearWorld();
-		for (ULevel* Level : PlayWorld->GetLevel())
+		if (GI)
 		{
-			delete Level;
+			GI->Shutdown();
 		}
-		delete PlayWorld;
-		PlayWorld = nullptr;
 	}
 
-	// 월드 컨텍스트 목록 정리
+	PIEGameInstances.Reset();
+	GameInstance = nullptr;
+	PlayWorld = nullptr;
+
+	// 피아이이 월드 및 컨텍스트 정리
 	for (int32 Index = WorldContextlist.Num() - 1; Index >= 0; --Index)
 	{
 		if (WorldContextlist[Index].WorldType == EWorldType::PIE)
 		{
+			if (UWorld* World = WorldContextlist[Index].World())
+			{
+				World->EndPlay();
+				World->ClearWorld();
+				for (ULevel* Level : World->GetLevel())
+				{
+					delete Level;
+				}
+				delete World;
+			}
 			WorldContextlist.RemoveAt(Index, 1);
 		}
 	}
@@ -846,16 +1027,16 @@ void UEditorEngine::StopPIESession()
 	OriginNewAnnotataion.Reset();
 }
 
-UWorld* UEditorEngine::CreatePIEWorld()
-{
-	FWorldContext* Context = GetWorldContextFromPIEInstance(0);
-	if (!Context)
-	{
-		Context = &CreateNewWorldContext(EWorldType::PIE);
-		Context->PIEInstance = 0;
-	}
-	return CreatePIEWorldByDuplication(*Context, EditorWorld);
-}
+//UWorld* UEditorEngine::CreatePIEWorld()
+//{
+//	FWorldContext* Context = GetWorldContextFromPIEInstance(0);
+//	if (!Context)
+//	{
+//		Context = &CreateNewWorldContext(EWorldType::PIE);
+//		Context->PIEInstance = 0;
+//	}
+//	return CreatePIEWorldByDuplication(*Context, EditorWorld);
+//}
 
 UWorld* UEditorEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld)
 {
@@ -864,6 +1045,9 @@ UWorld* UEditorEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, 
 		HTR_LOG(Error, "InWorld is nullptr");
 		return nullptr;
 	}
+
+	// 참조 맵 초기화
+	OriginNewAnnotataion.Reset();
 
 	double StartTime = FPlatformTime::Seconds();
 

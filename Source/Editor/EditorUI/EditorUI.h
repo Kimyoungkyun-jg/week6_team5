@@ -21,6 +21,12 @@ enum class EPIEAction : uint8 {
 	Stop
 };
 
+// 피아이이 실행 대상 모드
+enum class EPIEMode : uint8 {
+	SelectedViewport,
+	NewWindow
+};
+
 class FEditorUI
 {
 public:
@@ -48,8 +54,13 @@ public:
 	void SetPIEActionCallback(std::function<void(EPIEAction)> InCallback) { OnPIEAction = InCallback; }
 	void SetPIEStateGetter(std::function<EPIEState()> InGetter) { PIEStateGetter = InGetter; }
 	EPIEState GetPIEState() const { return PIEStateGetter ? PIEStateGetter() : EPIEState::Stopped; }
+	EPIEMode GetPIEMode() const { return PIEMode; }
+	int32 GetPIEPlayerCount() const { return PIEPlayerCount; }
 
 private:
+	EPIEMode PIEMode = EPIEMode::SelectedViewport;
+	int32 PIEPlayerCount = 1;
+
 	bool bUseDockSpace = true;
 	bool bPassthruCentralNode = false;
 

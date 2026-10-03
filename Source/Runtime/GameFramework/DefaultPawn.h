@@ -3,6 +3,10 @@
 #include "Pawn.h"
 #include "PlayerController.h"
 
+
+class UCameraComponent;
+class UStaticMeshComponent;
+
 class ADefaultPawn : public APawn
 {
 	DECLARE_CLASS(ADefaultPawn, APawn)
@@ -17,6 +21,11 @@ public:
 	virtual void AddControllerYawInput(float Value) override;
 	virtual void AddControllerPitchInput(float Value) override;
 
+	// 카메라 컴포넌트 반환
+	UCameraComponent* GetCameraComponent() const { return CameraComponent; }
+
 protected:
 	float MoveSpeed = 20.0f;
+	UCameraComponent* CameraComponent = nullptr;
+	UStaticMeshComponent* StaticMeshComponent = nullptr;
 };

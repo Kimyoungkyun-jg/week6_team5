@@ -66,8 +66,6 @@ private:
 
 	// PIE의 View를 구분한다.
 	int32 PIEViewIndex = InvalidViewIndex;
-	// 씬에 배치된 카메라를 찾아 반환한다.
-	ACameraActor* FindFirstSceneCamera();
 	// 플레이어 컨트롤러
 	APlayerController* PIEPlayerController = nullptr;
 

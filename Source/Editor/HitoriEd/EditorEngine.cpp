@@ -265,27 +265,6 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 			SettingsPanel->GetSettings().MouseSensitivity);
 	}
 
-/*	if (World && World->IsPIEWorld() && !bIsSimulatingInEditor)
-	{
-		// 플레이어 컨트롤러가 살아있으면 정상 뷰포트로 표시!
-		if (PIEPlayerController)
-		{
-			ViewportsPanel->SetShowNoCamera(false);
-		}
-		else
-		{
-			ViewportsPanel->SetShowNoCamera(true);
-		}
-	}
-	else
-	{
-		MultipleViewportsAdapter.UpdateInput(
-			DeltaTime,
-			LocalMousePosition,
-			SettingsPanel->GetSettings().CameraSpeed,
-			SettingsPanel->GetSettings().MouseSensitivity);
-	}*/
-
 	// 겹친 창은 Hover 선택에서 제외하고 우클릭 Capture를 우선한다.
 	if (ViewportsPanel->IsHovered() || MultipleViewportsAdapter.GetCapturedViewIndex() != InvalidViewIndex)
 		MultipleViewportsAdapter.SetEditorViewIndex(MultipleViewportsAdapter.GetActiveViewIndex());
@@ -387,14 +366,6 @@ void UEditorEngine::RenderMultipleViewports()
 			ViewProj = BuildViewMatrix(CamTransform) * BuildProjectionMatrix(CamProj, AspectRatio);
 		}
 
-		/*RenderFrame(
-			TargetWorld,
-			ViewIndex,
-			ViewportsPanel->GetRenderingInfo(ViewIndex),
-			MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
-			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
-			RenderQueue);*/
 		RenderFrame(
 			TargetWorld,
 			ViewIndex,
@@ -763,6 +734,7 @@ void UEditorEngine::StartPIE()
 		TargetPawn = PIEWorldContext.World->SpawnActor<ADefaultPawn>();
 
 		TargetPawn->GetRootComponent()->SetRelativeLocation(MultipleViewportsAdapter.GetEngineCameraLocation(PIEViewIndex));
+		TargetPawn->GetRootComponent()->SetRelativeRotation(MultipleViewportsAdapter.GetViewCamera(PIEViewIndex).Transform.Rotation.ToFRotator());
 	}
 	PIEPlayerController->Possess(TargetPawn);
 

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "Actor.h"
-#include "PlayerController.h"
+
+class APlayerController;
 
 class APawn : public AActor
 {
@@ -16,8 +17,10 @@ public:
 	virtual void AddControllerYawInput(float Value) {}
 	virtual void AddControllerPitchInput(float Value) {}
 
-	void SetOwner(APlayerController* NewOwner) { OwnerController = NewOwner; }
+	void PossessedBy(APlayerController* NewOwner) { Controller = NewOwner; }
+	void UnPossessed() { Controller = nullptr; }
+	APlayerController* GetController() const { return Controller; }
 
 protected:
-	APlayerController* OwnerController = nullptr;
+	APlayerController* Controller = nullptr;
 };

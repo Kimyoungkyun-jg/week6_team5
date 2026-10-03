@@ -34,14 +34,11 @@ public:
 
 	virtual void DuplicateSubobjects(UObject* SourceObject) override;
 
-	void SetIgnoreInput(bool bIgnore) { bIsIgnoreInput = bIgnore; }
-
 protected:
     // 카메라 시점 데이터
     FVector CameraLocation = FVector::ZeroVector;
-	FRotator CameraRotation = FRotator::FRotator(0.0f, 0.0f, 0.0f);
+	FRotator CameraRotation = FRotator(0.0f, 0.0f, 0.0f);
     float FOV = 90.0f;
-	bool bIsIgnoreInput = false;
 
     // 조작 감도
     float LookSensitivity = 0.1f;

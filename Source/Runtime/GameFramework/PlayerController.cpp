@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "PlayerController.h"
-#include "DefaultPawn.h"
+#include "Pawn.h"
 #include "Input/InputSystem.h"
 
 APlayerController::APlayerController()
@@ -30,7 +30,6 @@ void APlayerController::BeginPlay()
 void APlayerController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	if (bIsIgnoreInput) return;
 	// 카메라 시점 업데이트
 	if (PossessedPawn)
 	{
@@ -41,8 +40,7 @@ void APlayerController::Tick(float DeltaTime)
 
 void APlayerController::ProcessPlayerInput(float DeltaTime)
 {
-	if (bIsIgnoreInput) return;
-	// 입력 처리 및 카메라 시점 업데이트
+	// 입력 처리
 	float ForwardInput = 0.0f;
 	float RightInput = 0.0f;
 
@@ -97,7 +95,7 @@ void APlayerController::Possess(APawn* InPawn)
 	{
 		PossessedPawn = InPawn;
 		// 폰의 소유자 설정
-		InPawn->SetOwner(this);
+		InPawn->PossessedBy(this);
 	}
 }
 
@@ -106,7 +104,7 @@ void APlayerController::UnPossess()
 	if (PossessedPawn)
 	{
 		// 폰의 소유자 해제
-		PossessedPawn->SetOwner(nullptr);
+		PossessedPawn->UnPossessed();
 		PossessedPawn = nullptr;
 	}
 }

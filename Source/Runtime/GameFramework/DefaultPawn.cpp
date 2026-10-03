@@ -4,8 +4,6 @@
 
 ADefaultPawn::ADefaultPawn()
 {
-    PrimaryActorTick.bCanEverTick = true;
-    RootComponent = CreateDefaultSubobject<USceneComponent>(FName("RootComponent"));
 }
 
 void ADefaultPawn::AddMovementInput(const FVector& WorldDirection, float ScaleValue)
@@ -31,6 +29,7 @@ void ADefaultPawn::AddControllerPitchInput(float Value)
 {
 	FRotator NewRotation = GetActorRotation();
 	NewRotation.Pitch += Value;
+	NewRotation.Pitch = FMath::Clamp(NewRotation.Pitch + Value, -89.0f, 89.0f);
 	if (RootComponent)
 	{
 		RootComponent->SetRelativeRotation(NewRotation);

@@ -605,9 +605,29 @@ namespace
 			FTransform* Value = static_cast<FTransform*>(ValuePtr);
 
 			ImGui::NewLine();
-			DrawVector3Controller("Location", Value->Location.V, 0.0f, 55.0f);
-			DrawRotatorAsXYZ("Rotation", Value->Rotation);
-			DrawVector3Controller("Scale", Value->Scale.V, 1.0f, 55.0f);
+			if (DrawVector3Controller("Location", Value->Location.V, 0.0f, 55.0f))
+			{
+				if (USceneComponent* Component = Cast<USceneComponent>(Object))
+				{
+					Component->MarkTransformDirty();
+				}
+			}
+
+			if (DrawRotatorAsXYZ("Rotation", Value->Rotation))
+			{
+				if (USceneComponent* Component = Cast<USceneComponent>(Object))
+				{
+					Component->MarkTransformDirty();
+				}
+			}
+
+			if (DrawVector3Controller("Scale", Value->Scale.V, 1.0f, 55.0f))
+			{
+				if (USceneComponent* Component = Cast<USceneComponent>(Object))
+				{
+					Component->MarkTransformDirty();
+				}
+			}
 			break;
 		}
 		case EPropertyType::Object:
@@ -696,31 +716,8 @@ void FDetailsPanel::OnRender()
 	ImGui::SetNextWindowSize(ImVec2(400, 200), ImGuiCond_FirstUseEver);
 
 	ImGui::Begin("Details");
-
-	// UI만 제공한다. 각 메뉴의 컴포넌트 생성 및 등록은 추후 연결한다.
 	ImGui::BeginDisabled(!Target || !Target->GetOwner());
-	if (ImGui::Button("+ Add Component"))
-	{
-		ImGui::OpenPopup("AddComponentPopup");
-	}
-	if (ImGui::BeginPopup("AddComponentPopup"))
-	{
-		ImGui::TextDisabled("Components");
-		ImGui::Separator();
-		if (ImGui::MenuItem("TextComponent"))
-		{
-			// TODO: TextComponent 추가 기능 연결
-		}
-		if (ImGui::MenuItem("BillboardComponent"))
-		{
-			// TODO: BillboardComponent 추가 기능 연결
-		}
-		if (ImGui::MenuItem("PrimitiveComponent"))
-		{
-			// TODO: PrimitiveComponent 추가 기능 연결
-		}
-		ImGui::EndPopup();
-	}
+	
 	ImGui::EndDisabled();
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -730,7 +727,33 @@ void FDetailsPanel::OnRender()
 	{
 		// 액터 -> 컴포넌트 순으로, 클래스별 프로퍼티 표시
 		DrawProperties(Target->GetOwner(), CustomFont);
-
+		if (ImGui::Button("+ Add Component"))
+		{
+			ImGui::OpenPopup("AddComponentPopup");
+		}
+		if (ImGui::BeginPopup("AddComponentPopup"))
+		{
+			ImGui::TextDisabled("Components");
+			ImGui::Separator();
+			if (ImGui::MenuItem("TextComponent"))
+			{
+				UTextRenderComponent* TextComponent = Target->GetOwner()->CreateDefaultSubobject<UTextRenderComponent>("TextRenderComponent");
+				TextComponent->SetupAttachment(Target->GetOwner()->GetRootComponent());
+			}
+			if (ImGui::MenuItem("BillboardComponent"))
+			{
+				UBillboardComponent* BillboardComponent = Target->GetOwner()->CreateDefaultSubobject<UBillboardComponent>("BillboardComponent");
+				Target->GetOwner()->GetWorld()->GetScene().AddPrimitive(BillboardComponent);
+				BillboardComponent->SetupAttachment(Target->GetOwner()->GetRootComponent());
+			}
+			if (ImGui::MenuItem("StaticMeshComponent"))
+			{
+				UStaticMeshComponent* StaticMeshComponent = Target->GetOwner()->CreateDefaultSubobject<UStaticMeshComponent>("StaticMeshComponent");
+				Target->GetOwner()->GetWorld()->GetScene().AddPrimitive(StaticMeshComponent);
+				StaticMeshComponent->SetupAttachment(Target->GetOwner()->GetRootComponent());
+			}
+			ImGui::EndPopup();
+		}
 		// 선택된 컴포넌트뿐 아니라 같은 액터의 다른 컴포넌트도 보여준다.
 		// (예: 라이트는 빌보드를 클릭해서 고르지만 수치는 SpotLight 쪽에 있다)
 		if (AActor* Owner = Target->GetOwner())

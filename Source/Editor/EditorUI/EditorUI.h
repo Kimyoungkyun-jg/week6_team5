@@ -4,6 +4,23 @@
 
 #include <functional>
 
+// 피아이이 실행 상태
+enum class EPIEState : uint8 {
+	Stopped,
+	Playing,
+	Paused
+};
+
+// 피아이이 버튼 액션
+enum class EPIEAction : uint8 {
+	None,
+	Play,
+	Pause,
+	Resume,
+	Step,
+	Stop
+};
+
 class FEditorUI
 {
 public:
@@ -26,12 +43,18 @@ public:
 	void SetOpenSceneCallback(std::function<void()> InCallback) { OnOpenScene = InCallback; }
 	void SetSaveSceneCallback(std::function<void()> InCallback) { OnSaveScene = InCallback; }
 	void SetSaveSceneAsCallback(std::function<void()> InCallback) { OnSaveSceneAs = InCallback; }
+	void SetCreatePIECallback(std::function<void()> InCallback) { OnCreatePIE = InCallback; }
+	void SetStopPIECallback(std::function<void()> InCallback) { OnStopPIE = InCallback; }
+	void SetPIEActionCallback(std::function<void(EPIEAction)> InCallback) { OnPIEAction = InCallback; }
+	void SetPIEStateGetter(std::function<EPIEState()> InGetter) { PIEStateGetter = InGetter; }
+	EPIEState GetPIEState() const { return PIEStateGetter ? PIEStateGetter() : EPIEState::Stopped; }
 
 private:
 	bool bUseDockSpace = true;
 	bool bPassthruCentralNode = false;
 
 	void DrawMainMenuBar();
+	void DrawMainToolBar();
 
 	TArray<TUniquePtr<IEditorPanel>> Panels;
 
@@ -39,5 +62,8 @@ private:
 	std::function<void()> OnOpenScene;
 	std::function<void()> OnSaveScene;
 	std::function<void()> OnSaveSceneAs;
-
+	std::function<void()> OnCreatePIE;
+	std::function<void()> OnStopPIE;
+	std::function<void(EPIEAction)> OnPIEAction;
+	std::function<EPIEState()> PIEStateGetter;
 };

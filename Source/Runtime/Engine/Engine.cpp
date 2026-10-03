@@ -37,6 +37,36 @@ FWorldContext* UEngine::GetWorldContextFromPIEInstance(int32 PIEInstanceIndex)
 	return nullptr;
 }
 
+FWorldContext* UEngine::GetWorldContextFromType(EWorldType WorldType)
+{
+	for (FWorldContext& Context : WorldContextlist)
+	{
+		if (Context.WorldType == WorldType)
+		{
+			return &Context;
+		}
+	}
+	return nullptr;
+}
+
+void UEngine::DestroyWorldContext(EWorldType WorldType)
+{
+	for (int32 i = 0; i < WorldContextlist.Num(); ++i)
+	{
+		if (WorldContextlist[i].WorldType == WorldType)
+		{
+			if (WorldContextlist[i].World())
+			{
+				WorldContextlist[i].World()->ClearWorld();
+				delete WorldContextlist[i].World();
+				WorldContextlist[i].SetCurrentWorld(nullptr);
+			}
+			WorldContextlist.RemoveAtSwap(i);
+			return;
+		}
+	}
+}
+
 UWorld* UEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld)
 {
 	// 시작 시간 기록

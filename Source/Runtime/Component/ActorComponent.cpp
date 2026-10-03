@@ -9,3 +9,11 @@ UActorComponent::~UActorComponent()
         Owner->RemoveOwnedComponent(this);
     }
 }
+
+void UActorComponent::InitializeComponent()
+{
+    if (bIsInitialized)
+        return;
+
+    bIsInitialized = true;
+}

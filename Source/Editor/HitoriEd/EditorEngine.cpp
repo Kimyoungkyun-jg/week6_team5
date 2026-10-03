@@ -82,6 +82,39 @@ bool UEditorEngine::Init() {
 	EditorUI->SetOpenSceneCallback([this]() { OpenScene(); });
 	EditorUI->SetSaveSceneCallback([this]() { SaveCurrentScene(); });
 	EditorUI->SetSaveSceneAsCallback([this]() { SaveSceneAs(); });
+	EditorUI->SetCreatePIECallback([this]() { CreatePIESession(); });
+	EditorUI->SetStopPIECallback([this]() { StopPIESession(); });
+	EditorUI->SetPIEStateGetter([this]() { return PIEState; });
+	EditorUI->SetPIEActionCallback([this](EPIEAction Action) {
+		switch (Action) {
+		case EPIEAction::Play:
+			CreatePIESession();
+			break;
+		case EPIEAction::Pause:
+			if (PlayWorld) {
+				PlayWorld->GetbIsTickEnable() = false;
+				PIEState = EPIEState::Paused;
+			}
+			break;
+		case EPIEAction::Resume:
+			if (PlayWorld) {
+				PlayWorld->GetbIsTickEnable() = true;
+				PIEState = EPIEState::Playing;
+			}
+			break;
+		case EPIEAction::Step:
+			if (PlayWorld) {
+				bIsStep = true;
+				PlayWorld->GetbIsTickEnable() = true;
+			}
+			break;
+		case EPIEAction::Stop:
+			StopPIESession();
+			break;
+		default:
+			break;
+		}
+	});
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
@@ -351,12 +384,12 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
 				FWorldContext &Context = WorldContextlist[WorldIdx];
 				if (Context.WorldType == EWorldType::PIE && Context.World()) {
-					Context.World()->Tick(DeltaTime);
+					Context.World()->Tick(EWorldTick::All, DeltaTime);
 					bTicked = true;
 				}
 			}
 			if (!bTicked && PlayWorld) {
-				PlayWorld->Tick(DeltaTime);
+				PlayWorld->Tick(EWorldTick::All, DeltaTime);
 			}
 
 			// 단일 프레임 진행 후 일시정지 복구
@@ -384,7 +417,7 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 
 			// 에디터 모드 월드 틱
-			EditorWorld->Tick(DeltaTime);
+			EditorWorld->Tick(EWorldTick::ViewportsOnly, DeltaTime);
 		}
 		{
 			SCOPE_CYCLE_COUNTER(STAT_EditorTick);

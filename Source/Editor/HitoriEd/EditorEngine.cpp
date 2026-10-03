@@ -147,6 +147,9 @@ bool UEditorEngine::Init() {
 	OutlineRenderer = MakeUnique<FOutlineRenderer>();
 	OutlineRenderer->Init(Renderer);
 
+	SceneDepthRenderer = MakeUnique<FSceneDepthRenderer>();
+	SceneDepthRenderer->Init(Renderer);
+
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
 	Outline = MakeUnique<FOutline>();
@@ -612,7 +615,7 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 
 	// 씬 뎁스 렌더링
 	if (ViewClient && ViewClient->IsSceneDepth()) {
-		Renderer->RenderSceneDepthPass(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
+		SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
 	}
 
 	// 에디터 오버레이 렌더링

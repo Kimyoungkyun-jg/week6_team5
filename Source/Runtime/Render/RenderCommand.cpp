@@ -178,7 +178,7 @@ void RenderCommand::Unmap(FBuffer* InBuffer)
 
 void RenderCommand::BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits)
 {
-	ID3D11ShaderResourceView* SRV = Texture2D->GetSRV();
+	ID3D11ShaderResourceView* SRV = Texture2D ? Texture2D->GetSRV() : nullptr;
 	if (HasFlag(FlagBits, EShaderBindFlagBits::Vertex))
 	{
 		RenderDevice->GetContext()->VSSetShaderResources(Slot, 1, &SRV);
@@ -232,6 +232,15 @@ void RenderCommand::ClearDepthStencil(FTexture2D* DepthStencilTexture, float Dep
 
 	RenderDevice->GetContext()->ClearDepthStencilView(DepthStencilTexture->GetDSV(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, Depth, Stencil);
 }
+
+void RenderCommand::SetRenderTargets(FTexture2D* ColorTarget, FTexture2D* DepthTarget)
+{
+	ID3D11RenderTargetView* RTV = ColorTarget ? ColorTarget->GetRTV() : nullptr;
+	ID3D11DepthStencilView* DSV = DepthTarget ? DepthTarget->GetDSV() : nullptr;
+
+	RenderDevice->GetContext()->OMSetRenderTargets(RTV ? 1 : 0, &RTV, DSV);
+}
+
 
 void RenderCommand::SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 InHeight)
 {

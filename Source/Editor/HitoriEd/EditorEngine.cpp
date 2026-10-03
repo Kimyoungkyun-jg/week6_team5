@@ -596,7 +596,9 @@ void UEditorEngine::CreatePIESession()
 	EditorWorld = World;
 	PIEWorld = CreatePIEWorld(); // PIE World 복사
 	World = PIEWorld;
-	World->SetMainCamera(EditorWorld->GetMainCamera()); // Camera 객체는 공유함
+	ACameraActor* PIECamera = FObjectFactory::ConstructObject<ACameraActor>();
+	PIECamera->SetWorld(World);
+	World->SetMainCamera(PIECamera); // Camera 객체는 공유함
 	EditorControlsPanel->SetWorld(World); // Panel의 World 재설정
 	OutlinerPanel->SetWorld(World);
 	DetailsPanel->SetWorld(World);
@@ -608,11 +610,27 @@ void UEditorEngine::StopPIESession()
 {
 	World->EndPlay();
 	ResetSceneSelection(); // Selection 해제
+
+	PIEWorld->ClearWorld();
+	for (ULevel* Level : PIEWorld->GetLevel())
+	{
+		delete Level;
+	}
+	delete PIEWorld;
+
+	ACameraActor* Camera = EditorWorld->GetMainCamera();
+	Camera->RegisterAllActorTickFunctions(false);
+	Camera->SetWorld(EditorWorld);
+	Camera->RegisterAllActorTickFunctions(true);
+
 	EditorControlsPanel->SetWorld(EditorWorld); // Panel의 World 재설정
 	OutlinerPanel->SetWorld(EditorWorld);
 	DetailsPanel->SetWorld(EditorWorld);
 	SettingsPanel->SetWorld(EditorWorld);
+	
 	World = EditorWorld;
+	PIEWorld = nullptr;
+	OriginNewAnnotataion.Reset();
 }
 
 UWorld* UEditorEngine::CreatePIEWorld()
@@ -629,7 +647,7 @@ void UEditorEngine::SerializeWorldForPIE(UWorld* EditorWorld, UWorld* PIEWorld)
 	json WorldData;
 	World->Serialize(WorldData, false);
 	PIEWorld->Serialize(WorldData, true); // PIE용 월드에 Editor World Deserialize로 복사
-	OriginNewAnnotataion.Reset(); // 연결 나타내는 AnnotationMap 리셋
+	
 	OriginNewAnnotataion.Add(EditorWorld, PIEWorld); // Editor월드 - PIE월드간 Annotation 기록
 	for (int i = 0; i < World->GetLevel().Num();i++) // EditorWorld의 Level 순회
 	{

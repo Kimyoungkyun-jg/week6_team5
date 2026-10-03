@@ -107,8 +107,7 @@ public:
 		PlayWorld = &playWorld;
 	}
 
-	FWorldContext& CreateNewWorldContext(EWorldType WorldType);
-	FWorldContext* GetWorldContextFromType(EWorldType WorldType) const;
+	FWorldContext* GetWorldContextFromType(EWorldType WorldType);
 	void DestroyWorldContext(EWorldType WorldType);
 
 protected:

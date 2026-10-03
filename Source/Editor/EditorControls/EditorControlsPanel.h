@@ -8,6 +8,7 @@
 #include "GameFramework/Actor/LightActor.h"
 #include "GameFramework/Actor/TextRenderActor.h"
 #include "GameFramework/Actor/SpinActor.h"
+#include "Camera/CameraActor.h"
 class FViewportsPanel;
 
 // 액터 생성과 카메라·기즈모 편집에 필요한 패널 상태를 보관한다.

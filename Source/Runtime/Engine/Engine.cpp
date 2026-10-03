@@ -37,19 +37,31 @@ FWorldContext* UEngine::GetWorldContextFromPIEInstance(int32 PIEInstanceIndex)
 	return nullptr;
 }
 
+FWorldContext* UEngine::GetWorldContextFromType(EWorldType WorldType)
+{
+	for (FWorldContext& Context : WorldContextlist)
+	{
+		if (Context.WorldType == WorldType)
+		{
+			return &Context;
+		}
+	}
+	return nullptr;
+}
+
 void UEngine::DestroyWorldContext(EWorldType WorldType)
 {
-	for (int32 i = 0; i < WorldContexts.Num(); ++i)
+	for (int32 i = 0; i < WorldContextlist.Num(); ++i)
 	{
-		if (WorldContexts[i].WorldType == WorldType)
+		if (WorldContextlist[i].WorldType == WorldType)
 		{
-			if (WorldContexts[i].World)
+			if (WorldContextlist[i].World())
 			{
-				WorldContexts[i].World->ClearWorld();
-				delete WorldContexts[i].World;
-				WorldContexts[i].World = nullptr;
+				WorldContextlist[i].World()->ClearWorld();
+				delete WorldContextlist[i].World();
+				WorldContextlist[i].SetCurrentWorld(nullptr);
 			}
-			WorldContexts.RemoveAtSwap(i);
+			WorldContextlist.RemoveAtSwap(i);
 			return;
 		}
 	}

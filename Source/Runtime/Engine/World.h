@@ -165,7 +165,4 @@ private:
 	FRenderStats RenderStats;
 
 	bool bIsTickEnable = true;
-
-	EWorldType WorldType;
-
 };

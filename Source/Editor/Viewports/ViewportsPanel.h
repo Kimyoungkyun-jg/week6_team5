@@ -1,26 +1,10 @@
 #pragma once
 
 #include "Editor/EditorUI/EditorPanel.h"
+#include "Editor/EditorUI/EditorUI.h"
 #include "Editor/Viewports/EditorViewportClient.h" 
 #include "Editor/Viewports/ViewportLayout.h"
 #include <functional>
-
-// PIE 실행 상태
-enum class EPIEState : uint8 {
-	Stopped,
-	Playing,
-	Paused
-};
-
-// PIE 버튼 액션
-enum class EPIEAction : uint8 {
-	None,
-	Play,
-	Pause,
-	Resume,
-	Step,
-	Stop
-};
 
 class FViewportsPanel : public IEditorPanel {
 public:
@@ -78,6 +62,7 @@ public:
 
 private:
 	int32 ActiveViewIndex = 0;
+	bool bShowNoCamera = false;
 
 	// 통계 정보 출력
 	void DrawStatOverlay(ImDrawList *DrawList, const ImVec2 &ViewMin) const;

@@ -143,30 +143,12 @@ void FEditorUI::DrawMainMenuBar()
 			ImGui::EndMenu();
 		}
 
-		ImGui::Separator();
-		ImGui::BeginDisabled(bPIESessionActive || !OnCreatePIE);
-		if (ImGui::Button("Create PIE"))
-		{
-			OnCreatePIE();
-			bPIESessionActive = true;
-		}
-		ImGui::EndDisabled();
-
-		ImGui::SameLine();
-		ImGui::BeginDisabled(!bPIESessionActive || !OnStopPIE);
-		if (ImGui::Button("Stop PIE"))
-		{
-			OnStopPIE();
-			bPIESessionActive = false;
-		}
-		ImGui::EndDisabled();
-
 		ImGui::EndMainMenuBar();
 	}
 	ImGui::PopStyleVar(2);
 }
 
-// 툴바를 그린다. Play, Pause, Stop 요청을 애플리케이션 콜백으로 호출한다.
+// 툴바를 그린다. PIE 세션 제어를 툴바에서 수행한다.
 void FEditorUI::DrawMainToolBar()
 {
 	const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -188,24 +170,235 @@ void FEditorUI::DrawMainToolBar()
 
 	if(ImGui::Begin("Toolbar", nullptr, flags))
 	{
-		const float ButtonWidth = 50.0f;
-		const float Spacing = ImGui::GetStyle().ItemSpacing.x;
-		const float TotalWidth = ButtonWidth * 3.0f + Spacing * 2.0f;
+		ImDrawList* DrawList = ImGui::GetWindowDrawList();
 
-		if (ImGui::Button("Play", ImVec2(ButtonWidth, 24.0f)))
+		const float ButtonWidth = 28.0f;
+		const float ButtonHeight = 24.0f;
+		const float ButtonSpacing = 4.0f;
+		const float BarPaddingX = 6.0f;
+		const float BarPaddingY = 3.0f;
+		const float BarHeight = ButtonHeight + BarPaddingY * 2.0f;
+		const float TotalWidth = BarPaddingX * 2.0f + ButtonWidth * 3.0f + ButtonSpacing * 2.0f;
+
+		const float StartX = viewport->WorkPos.x + 8.0f;
+		const float StartY = viewport->WorkPos.y + (ToolbarHeight - BarHeight) * 0.5f;
+
+		const ImVec2 BarMin{StartX, StartY};
+		const ImVec2 BarMax{StartX + TotalWidth, StartY + BarHeight};
+
+		DrawList->AddRectFilled(BarMin, BarMax, IM_COL32(36, 36, 36, 230), 6.0f);
+		DrawList->AddRect(BarMin, BarMax, IM_COL32(60, 60, 60, 200), 6.0f, 0, 1.0f);
+
+		float CurrentX = StartX + BarPaddingX;
+		const float CurrentY = StartY + BarPaddingY;
+
+		const EPIEState CurrentPIEState = GetPIEState();
+
+		if (CurrentPIEState == EPIEState::Stopped)
 		{
-			if (PlayCallback) PlayCallback();
+			// 플레이 버튼
+			ImGui::SetCursorScreenPos({CurrentX, CurrentY});
+			if (ImGui::InvisibleButton("##PIE_PlayButton", {ButtonWidth, ButtonHeight}))
+			{
+				if (OnPIEAction)
+				{
+					OnPIEAction(EPIEAction::Play);
+				}
+				else if (OnCreatePIE)
+				{
+					OnCreatePIE();
+				}
+			}
+			const bool bHoveredBtn = ImGui::IsItemHovered();
+
+			const ImVec2 BtnMin{CurrentX, CurrentY};
+			const ImVec2 BtnMax{CurrentX + ButtonWidth, CurrentY + ButtonHeight};
+
+			if (bHoveredBtn)
+			{
+				DrawList->AddRectFilled(BtnMin, BtnMax, IM_COL32(65, 65, 65, 200), 4.0f);
+				ImGui::SetTooltip("Play");
+			}
+
+			// 재생 아이콘
+			const ImU32 PlayColor = bHoveredBtn ? IM_COL32(130, 225, 50, 255) : IM_COL32(106, 186, 40, 255);
+			const float CenterX = CurrentX + ButtonWidth * 0.5f;
+			const float CenterY = CurrentY + ButtonHeight * 0.5f;
+			const float IconSize = 6.0f;
+
+			const ImVec2 P1{CenterX - IconSize * 0.6f, CenterY - IconSize};
+			const ImVec2 P2{CenterX - IconSize * 0.6f, CenterY + IconSize};
+			const ImVec2 P3{CenterX + IconSize * 0.9f, CenterY};
+			DrawList->AddTriangleFilled(P1, P2, P3, PlayColor);
 		}
-		ImGui::SameLine();
-		if (ImGui::Button("Pause", ImVec2(ButtonWidth, 24.0f)))
+		else if (CurrentPIEState == EPIEState::Playing)
 		{
-			if (PauseCallback) PauseCallback();
+			// 일시정지 버튼
+			ImGui::SetCursorScreenPos({CurrentX, CurrentY});
+			if (ImGui::InvisibleButton("##PIE_PauseButton", {ButtonWidth, ButtonHeight}))
+			{
+				if (OnPIEAction)
+				{
+					OnPIEAction(EPIEAction::Pause);
+				}
+			}
+
+			const bool bHoveredBtn = ImGui::IsItemHovered();
+
+			const ImVec2 BtnMin{CurrentX, CurrentY};
+			const ImVec2 BtnMax{CurrentX + ButtonWidth, CurrentY + ButtonHeight};
+
+			if (bHoveredBtn)
+			{
+				DrawList->AddRectFilled(BtnMin, BtnMax, IM_COL32(65, 65, 65, 200), 4.0f);
+				ImGui::SetTooltip("Pause");
+			}
+
+			// 일시정지 아이콘
+			const ImU32 PauseColor = bHoveredBtn ? IM_COL32(230, 230, 230, 255) : IM_COL32(180, 180, 180, 220);
+			const float CenterX = CurrentX + ButtonWidth * 0.5f;
+			const float CenterY = CurrentY + ButtonHeight * 0.5f;
+			const float BarW = 2.5f;
+			const float BarH = 11.0f;
+			const float Gap = 2.0f;
+
+			DrawList->AddRectFilled({CenterX - Gap - BarW, CenterY - BarH * 0.5f}, {CenterX - Gap, CenterY + BarH * 0.5f}, PauseColor, 1.0f);
+			DrawList->AddRectFilled({CenterX + Gap, CenterY - BarH * 0.5f}, {CenterX + Gap + BarW, CenterY + BarH * 0.5f}, PauseColor, 1.0f);
 		}
-		ImGui::SameLine();
-		if (ImGui::Button("Stop", ImVec2(ButtonWidth, 24.0f)))
+		else
 		{
-			if (StopCallback) StopCallback();
+			// 재개 버튼
+			ImGui::SetCursorScreenPos({CurrentX, CurrentY});
+			if (ImGui::InvisibleButton("##PIE_ResumeButton", {ButtonWidth, ButtonHeight}))
+			{
+				if (OnPIEAction)
+				{
+					OnPIEAction(EPIEAction::Resume);
+				}
+			}
+			const bool bHoveredBtn = ImGui::IsItemHovered();
+
+			const ImVec2 BtnMin{CurrentX, CurrentY};
+			const ImVec2 BtnMax{CurrentX + ButtonWidth, CurrentY + ButtonHeight};
+
+			if (bHoveredBtn)
+			{
+				DrawList->AddRectFilled(BtnMin, BtnMax, IM_COL32(65, 65, 65, 200), 4.0f);
+				ImGui::SetTooltip("Resume");
+			}
+
+			const ImU32 ResumeColor = bHoveredBtn ? IM_COL32(230, 230, 230, 255) : IM_COL32(180, 180, 180, 220);
+			const float CenterX = CurrentX + ButtonWidth * 0.5f;
+			const float CenterY = CurrentY + ButtonHeight * 0.5f;
+			const float IconSize = 6.0f;
+
+			const ImVec2 P1{CenterX - IconSize * 0.6f, CenterY - IconSize};
+			const ImVec2 P2{CenterX - IconSize * 0.6f, CenterY + IconSize};
+			const ImVec2 P3{CenterX + IconSize * 0.9f, CenterY};
+			DrawList->AddTriangleFilled(P1, P2, P3, ResumeColor);
 		}
+
+		CurrentX += ButtonWidth + ButtonSpacing;
+
+		// 스텝 버튼
+		{
+			ImGui::SetCursorScreenPos({CurrentX, CurrentY});
+			const bool bStepClicked = ImGui::InvisibleButton("##PIE_StepButton", {ButtonWidth, ButtonHeight});
+			const bool bHoveredBtn = ImGui::IsItemHovered();
+
+			const ImVec2 BtnMin{CurrentX, CurrentY};
+			const ImVec2 BtnMax{CurrentX + ButtonWidth, CurrentY + ButtonHeight};
+
+			const bool bStepEnabled = (CurrentPIEState == EPIEState::Paused);
+
+			if (bStepEnabled)
+			{
+				if (bStepClicked)
+				{
+					if (OnPIEAction)
+					{
+						OnPIEAction(EPIEAction::Step);
+					}
+				}
+
+				if (bHoveredBtn)
+				{
+					DrawList->AddRectFilled(BtnMin, BtnMax, IM_COL32(65, 65, 65, 200), 4.0f);
+					ImGui::SetTooltip("Step");
+				}
+			}
+
+			// 스텝 아이콘
+			ImU32 StepColor = IM_COL32(130, 130, 130, 160);
+			if (bStepEnabled)
+			{
+				StepColor = bHoveredBtn ? IM_COL32(255, 255, 255, 255) : IM_COL32(220, 220, 220, 255);
+			}
+
+			const float CenterX = CurrentX + ButtonWidth * 0.5f;
+			const float CenterY = CurrentY + ButtonHeight * 0.5f;
+			const float BarW = 2.0f;
+			const float BarH = 10.0f;
+			const float Gap = 2.0f;
+			const float TriW = 6.0f;
+			const float TriH = 5.0f;
+
+			DrawList->AddRectFilled({CenterX - Gap - BarW, CenterY - BarH * 0.5f}, {CenterX - Gap, CenterY + BarH * 0.5f}, StepColor, 0.5f);
+
+			const ImVec2 P1{CenterX, CenterY - TriH};
+			const ImVec2 P2{CenterX, CenterY + TriH};
+			const ImVec2 P3{CenterX + TriW, CenterY};
+			DrawList->AddTriangleFilled(P1, P2, P3, StepColor);
+		}
+
+		CurrentX += ButtonWidth + ButtonSpacing;
+
+		// 정지 버튼
+		{
+			ImGui::SetCursorScreenPos({CurrentX, CurrentY});
+			const bool bStopClicked = ImGui::InvisibleButton("##PIE_StopButton", {ButtonWidth, ButtonHeight});
+			const bool bHoveredBtn = ImGui::IsItemHovered();
+
+			const ImVec2 BtnMin{CurrentX, CurrentY};
+			const ImVec2 BtnMax{CurrentX + ButtonWidth, CurrentY + ButtonHeight};
+
+			const bool bCanStop = (CurrentPIEState != EPIEState::Stopped);
+
+			if (bCanStop)
+			{
+				if (bStopClicked)
+				{
+					if (OnPIEAction)
+					{
+						OnPIEAction(EPIEAction::Stop);
+					}
+					else if (OnStopPIE)
+					{
+						OnStopPIE();
+					}
+				}
+
+				if (bHoveredBtn)
+				{
+					DrawList->AddRectFilled(BtnMin, BtnMax, IM_COL32(65, 65, 65, 200), 4.0f);
+					ImGui::SetTooltip("Stop");
+				}
+			}
+
+			// 정지 아이콘
+			ImU32 StopColor = IM_COL32(130, 130, 130, 160);
+			if (bCanStop)
+			{
+				StopColor = bHoveredBtn ? IM_COL32(245, 75, 75, 255) : IM_COL32(220, 55, 55, 255);
+			}
+
+			const float CenterX = CurrentX + ButtonWidth * 0.5f;
+			const float CenterY = CurrentY + ButtonHeight * 0.5f;
+			const float HalfSize = 5.0f;
+
+			DrawList->AddRectFilled({CenterX - HalfSize, CenterY - HalfSize}, {CenterX + HalfSize, CenterY + HalfSize}, StopColor, 1.5f);
+		}
+
 		ImGui::End();
 	}
 

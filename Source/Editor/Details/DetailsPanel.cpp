@@ -697,6 +697,35 @@ void FDetailsPanel::OnRender()
 
 	ImGui::Begin("Details");
 
+	// UI만 제공한다. 각 메뉴의 컴포넌트 생성 및 등록은 추후 연결한다.
+	ImGui::BeginDisabled(!Target || !Target->GetOwner());
+	if (ImGui::Button("+ Add Component"))
+	{
+		ImGui::OpenPopup("AddComponentPopup");
+	}
+	if (ImGui::BeginPopup("AddComponentPopup"))
+	{
+		ImGui::TextDisabled("Components");
+		ImGui::Separator();
+		if (ImGui::MenuItem("TextComponent"))
+		{
+			// TODO: TextComponent 추가 기능 연결
+		}
+		if (ImGui::MenuItem("BillboardComponent"))
+		{
+			// TODO: BillboardComponent 추가 기능 연결
+		}
+		if (ImGui::MenuItem("PrimitiveComponent"))
+		{
+			// TODO: PrimitiveComponent 추가 기능 연결
+		}
+		ImGui::EndPopup();
+	}
+	ImGui::EndDisabled();
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
 	if (Target)
 	{
 		// 액터 -> 컴포넌트 순으로, 클래스별 프로퍼티 표시

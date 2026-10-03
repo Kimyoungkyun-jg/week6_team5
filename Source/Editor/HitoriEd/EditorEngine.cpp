@@ -606,6 +606,7 @@ void UEditorEngine::CreatePIESession()
 
 void UEditorEngine::StopPIESession()
 {
+	World->EndPlay();
 	ResetSceneSelection(); // Selection 해제
 	EditorControlsPanel->SetWorld(EditorWorld); // Panel의 World 재설정
 	OutlinerPanel->SetWorld(EditorWorld);

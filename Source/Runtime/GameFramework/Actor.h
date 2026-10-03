@@ -20,13 +20,6 @@ public:
 	AActor();
 	virtual ~AActor();
 
-	// 컴포넌트들 복제 직후 필요한 값 초기화(액터의 무게 값 등)
-	virtual void PreInitializeComponents();
-	// 컴포넌트들을 게임 월드와 물리 엔진에 등록(메쉬 등록, 물리 충돌용 콜리전 등)
-	virtual void InitializeComponents();
-	// 최종적으로 컴포넌트 조립 및 검증
-	virtual void PostInitializeComponents();
-
 	virtual void BeginPlay(); // xx World->AddPrimitive 책임이동 필요
 	// 액터 자신의 로직. 컴포넌트는 각자의 PrimaryComponentTick으로 따로 실행된다.
 	virtual void Tick(float DeltaTime) {}
@@ -72,6 +65,7 @@ public:
 	FActorTickFunction PrimaryActorTick;
 
 	virtual void DuplicateSubobjects(UObject* SourceObject) override;
+
 protected:
 	//TSet<TObjectPtr<UActorComponent>> OwnedComponents;
 	TArray<UActorComponent*> Components;

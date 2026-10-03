@@ -24,26 +24,6 @@ AActor::~AActor()
     }
 }
 
-void AActor::PreInitializeComponents()
-{
-	// 액터의 사전 정보를 초기화
-}
-
-void AActor::InitializeComponents()
-{
-	PreInitializeComponents();
-    // 컴포넌트를 순회하면서 초기화
-	for (UActorComponent* Component : Components)
-	{
-		Component->InitializeComponent();
-	}
-	PostInitializeComponents();
-}
-
-void AActor::PostInitializeComponents()
-{
-	// 포인터 등과 같은 의존성 초기화 및 검증, 물리 데이터 생성, 이벤트 바인딩
-}
 
 void AActor::BeginPlay()
 {

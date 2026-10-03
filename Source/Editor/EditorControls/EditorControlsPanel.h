@@ -8,7 +8,6 @@
 #include "GameFramework/Actor/LightActor.h"
 #include "GameFramework/Actor/TextRenderActor.h"
 #include "GameFramework/Actor/SpinActor.h"
-#include "Camera/CameraActor.h"
 class FViewportsPanel;
 
 // 액터 생성과 카메라·기즈모 편집에 필요한 패널 상태를 보관한다.
@@ -31,8 +30,7 @@ public:
 
 	int32 SelectedIndex = 0;
 
-	const char* Items[6] = {"StaticMesh", "Particle", "Text", "Light", "SpinActor", "Camera"};
-
+	const char* Items[5] = {"StaticMesh", "Particle", "Text", "Light", "SpinActor"};
 
 	FGizmo* Gizmo = nullptr;
 	int32 GizmoSelectedIndex = 0;
@@ -48,7 +46,6 @@ public:
 		ATextRenderActor::StaticClass(),
 		ALightActor::StaticClass(),
 		ASpinActor::StaticClass(),
-		ACameraActor::StaticClass(),
 	};
 
 private:

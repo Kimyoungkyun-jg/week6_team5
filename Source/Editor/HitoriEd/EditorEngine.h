@@ -97,6 +97,7 @@ private:
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 
 	UWorld* EditorWorld = nullptr;
+	UWorld* PIEWorld = nullptr;
 
 	void ResetSceneSelection();
 

@@ -592,12 +592,12 @@ void UEditorEngine::SaveSceneAs()
 
 void UEditorEngine::CreatePIESession()
 {
-	ResetSceneSelection();
+	ResetSceneSelection(); // Selection 해제
 	EditorWorld = World;
-	UWorld* CurrentWorld = CreatePIEWorld();
-	World = CurrentWorld;
-	World->SetMainCamera(EditorWorld->GetMainCamera());
-	EditorControlsPanel->SetWorld(World);
+	PIEWorld = CreatePIEWorld(); // PIE World 복사
+	World = PIEWorld;
+	World->SetMainCamera(EditorWorld->GetMainCamera()); // Camera 객체는 공유함
+	EditorControlsPanel->SetWorld(World); // Panel의 World 재설정
 	OutlinerPanel->SetWorld(World);
 	DetailsPanel->SetWorld(World);
 	SettingsPanel->SetWorld(World);
@@ -606,8 +606,8 @@ void UEditorEngine::CreatePIESession()
 
 void UEditorEngine::StopPIESession()
 {
-	ResetSceneSelection();
-	EditorControlsPanel->SetWorld(EditorWorld);
+	ResetSceneSelection(); // Selection 해제
+	EditorControlsPanel->SetWorld(EditorWorld); // Panel의 World 재설정
 	OutlinerPanel->SetWorld(EditorWorld);
 	DetailsPanel->SetWorld(EditorWorld);
 	SettingsPanel->SetWorld(EditorWorld);

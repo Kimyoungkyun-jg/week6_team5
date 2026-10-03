@@ -9,6 +9,8 @@
 class UWorld;
 class UGameInstance;
 class UEngine;
+class UCameraComponent;
+
 struct FWorldContext;
 
 // 게임 뷰포트 클라이언트 클래스

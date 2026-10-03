@@ -20,6 +20,7 @@ void FGameViewportClient::Init(FWorldContext& InWorldContext, UEngine* InEngine)
 
 void FGameViewportClient::Draw(FViewport* Viewport)
 {
+
 }
 
 void FGameViewportClient::Tick(float DeltaTime)

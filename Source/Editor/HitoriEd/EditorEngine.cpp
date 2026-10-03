@@ -663,7 +663,7 @@ void UEditorEngine::SerializeWorldForPIE(UWorld* EditorWorld, UWorld* PIEWorld)
 	}
 }
 
-UWorld* UEditorEngine::FixupPIEWorldReferences(UWorld* EditorWorld, UWorld* PIEWorld)
+UWorld* UEditorEngine::RecoverPIEWorldReferences(UWorld* EditorWorld, UWorld* PIEWorld)
 {
 	for (auto pair : OriginNewAnnotataion) // 참조 관계 복구
 	{

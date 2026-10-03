@@ -596,6 +596,11 @@ void UEditorEngine::CreatePIESession()
 	EditorWorld = World;
 	UWorld* CurrentWorld = CreatePIEWorld();
 	World = CurrentWorld;
+	World->SetMainCamera(EditorWorld->GetMainCamera());
+	EditorControlsPanel->SetWorld(World);
+	OutlinerPanel->SetWorld(World);
+	DetailsPanel->SetWorld(World);
+	SettingsPanel->SetWorld(World);
 	World->BeginPlay();
 }
 

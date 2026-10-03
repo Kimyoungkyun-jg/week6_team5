@@ -105,12 +105,6 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 
 void UWorld::Tick(float DeltaTime)
 {
-	while (!BeginPlayList.IsEmpty())
-	{
-		BeginPlayList.Peek()->BeginPlay();
-		BeginPlayList.Dequeue();
-	}
-
 	{
 		SCOPE_CYCLE_COUNTER(STAT_ActorTick);
 		// 모든 Actor를 도는 대신 등록된 Tick 함수(메인 카메라 포함)만 실행한다.
@@ -667,6 +661,11 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 void UWorld::BeginPlay()
 {
+	while (!BeginPlayList.IsEmpty())
+	{
+		BeginPlayList.Peek()->BeginPlay();
+		BeginPlayList.Dequeue();
+	}
 }
 
 void UWorld::EndPlay()

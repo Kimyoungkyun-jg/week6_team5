@@ -82,8 +82,6 @@ bool UEditorEngine::Init() {
 	EditorUI->SetOpenSceneCallback([this]() { OpenScene(); });
 	EditorUI->SetSaveSceneCallback([this]() { SaveCurrentScene(); });
 	EditorUI->SetSaveSceneAsCallback([this]() { SaveSceneAs(); });
-	EditorUI->SetCreatePIECallback([this]() { CreatePIESession(); });
-	EditorUI->SetStopPIECallback([this]() { StopPIESession(); });
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);

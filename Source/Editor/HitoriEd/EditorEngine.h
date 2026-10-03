@@ -96,7 +96,7 @@ private:
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 
-	UWorld* EditorWorld;
+	UWorld* EditorWorld = nullptr;
 
 	void ResetSceneSelection();
 
@@ -107,6 +107,7 @@ private:
 
 	void CreatePIESession();
 	void StopPIESession();
-	void ResetPIEWorld();
 	UWorld* CreatePIEWorld();
+	void SerializeWorldForPIE(UWorld* editorWorld, UWorld* PIEWorld);
+	UWorld* RecoverPIEWorldReferences(UWorld* editorWorlds, UWorld* PIEWorld);
 };

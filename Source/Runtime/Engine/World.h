@@ -73,6 +73,8 @@ public:
 
 	// Level
 	ULevel* GetPersistentLevel() const { return PersistentLevel; }
+	TArray<ULevel*> GetLevel()  { return Levels; }
+	void AddLevel(ULevel* InLevel) { Levels.Add(InLevel); }
 	void SetPersistentLevel(ULevel* InLevel) { PersistentLevel = InLevel; }
 
 	ULevel* GetCurrentLevel() const { return CurrentLevel; }

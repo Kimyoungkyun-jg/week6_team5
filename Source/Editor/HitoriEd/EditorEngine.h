@@ -77,6 +77,11 @@ private:
 	FSwapchain* MainWindowSC = nullptr;
 	FRenderer* Renderer = nullptr;
 
+	TMap<UObject*, UObject*> OriginNewAnnotataion;
+	TMap<ULevel*,json> LeveljsonMap;
+	TMap<AActor*, json> ActorjsonMap;
+	TMap<UActorComponent*, json> ActorCompjsonMap;
+
 	TUniquePtr<FEditorUI> EditorUI;
 
 	TUniquePtr<FImGuiRenderer> ImGuiRenderer;
@@ -120,4 +125,9 @@ private:
 
 	// 액터 머리 위에 UUID 라벨 렌더링
 	void RenderActorUUIDs(const FSceneView& View);
+	void CreatePIESession();
+	void StopPIESession();
+	UWorld* CreatePIEWorld();
+	void SerializeWorldForPIE(UWorld* editorWorld, UWorld* PIEWorld);
+	UWorld* RecoverPIEWorldReferences(UWorld* editorWorlds, UWorld* PIEWorld);
 };

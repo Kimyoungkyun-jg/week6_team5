@@ -662,6 +662,11 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 void UWorld::BeginPlay()
 {
+	while (!BeginPlayList.IsEmpty())
+	{
+		BeginPlayList.Peek()->BeginPlay();
+		BeginPlayList.Dequeue();
+	}
 }
 
 void UWorld::EndPlay()

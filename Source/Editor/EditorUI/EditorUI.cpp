@@ -140,6 +140,24 @@ void FEditorUI::DrawMainMenuBar()
 			ImGui::EndMenu();
 		}
 
+		ImGui::Separator();
+		ImGui::BeginDisabled(bPIESessionActive || !OnCreatePIE);
+		if (ImGui::Button("Create PIE"))
+		{
+			OnCreatePIE();
+			bPIESessionActive = true;
+		}
+		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+		ImGui::BeginDisabled(!bPIESessionActive || !OnStopPIE);
+		if (ImGui::Button("Stop PIE"))
+		{
+			OnStopPIE();
+			bPIESessionActive = false;
+		}
+		ImGui::EndDisabled();
+
 		ImGui::EndMainMenuBar();
 	}
 	ImGui::PopStyleVar(2);

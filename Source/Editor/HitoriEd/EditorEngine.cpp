@@ -82,6 +82,8 @@ bool UEditorEngine::Init() {
 	EditorUI->SetOpenSceneCallback([this]() { OpenScene(); });
 	EditorUI->SetSaveSceneCallback([this]() { SaveCurrentScene(); });
 	EditorUI->SetSaveSceneAsCallback([this]() { SaveSceneAs(); });
+	EditorUI->SetCreatePIECallback([this]() { CreatePIESession(); });
+	EditorUI->SetStopPIECallback([this]() { StopPIESession(); });
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
@@ -744,4 +746,161 @@ void UEditorEngine::RenderActorUUIDs(const FSceneView &SceneView) {
 		TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont,
 			SceneView.ViewProjectionMatrix);
 	}
+}
+
+void UEditorEngine::CreatePIESession()
+{
+	ResetSceneSelection(); // Selection 해제
+	EditorWorld = World;
+	PIEWorld = CreatePIEWorld(); // PIE World 복사
+	World = PIEWorld;
+	ACameraActor* PIECamera = FObjectFactory::ConstructObject<ACameraActor>();
+	PIECamera->SetWorld(World);
+	World->SetMainCamera(PIECamera); // Camera 객체는 공유함
+	EditorControlsPanel->SetWorld(World); // Panel의 World 재설정
+	OutlinerPanel->SetWorld(World);
+	DetailsPanel->SetWorld(World);
+	SettingsPanel->SetWorld(World);
+	World->BeginPlay();
+}
+
+void UEditorEngine::StopPIESession()
+{
+	World->EndPlay();
+	ResetSceneSelection(); // Selection 해제
+
+	PIEWorld->ClearWorld();	// PIEWorld 및 하위 객체 Delete
+	for (ULevel* Level : PIEWorld->GetLevel())	
+	{
+		delete Level;
+	}
+	delete PIEWorld;
+
+	ACameraActor* Camera = EditorWorld->GetMainCamera();	// 카메라 Tick 재연결, World 재설정
+	Camera->RegisterAllActorTickFunctions(false);
+	Camera->SetWorld(EditorWorld);
+	Camera->RegisterAllActorTickFunctions(true);
+
+	EditorControlsPanel->SetWorld(EditorWorld); // Panel의 World 재설정
+	OutlinerPanel->SetWorld(EditorWorld);
+	DetailsPanel->SetWorld(EditorWorld);
+	SettingsPanel->SetWorld(EditorWorld);
+	
+	World = EditorWorld;
+	PIEWorld = nullptr;
+	OriginNewAnnotataion.Reset();	// AnnotationArray 리셋
+}
+
+UWorld* UEditorEngine::CreatePIEWorld()
+{
+	UWorld* CurrentWorld = World;
+	UWorld* NewWorld = FObjectFactory::ConstructObject<UWorld>();  // PIE용 월드 생성
+	SerializeWorldForPIE(CurrentWorld, NewWorld);
+	RecoverPIEWorldReferences(CurrentWorld, NewWorld);
+	return NewWorld;
+}
+
+void UEditorEngine::SerializeWorldForPIE(UWorld* EditorWorld, UWorld* PIEWorld)
+{
+	json WorldData;
+	World->Serialize(WorldData, false);
+	PIEWorld->Serialize(WorldData, true); // PIE용 월드에 Editor World Deserialize로 복사
+	
+	OriginNewAnnotataion.Add(EditorWorld, PIEWorld); // Editor월드 - PIE월드간 Annotation 기록
+	for (int i = 0; i < World->GetLevel().Num();i++) // EditorWorld의 Level 순회
+	{
+		json LevelData;
+		ULevel* OriginalLevel = World->GetLevel()[i];
+		OriginalLevel->Serialize(LevelData, false);
+		ULevel* NewLevel = Cast<ULevel>(FObjectFactory::ConstructObject(OriginalLevel->GetClass(), PIEWorld));   // Outer 유지하면서 생성
+		NewLevel->Serialize(LevelData, true);												// LevelData 복사해서 NewLevel에 다 Deserialize
+		OriginNewAnnotataion.Add(OriginalLevel, NewLevel);							// Editor레벨 - PIE레벨간 Annotation 기록
+		for (int j = 0;j < OriginalLevel->GetActors().Num();j++)
+		{
+			json ActorData;
+			AActor* OriginalActor = OriginalLevel->GetActors()[j];
+			OriginalActor->Serialize(ActorData, false);
+			AActor* NewActor = Cast<AActor>(FObjectFactory::ConstructObject(OriginalActor->GetClass(), NewLevel));	// Outer 유지하면서 생성
+			NewActor->Serialize(ActorData, true);											// ActorData 복사해서 NewActor에 다 Deserialize
+			OriginNewAnnotataion.Add(World->GetLevel()[i]->GetActors()[j], NewActor);		// Editor액터 - PIE액터간 Annotation 기록
+			for (int k = 0;k < OriginalActor->GetComponents().Num();k++)
+			{
+				json ActorCompData;
+				UActorComponent* OriginalComp = OriginalActor->GetComponents()[k];
+				OriginalComp->Serialize(ActorCompData, false);
+				UActorComponent* NewActorComp = nullptr;
+				for (UActorComponent* DupComponents : NewActor->GetComponents()) // NewActor 생성과정에서 발생한 Component를 체크
+				{
+					if (DupComponents && DupComponents->GetFName() == OriginalComp->GetFName() && DupComponents->GetClass() == OriginalComp->GetClass())
+					{
+						NewActorComp = DupComponents; // Actor 생성자에서 Component가 생성되는 경우, 해당 Component로 인해 Component를 더 읽어 추가 생성되는 문제 방지
+						break;
+					}
+				}
+				if (NewActorComp == nullptr)  // 추가 생성된 Component가 존재하는 형태가 아닐경우에만 실행
+				{
+					NewActorComp = Cast<UActorComponent>(FObjectFactory::ConstructObject(OriginalComp->GetClass(), NewActor));	// Outer 유지하면서 생성
+					NewActor->AddComponents(NewActorComp);
+				}
+				NewActorComp->Serialize(ActorCompData, true);								// ActorCompData 복사해서 NewActorComp에 다 Deserialize
+				OriginNewAnnotataion.Add(OriginalComp, NewActorComp); // Editor액터컴포 - PIE액터컴포간 Annotation 기록
+			}
+		}
+	}
+}
+
+UWorld* UEditorEngine::RecoverPIEWorldReferences(UWorld* EditorWorld, UWorld* PIEWorld)
+{
+	for (auto pair : OriginNewAnnotataion) // 참조 관계 복구
+	{
+		if (pair.second->IsA(ULevel::StaticClass())) // Level 복구
+		{
+			ULevel* OriginalLevel = Cast<ULevel>(pair.first);
+			ULevel* NewLevel = Cast<ULevel>(pair.second);
+			NewLevel->SetWorld(PIEWorld); // World 참조 복구
+			PIEWorld->AddLevel(NewLevel); // World 쪽 Level 배열에 추가
+		}
+		if (pair.second->IsA(AActor::StaticClass())) // Actor 복구
+		{
+			AActor* OriginalActor = Cast<AActor>(pair.first);
+			AActor* NewActor = Cast<AActor>(pair.second);
+			NewActor->SetWorld(PIEWorld);
+			NewActor->SetLevel(Cast<ULevel>(OriginNewAnnotataion[OriginalActor->GetLevel()]));
+			NewActor->GetLevel()->AddActor(NewActor);
+			USceneComponent* OriginalRoot = OriginalActor->GetRootComponent();
+			if (OriginalRoot == nullptr)
+			{
+				NewActor->SetRootComponent(nullptr);
+			}
+			else
+			{
+				NewActor->SetRootComponent(
+					Cast<USceneComponent>(OriginNewAnnotataion[OriginalRoot]));
+			}
+		}
+		if (pair.second->IsA(UActorComponent::StaticClass())) // ActorComponent 복구
+		{
+			UActorComponent* OriginalActorComp = Cast<UActorComponent>(pair.first);
+			UActorComponent* NewActorComp = Cast<UActorComponent>(pair.second);
+			NewActorComp->SetOwner(Cast<AActor>(OriginNewAnnotataion[OriginalActorComp->GetOwner()])); // Owner 설정
+			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(NewActorComp))
+			{
+				PIEWorld->GetScene().AddPrimitive(Primitive); // SceneComponent에서 Proxies 재설정
+			}
+			USceneComponent* SceneOrigin = Cast<USceneComponent>(OriginalActorComp);
+			USceneComponent* Scene = Cast<USceneComponent>(NewActorComp);
+			if (SceneOrigin != nullptr && Scene != nullptr)
+			{
+				if (SceneOrigin->GetAttachParent() == nullptr)
+				{
+					Scene->SetupAttachment(nullptr);  // Parent가 원래 없을경우 nullptr로 설정
+				}
+				else Scene->SetupAttachment(Cast<USceneComponent>(OriginNewAnnotataion[SceneOrigin->GetAttachParent()])); // Parent 복구 
+			}
+		}
+	}
+	PIEWorld->SetCurrentLevel(Cast<ULevel>(OriginNewAnnotataion[EditorWorld->GetCurrentLevel()]));
+	PIEWorld->SetPersistentLevel(Cast<ULevel>(OriginNewAnnotataion[EditorWorld->GetPersistentLevel()]));	// CurrentLevel, PersistentLevel 복구
+	PIEWorld->SetWorldType(PIE);	// WorldType 설정
+	return PIEWorld;
 }

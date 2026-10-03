@@ -28,8 +28,11 @@ public:
 
 	UWorld* GetWorld() const { return World; }
 	ULevel* GetLevel() const { return Level; }
+	void SetWorld(UWorld* world) { World=world; }
+	void SetLevel(ULevel* level) { Level=level; }
 
 	const TArray<UActorComponent*>& GetComponents() const { return Components; }
+	void AddComponents(UActorComponent* component) { Components.Add(component); }
 	USceneComponent* GetRootComponent() const { return RootComponent; }
 	void SetRootComponent(USceneComponent* SceneComponent) { RootComponent = SceneComponent; }
 

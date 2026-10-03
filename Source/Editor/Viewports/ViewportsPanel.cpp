@@ -262,7 +262,7 @@ void FViewportsPanel::OnRender() {
 		const char *Labels[] = {"Solid", "Wireframe"};
 		ImGui::SetNextItemWidth(100.0f);
 		if (ImGui::Combo("##FillMode", &Mode, Labels, 2)) {
-			Client->SetWireframe(Mode == 1);
+			Client->SetViewportMode(Mode == 1 ? EViewportMode::Wireframe : EViewportMode::Solid);
 		}
 		ImGui::SameLine();
 		if (CurrentLayoutMode == ELayoutMode::QuadSplit) {

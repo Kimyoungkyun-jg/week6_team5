@@ -62,6 +62,8 @@ public:
 	// 측정 전용 불투명 오클루전 검사
 	FOcclusionMeasureResult MeasureOpaqueOcclusion(const FMatrix& ViewProjection, const FRenderQueue& InQueue);
 
+	bool RenderSceneDepthPass(const FSceneView& View, FTexture2D* DepthTarget, FTexture2D* ColorTarget, float MaxRange);
+
 	uint8* BeginObjectConstants(uint32 MaxSlots);
 	void EndObjectConstants();
 

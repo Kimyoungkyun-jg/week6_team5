@@ -380,6 +380,16 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	return Result;
 }
 
+
+bool FRenderer::RenderSceneDepthPass(const FSceneView& View, FTexture2D* DepthTarget, FTexture2D* ColorTarget, float MaxRange)
+{
+	// todo
+
+	return false;
+}
+
+
+
 uint8* FRenderer::BeginObjectConstants(uint32 MaxSlots)
 {
 	bObjectConstantsPrepared = false;

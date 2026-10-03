@@ -610,6 +610,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				SceneView.ViewProjectionMatrix);
 	}
 
+	// 씬 뎁스 렌더링
+	if (ViewClient && ViewClient->IsSceneDepth()) {
+		Renderer->RenderSceneDepthPass(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
+	}
+
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE || ViewIndex != 0) {
 		// 활성 뷰포트에만 아웃라인과 기즈모 렌더링

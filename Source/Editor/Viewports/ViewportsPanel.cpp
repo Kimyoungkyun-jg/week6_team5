@@ -146,6 +146,14 @@ void FViewportsPanel::OnRender() {
 		const ImVec2 ViewMax{ViewMin.x + Rect.Width,
 			ViewMin.y + Rect.Height};
 		DrawList->AddImage(Client->GetColorTarget()->GetSRV(), ViewMin, ViewMax);
+
+		// 마우스 클릭 시 활성 뷰포트 설정
+		const bool bViewHovered = bHovered && ImGui::IsMouseHoveringRect(ViewMin, ViewMax);
+		if (bViewHovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
+				ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+				ImGui::IsMouseClicked(ImGuiMouseButton_Middle))) {
+			ActiveViewIndex = ViewIndex;
+		}
 	}
 	DrawList->PopClipRect();
 

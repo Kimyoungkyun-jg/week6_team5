@@ -309,14 +309,8 @@ void FSettingsPanel::ApplyViewportSettings()
 
 		if (Settings.ViewFov[Index] > 0.0f)
 			Client->SetViewFOV(Settings.ViewFov[Index]);
-		if (Settings.ViewOrthoWidth[Index] > 0.0f)
-			Client->SetOrthoWidth(Settings.ViewOrthoWidth[Index]);
 		if (Settings.ViewWireframe[Index] >= 0)
 			Client->SetWireframe(Settings.ViewWireframe[Index] == 1);
-		if (Settings.bViewLocationSaved[Index])
-			Client->SetViewLocation(Settings.ViewLocation[Index]);
-		if (Settings.bViewRotationSaved[Index])
-			Client->SetViewRotation(Settings.ViewRotation[Index].ToFRotator());
 	}
 }
 

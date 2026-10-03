@@ -848,45 +848,11 @@ void FDetailsPanel::OnRender()
 			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.20f, 0.70f, 0.20f, 1.0f));
 			
 			if (ImGui::Button("+ Add", ImVec2(ButtonWidth, 0)))
-		// 액터 -> 컴포넌트 순으로, 클래스별 프로퍼티 표시
-		DrawProperties(Target->GetOwner(), CustomFont);
-		if (ImGui::Button("+ Add Component"))
-		{
-			ImGui::OpenPopup("AddComponentPopup");
-		}
-		if (ImGui::BeginPopup("AddComponentPopup"))
-		{
-			ImGui::TextDisabled("Components");
-			ImGui::Separator();
-			if (ImGui::MenuItem("TextComponent"))
-			{
-				UTextRenderComponent* TextComponent = Target->GetOwner()->CreateDefaultSubobject<UTextRenderComponent>("TextRenderComponent");
-				TextComponent->SetupAttachment(Target->GetOwner()->GetRootComponent());
-			}
-			if (ImGui::MenuItem("BillboardComponent"))
-			{
-				UBillboardComponent* BillboardComponent = Target->GetOwner()->CreateDefaultSubobject<UBillboardComponent>("BillboardComponent");
-				Target->GetOwner()->GetWorld()->GetScene().AddPrimitive(BillboardComponent);
-				BillboardComponent->SetupAttachment(Target->GetOwner()->GetRootComponent());
-			}
-			if (ImGui::MenuItem("StaticMeshComponent"))
-			{
-				UStaticMeshComponent* StaticMeshComponent = Target->GetOwner()->CreateDefaultSubobject<UStaticMeshComponent>("StaticMeshComponent");
-				Target->GetOwner()->GetWorld()->GetScene().AddPrimitive(StaticMeshComponent);
-				StaticMeshComponent->SetupAttachment(Target->GetOwner()->GetRootComponent());
-			}
-			ImGui::EndPopup();
-		}
-		// 선택된 컴포넌트뿐 아니라 같은 액터의 다른 컴포넌트도 보여준다.
-		// (예: 라이트는 빌보드를 클릭해서 고르지만 수치는 SpotLight 쪽에 있다)
-		if (AActor* Owner = Target->GetOwner())
-		{
-			for (UActorComponent* Component : Owner->GetComponents())
 			{
 				ImGui::OpenPopup("AddComponentPopup");
 			}
-
 			ImGui::PopStyleColor(2);
+
 			DrawAddComponentPopup(Owner);
 			ImGui::Spacing();
 

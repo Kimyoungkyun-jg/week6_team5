@@ -96,7 +96,7 @@ public:
 
 	// 월드 컨텍스트 관리
 	FWorldContext* GetWorldContextFromPIEInstance(int32 PIEInstanceIndex);
-	UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld);
+	virtual UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld);
 	FWorldContext& CreateNewWorldContext(EWorldType InWorldType);
 
 	// 관리 중인 월드 컨텍스트 목록

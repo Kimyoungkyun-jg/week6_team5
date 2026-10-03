@@ -57,7 +57,8 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 	const float Aspect = Width / Height;
 
 
-	if (CameraComponent == nullptr)
+	// 메인 카메라 유효성 검사 후 컴포넌트 획득
+	if (CameraComponent == nullptr && World && World->GetMainCamera())
 	{
 		CameraComponent = World->GetMainCamera()->GetCameraComponent();
 	}

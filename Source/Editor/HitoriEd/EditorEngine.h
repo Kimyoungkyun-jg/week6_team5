@@ -128,6 +128,7 @@ private:
 	void CreatePIESession();
 	void StopPIESession();
 	UWorld* CreatePIEWorld();
+	virtual UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld) override;
 	void SerializeWorldForPIE(UWorld* editorWorld, UWorld* PIEWorld);
 	UWorld* RecoverPIEWorldReferences(UWorld* editorWorlds, UWorld* PIEWorld);
 };

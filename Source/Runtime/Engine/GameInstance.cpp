@@ -16,7 +16,11 @@ void UGameInstance::Shutdown()
 	if (WorldContext)
 	{
 		// 게임 뷰포트 클라이언트 해제
-		WorldContext->GameViewport->Reset();
+		if (WorldContext->GameViewport)
+		{
+			WorldContext->GameViewport->Reset();
+			WorldContext->GameViewport.reset();
+		}
 		WorldContext->OwningGameInstance = nullptr;
 		WorldContext = nullptr;
 	}

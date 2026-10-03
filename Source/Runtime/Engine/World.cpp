@@ -662,6 +662,22 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 void UWorld::BeginPlay()
 {
+	// 레벨 액터 재생 시작
+	for (ULevel* Level : Levels)
+	{
+		if (Level)
+		{
+			for (AActor* Actor : Level->GetActors())
+			{
+				if (Actor)
+				{
+					Actor->BeginPlay();
+				}
+			}
+		}
+	}
+
+	// 대기열 액터 재생 시작
 	while (!BeginPlayList.IsEmpty())
 	{
 		BeginPlayList.Peek()->BeginPlay();

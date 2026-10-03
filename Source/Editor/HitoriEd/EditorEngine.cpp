@@ -240,32 +240,18 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 		SettingsPanel->GetMutableSettings().MultipleViewportsVertical = Ratio.Vertical;
 	}
 
-	if(World && World->IsPIEWorld() && !bIsSimulatingInEditor)
+	if (World && World->IsPIEWorld() && !bIsSimulatingInEditor)
 	{
-		ACameraActor* PIECamera = FindFirstSceneCamera();
-
-		if(PIECamera && PIECamera->GetCameraComponent())
+		// 플레이어 컨트롤러가 살아있으면 정상 뷰포트로 표시!
+		if (PIEPlayerController)
 		{
 			ViewportsPanel->SetShowNoCamera(false);
-			UCameraComponent* CameraComp = PIECamera->GetCameraComponent();
-
-			FViewCamera ViewCamera;
-			
-			ViewCamera.Transform.Location = CameraComp->GetWorldLocation();
-			ViewCamera.Transform.Rotation = CameraComp->GetWorldRotation();
-			ViewCamera.Projection.Mode = EProjectionMode::Perspective;
-			ViewCamera.Projection.FovDegrees = CameraComp->GetFieldOfView();
-			ViewCamera.Projection.NearClip = CameraComp->GetNearZ();
-			ViewCamera.Projection.FarClip = CameraComp->GetFarZ();
-
-			MultipleViewportsAdapter.SetViewCamera(0, ViewCamera);
 		}
 		else
 		{
 			ViewportsPanel->SetShowNoCamera(true);
 		}
 	}
-
 	else
 	{
 		MultipleViewportsAdapter.UpdateInput(
@@ -345,13 +331,52 @@ void UEditorEngine::RenderMultipleViewports()
 			}
 		}
 
-		RenderFrame(
+		FMatrix ViewProj = MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex);
+		FVector CamLoc = MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex);
+		FVector CamFwd = MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex);
+
+		if(ViewIndex == PIEViewIndex && PIEPlayerController)
+		{
+			FVector Location;
+			FRotator Rotation;
+			PIEPlayerController->GetPlayerViewCamera(Location, Rotation);
+
+			CamLoc = Location;
+			FQuat CamQuat = Rotation.Quaternion();
+			CamFwd = CamQuat.GetForwardVector();
+
+			FCameraTransform CamTransform;
+			CamTransform.Location = Location;
+			CamTransform.Rotation = CamQuat;
+
+			const FRect& Rect = MultipleViewportsAdapter.GetViewRect(ViewIndex);
+			const float AspectRatio = (Rect.Width > 0.0f && Rect.Height > 0.0f) ? (Rect.Width / Rect.Height) : (16.0f / 9.0f);
+
+			FCameraProjection CamProj;
+			CamProj.Mode = EProjectionMode::Perspective;
+			CamProj.FovDegrees = PIEPlayerController->GetFOV();
+			CamProj.NearClip = 0.1f;
+			CamProj.FarClip = 10000.0f;
+			CamProj.OrthoWidth = 100.0f;
+			// 5. 핵심: ViewProjection 행렬 직접 계산!
+			ViewProj = BuildViewMatrix(CamTransform) * BuildProjectionMatrix(CamProj, AspectRatio);
+		}
+
+		/*RenderFrame(
 			TargetWorld,
 			ViewIndex,
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
 			MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
 			MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
 			MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
+			RenderQueue);*/
+		RenderFrame(
+			TargetWorld,
+			ViewIndex,
+			ViewportsPanel->GetRenderingInfo(ViewIndex),
+			ViewProj,
+			CamLoc,
+			CamFwd,
 			RenderQueue);
 	}
 
@@ -695,6 +720,27 @@ void UEditorEngine::StartPIE()
 	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 	ViewportsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
 
+
+	PIEPlayerController = PIEWorldContext.World->SpawnActor<APlayerController>();
+
+	APawn* TargetPawn = nullptr;
+	for(AActor* Actor: PIEWorldContext.World->GetPersistentLevel()->GetActors())
+	{
+		if(APawn* Pawn = Cast<APawn>(Actor))
+		{
+			TargetPawn = Pawn;
+			break;
+		}
+	}
+
+	if (!TargetPawn)
+	{
+		TargetPawn = PIEWorldContext.World->SpawnActor<ADefaultPawn>();
+
+		TargetPawn->GetRootComponent()->SetRelativeLocation(MultipleViewportsAdapter.GetEngineCameraLocation(PIEViewIndex));
+	}
+	PIEPlayerController->Possess(TargetPawn);
+
 	PIEWorldContext.World->BeginPlay();
 }
 
@@ -717,21 +763,7 @@ void UEditorEngine::EndPIE()
 	EditorControlsPanel->SetWorld(World);
 	SettingsPanel->SetWorld(World);
 
-	// 에디터 카메라로 돌아오는 로직 필요
+	PIEPlayerController = nullptr;
 
 	DestroyWorldContext(EWorldType::PIE);
-}
-
-ACameraActor* UEditorEngine::FindFirstSceneCamera()
-{
-	if (!World || !World->GetPersistentLevel()) return nullptr;
-
-	for (AActor* Actor : World->GetPersistentLevel()->GetActors())
-	{
-		if (ACameraActor* Camera = Cast<ACameraActor>(Actor))
-		{
-			return Camera;
-		}
-	}
-	return nullptr;
 }

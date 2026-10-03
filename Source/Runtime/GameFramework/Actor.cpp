@@ -108,15 +108,15 @@ FVector AActor::GetActorLocation() const
     return FVector::ZeroVector;
 }
 
-//FRotator AActor::GetActorRotation() const
-//{
-//    if (RootComponent)
-//    {
-//        // USceneComponent의 GetWorldRotation() 호출
-//        return RootComponent->GetWorldRotation();
-//    }
-//    return FRotator::ZeroRotator;
-//}
+FRotator AActor::GetActorRotation() const
+{
+    if (RootComponent)
+    {
+        // USceneComponent의 GetWorldRotation() 호출
+        return RootComponent->GetWorldRotation();
+    }
+    return FRotator(0.0f, 0.0f, 0.0f);
+}
 
 FVector AActor::GetActorScale3D() const
 {

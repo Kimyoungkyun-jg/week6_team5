@@ -659,7 +659,17 @@ namespace
 			break;
 
 		case EPropertyType::Bool:
-			ImGui::Checkbox(Label.c_str(), static_cast<bool*>(ValuePtr));
+			if (ImGui::Checkbox(Label.c_str(), static_cast<bool*>(ValuePtr)))
+			{
+				if (Property.Name == "bVisible")
+				{
+					if (UPrimitiveComponent* Primitive =
+						Cast<UPrimitiveComponent>(Object))
+					{
+						Primitive->SetVisible(*static_cast<bool*>(ValuePtr));
+					}
+				}
+			}
 			break;
 
 		case EPropertyType::Vector:

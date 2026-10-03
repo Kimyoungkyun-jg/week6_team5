@@ -607,6 +607,10 @@ void UEditorEngine::CreatePIESession()
 void UEditorEngine::StopPIESession()
 {
 	ResetSceneSelection();
+	EditorControlsPanel->SetWorld(EditorWorld);
+	OutlinerPanel->SetWorld(EditorWorld);
+	DetailsPanel->SetWorld(EditorWorld);
+	SettingsPanel->SetWorld(EditorWorld);
 	World = EditorWorld;
 }
 

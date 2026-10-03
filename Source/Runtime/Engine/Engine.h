@@ -107,6 +107,10 @@ public:
 		PlayWorld = &playWorld;
 	}
 
+	FWorldContext& CreateNewWorldContext(EWorldType WorldType);
+	FWorldContext* GetWorldContextFromType(EWorldType WorldType) const;
+	void DestroyWorldContext(EWorldType WorldType);
+
 protected:
 	FEngineLoop& GetEngineLoop() const { return *EngineLoop; }
 

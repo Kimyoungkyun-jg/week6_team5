@@ -116,6 +116,12 @@ public:
 		free(Ptr);
 	}
 
+	virtual UObject* Duplicate(UObject* InOuter = nullptr);
+
+	virtual void DuplicateSubobjects(UObject* SourceObject) {}
+
+	static void CopyProperties(UObject* SourceObject, UObject* TargetObject);
+
 private:
 	uint32 ObjectUUID;
 	uint32 InternalIndex;

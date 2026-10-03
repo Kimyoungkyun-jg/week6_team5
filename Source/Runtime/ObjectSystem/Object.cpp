@@ -3,6 +3,7 @@
 
 #include "Core/EngineStatics.h"
 #include "ObjectSystem/Class.h"
+#include "ObjectSystem/ObjectFactory.h"
 
 #include "Serialization/TypeSerializer.h"
 #include "Asset/AssetManager.h"
@@ -186,4 +187,38 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 }
 
 
+UObject* UObject::Duplicate(UObject* Outer)
+{
+	UObject* NewObject = FObjectFactory::ConstructObject(GetClass(), Outer, GetFName());
+	if (!NewObject) return nullptr;
 
+	CopyProperties(this, NewObject);
+
+	NewObject->DuplicateSubobjects(this);
+
+	return NewObject;
+}
+
+void UObject::CopyProperties(UObject* SourceObject, UObject* TargetObject)
+{
+	if(!SourceObject || !TargetObject)
+		return;
+
+	for (UClass* c = SourceObject->GetClass(); c; c = c->Super)
+	{
+		for(const FProperty& Property : c->Properties)
+		{
+			const void* SourcePtr = reinterpret_cast<const uint8*>(SourceObject) + Property.Offset;
+			void* DestPtr = reinterpret_cast<uint8*>(TargetObject) + Property.Offset;
+
+			if (Property.Type == EPropertyType::String)
+			{
+				*static_cast<FString*>(DestPtr) = *static_cast<const FString*>(SourcePtr);
+			}
+			else
+			{
+				memcpy(DestPtr, SourcePtr, Property.Size);
+			}
+		}
+	}
+}

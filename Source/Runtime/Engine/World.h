@@ -3,6 +3,9 @@
 #include "ObjectSystem/Object.h"
 #include "ObjectSystem/Class.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/DefaultPawn.h"
 #include "Component/PrimitiveComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Math/Transform.h"
@@ -41,6 +44,20 @@ struct FRenderStats
 	void Reset() { *this = FRenderStats(); }
 };
 
+
+enum class EWorldTick : uint8
+{
+	TimeOnly,
+	ViewportsOnly,
+	PauseTick,
+	All,
+};
+
+
+
+
+
+
 class UWorld : public UObject
 {
 	DECLARE_CLASS(UWorld, UObject)
@@ -59,7 +76,7 @@ public:
 		return CastChecked<T>(SpawnActor(T::StaticClass(), InName, Transform));
 	}
 
-	void Tick(float DeltaTime);
+	void Tick(EWorldTick TickType, float DeltaTime);
 
 	void ClearWorld();
 
@@ -133,6 +150,10 @@ private:
 	ULevel* PersistentLevel = nullptr;
 	ULevel* CurrentLevel = nullptr;
 	TArray<ULevel*> Levels;
+	EWorldType WorldType = EWorldType::None;
+	EWorldTick CurrentTickType = EWorldTick::All;
+	bool bBegunPlay = false;
+	bool bIsPaused = false;
 
 	FScene Scene;
 

@@ -503,6 +503,18 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 			Cast<ALightActor>(Gizmo->GetTarget()->GetOwner())) {
 				LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
 			}
+
+			// 선택된 액터가 라이트면 원뿔을 같이 쌓는다
+			if (Gizmo->GetTarget())
+			{
+				if (ALightActor* LightActor = Cast<ALightActor>(Gizmo->GetTarget()->GetOwner()))
+				{
+					LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
+				}
+			}
+
+			LineBatcher->OnRender(ViewProjection);
+
 		}
 
 		LineBatcher->OnRender(SceneView.ViewProjectionMatrix);
@@ -980,4 +992,90 @@ UWorld* UEditorEngine::RecoverPIEWorldReferences(UWorld* InEditorWorld, UWorld* 
 	InPIEWorld->GetWorldType() = EWorldType::PIE;
 
 	return InPIEWorld;
+}
+
+void UEditorEngine::StartPIE()
+{
+	if (GetWorldContextFromType(EWorldType::PIE) != nullptr) return;
+
+	PIEViewIndex = MultipleViewportsAdapter.GetActiveViewIndex();
+
+	if (PIEViewIndex == InvalidViewIndex) PIEViewIndex = 0;
+
+	FWorldContext* EditorContext = GetWorldContextFromType(EWorldType::Editor);
+	if (!EditorContext || !EditorContext->World)
+		return;
+
+	FWorldContext& PIEWorldContext = CreateNewWorldContext(EWorldType::PIE);
+	if (!PIEWorldContext.World)
+		return;
+
+	UWorld::DuplicateWorld(EditorContext->World, PIEWorldContext.World);
+
+	World = PIEWorldContext.World;
+	if (!World)
+		return;
+
+	Gizmo->SetTarget(nullptr);
+	Outline->SetTarget(nullptr);
+	DetailsPanel->SetTarget(nullptr);
+
+	OutlinerPanel->SetWorld(World);
+	DetailsPanel->SetWorld(World);
+
+	EditorControlsPanel->SetWorld(World);
+	EditorControlsPanel->SetGizmo(Gizmo.get());
+	EditorControlsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+
+	SettingsPanel->SetWorld(World);
+	SettingsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+	ViewportsPanel->SetViewportAdapter(&MultipleViewportsAdapter);
+
+
+	PIEPlayerController = PIEWorldContext.World->SpawnActor<APlayerController>();
+
+	APawn* TargetPawn = nullptr;
+	for(AActor* Actor: PIEWorldContext.World->GetPersistentLevel()->GetActors())
+	{
+		if(APawn* Pawn = Cast<APawn>(Actor))
+		{
+			TargetPawn = Pawn;
+			break;
+		}
+	}
+
+	if (!TargetPawn)
+	{
+		TargetPawn = PIEWorldContext.World->SpawnActor<ADefaultPawn>();
+
+		TargetPawn->GetRootComponent()->SetRelativeLocation(MultipleViewportsAdapter.GetEngineCameraLocation(PIEViewIndex));
+		TargetPawn->GetRootComponent()->SetRelativeRotation(MultipleViewportsAdapter.GetViewCamera(PIEViewIndex).Transform.Rotation.ToFRotator());
+	}
+	PIEPlayerController->Possess(TargetPawn);
+
+	PIEWorldContext.World->BeginPlay();
+}
+
+void UEditorEngine::EndPIE()
+{
+	FWorldContext* PIEWorldContext = GetWorldContextFromType(EWorldType::PIE);
+	if(!PIEWorldContext || !PIEWorldContext->World)
+		return;
+
+	PIEWorldContext->World->EndPlay();
+
+	FWorldContext* EditorWorldContext = GetWorldContextFromType(EWorldType::Editor);
+	if(EditorWorldContext && EditorWorldContext->World)
+		World = EditorWorldContext->World;
+
+	ResetSceneSelection();
+
+	OutlinerPanel->SetWorld(World);
+	DetailsPanel->SetWorld(World);
+	EditorControlsPanel->SetWorld(World);
+	SettingsPanel->SetWorld(World);
+
+	PIEPlayerController = nullptr;
+
+	DestroyWorldContext(EWorldType::PIE);
 }

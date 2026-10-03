@@ -74,6 +74,8 @@ public:
 			return nullptr;
 	}
 
+	void SetShowNoCamera(bool bValue) { bShowNoCamera = bValue; }
+
 private:
 	int32 ActiveViewIndex = 0;
 

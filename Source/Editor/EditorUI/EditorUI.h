@@ -35,6 +35,7 @@ private:
 	bool bPIESessionActive = false;
 
 	void DrawMainMenuBar();
+	void DrawMainToolBar();
 
 	TArray<TUniquePtr<IEditorPanel>> Panels;
 

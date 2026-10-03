@@ -280,7 +280,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	// 기즈모 조작 결과가 같은 프레임의 UpdateAllTransforms에 반영되도록 World Tick보다 앞에 둔다.
 	UpdateGizmoAndPicking();
 
-	EditorWorld->Tick(DeltaTime);
+	World->Tick(EWorldTick::ViewportsOnly, DeltaTime);
 
 	EditorControlsPanel->DeltaTime = DeltaTime;
 	EditorUI->Tick(DeltaTime);

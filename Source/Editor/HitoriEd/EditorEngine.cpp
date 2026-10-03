@@ -611,14 +611,14 @@ void UEditorEngine::StopPIESession()
 	World->EndPlay();
 	ResetSceneSelection(); // Selection 해제
 
-	PIEWorld->ClearWorld();
-	for (ULevel* Level : PIEWorld->GetLevel())
+	PIEWorld->ClearWorld();	// PIEWorld 및 하위 객체 Delete
+	for (ULevel* Level : PIEWorld->GetLevel())	
 	{
 		delete Level;
 	}
 	delete PIEWorld;
 
-	ACameraActor* Camera = EditorWorld->GetMainCamera();
+	ACameraActor* Camera = EditorWorld->GetMainCamera();	// 카메라 Tick 재연결, World 재설정
 	Camera->RegisterAllActorTickFunctions(false);
 	Camera->SetWorld(EditorWorld);
 	Camera->RegisterAllActorTickFunctions(true);
@@ -630,7 +630,7 @@ void UEditorEngine::StopPIESession()
 	
 	World = EditorWorld;
 	PIEWorld = nullptr;
-	OriginNewAnnotataion.Reset();
+	OriginNewAnnotataion.Reset();	// AnnotationArray 리셋
 }
 
 UWorld* UEditorEngine::CreatePIEWorld()

@@ -17,10 +17,10 @@ class UFireBallComponent : public UPrimitiveComponent
 	DECLARE_CLASS(UFireBallComponent, UPrimitiveComponent)
 
 	REFLECT_START(ClassName)
-		PROPERTY(Radius)
+		PROPERTY_RANGE(Radius, 0.0f, 100.0f)
 		PROPERTY_TYPE(Color, Color)
-		PROPERTY(RadiusFalloff)
-		PROPERTY(Intensity)
+		PROPERTY_RANGE(RadiusFalloff, 0.0f, 5.0f)
+		PROPERTY_RANGE(Intensity, 0.0f, 10.0f)
 	REFLECT_END()
 public:
 	UFireBallComponent();

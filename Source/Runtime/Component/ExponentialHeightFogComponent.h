@@ -7,12 +7,12 @@ class UExponentialHeightFogComponent : public USceneComponent
 	DECLARE_CLASS(UExponentialHeightFogComponent, USceneComponent)
 
 	REFLECT_START(UExponentialHeightFogComponent)
-		PROPERTY(FogDensity)
-		PROPERTY(FogHeightFalloff)
+		PROPERTY_RANGE(FogDensity, 0.0f, 1.0f)
+		PROPERTY_RANGE(FogHeightFalloff, 0.0f, 1.0f)
 		PROPERTY_TYPE(FogInscatteringColor, Color)
-		PROPERTY(FogStartDistance)
-		PROPERTY(FogCutoffDistance)
-		PROPERTY(FogMaxOpacity)
+		PROPERTY_RANGE(FogStartDistance, 0.0f, 1000.0f)
+		PROPERTY_RANGE(FogCutoffDistance, 0.0f, 3000.0f)
+		PROPERTY_RANGE(FogMaxOpacity, 0.0f, 1.0f)
 		PROPERTY(bVisible)
 		REFLECT_END()
 public:

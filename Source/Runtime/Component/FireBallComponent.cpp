@@ -26,7 +26,7 @@ void UFireBallComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FV
 {
 	FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
 	Packet.Mesh = UAssetManager::GetAssetByPath<UStaticMesh>("Sphere");
-	Packet.Material = UAssetManager::GetAssetByPath<UMaterial>("FireBallMaterial");
+	//Packet.Material = UAssetManager::GetAssetByPath<UMaterial>("FireBallMaterial");
 	MaterialParams.Center = GetWorldLocation();
 	MaterialParams.Color = Color;
 	MaterialParams.Radius = Radius;

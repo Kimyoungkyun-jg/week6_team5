@@ -652,9 +652,19 @@ namespace
 		switch (Property.Type)
 		{
 		case EPropertyType::Float:
-			ImGui::DragFloat(Label.c_str(), static_cast<float*>(ValuePtr), 0.1f);
+		{
+			float* Value = static_cast<float*>(ValuePtr);
+			if (Property.MinValue != Property.MaxValue)
+			{
+				float DragSpeed = abs(Property.MinValue - Property.MaxValue) * 0.001f;
+				ImGui::DragFloat(Label.c_str(), Value, DragSpeed,Property.MinValue, Property.MaxValue);
+			}
+			else
+			{
+				ImGui::DragFloat(Label.c_str(), Value, 0.1f);
+			}
 			break;
-
+		}
 		case EPropertyType::Int:
 			ImGui::DragInt(Label.c_str(), static_cast<int*>(ValuePtr), 1.0f);
 			break;

@@ -24,6 +24,7 @@
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Actor/LightActor.h"
+#include "Component/ExponentialHeightFogComponent.h"
 
 #include "Asset/AssetManager.h"
 #include "Render/RenderResourceManager.h"
@@ -149,6 +150,9 @@ bool UEditorEngine::Init() {
 
 	SceneDepthRenderer = MakeUnique<FSceneDepthRenderer>();
 	SceneDepthRenderer->Init(Renderer);
+
+	HeightFogRenderer = MakeUnique<FHeightFogRenderer>();
+	HeightFogRenderer->Init(Renderer);
 
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
@@ -554,6 +558,31 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		SceneRenderer.RenderOpaque(Renderer);
 	}
 
+	UWorld* TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
+	// 현재 월드의 첫 활성 안개만 사용한다. 디버그/직교 뷰에는 적용하지 않는다.
+	if (TargetWorld && HeightFogRenderer && ColorTarget && DepthTarget && bDrawPrimitives && SceneView.bIsPerspective && 
+		ViewClient && ViewClient->GetViewportMode() == EViewportMode::Solid) {
+		for (TObjectIterator<UExponentialHeightFogComponent> Fog; Fog; ++Fog) {
+			if (!Fog || !Fog->IsVisible() || !Fog->GetOwner() ||
+					Fog->GetOwner()->GetWorld() != TargetWorld) {
+				continue;
+			}
+
+			FHeightFogSetting FogSetting;
+			FogSetting.FogDensity = Fog->GetFogDensity();
+			FogSetting.FogHeightFalloff = Fog->GetFogHeightFalloff();
+			FogSetting.FogHeight = Fog->GetFogHeight();
+			FogSetting.FogColor = Fog->GetFogColor();
+			FogSetting.StartDistance = Fog->GetStartDistance();
+			FogSetting.FogMaxOpacity = Fog->GetFogMaxOpacity();
+			FogSetting.FogCutoffDistance = Fog->GetFogCutoffDistance();
+			HeightFogRenderer->OnRender(SceneView, DepthTarget, ColorTarget, FogSetting);
+
+			// 가장 첫번째 fog component에 대하여만 렌더링한다.
+			break;
+		}
+	}
+
 	// 에디터 그리드 렌더링
 	if ((!bIsPIE || ViewIndex != 0) &&
 			SettingsPanel->GetSettings().bDrawBatchLine) {
@@ -594,7 +623,6 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	}
 
 	// 텍스트 컴포넌트 렌더링
-	UWorld *TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
 	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent;
 			 ++TextComponent) {
 		if (!TextComponent || !TextComponent->GetFont() ||

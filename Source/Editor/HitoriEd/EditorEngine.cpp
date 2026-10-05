@@ -614,6 +614,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	FTexture2D* SecondDepthTarget = nullptr;
 	RenderCommand::BeginRenderPass(ColorTarget, SecondDepthTarget, Width, Height);
 	Renderer->RenderSceneDepth(DepthTarget,SettingsPanel->GetSettings().DepthDisplayMin,SettingsPanel->GetSettings().DepthDisplayMax);
+	/*for (TObjectIterator<UHeightFogComponent> FogComponent; FogComponent; ++FogComponent)
+	{
+		Renderer->RenderExponentialFog(ColorTarget, DepthTarget, *FogComponent);
+		break;
+	}*/
 
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE || ViewIndex != 0) {

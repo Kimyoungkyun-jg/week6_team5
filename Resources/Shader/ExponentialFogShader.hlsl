@@ -1,10 +1,18 @@
-Texture2D DepthTarget : register(t0);
+Texture2D ColorTarget : register(t0);
+Texture2D DepthTarget : register(t1);
 
-cbuffer DepthDisplayConstants : register(b0)
+cbuffer constants : register(b0)
 {
-    float MinDepth;
-    float MaxDepth;
-    float2 Padding;
+    float FogDensity;
+    float FogHeightFalloff;
+    float StartDistance;
+    float FogCutoffDistance;
+    float FogMaxOpacity;
+    float Pad[3]
+    {
+    };
+
+    float4 FogInscatteringColor;
 };
 
 struct VSInput
@@ -31,7 +39,5 @@ float4 mainPS(PSInput Input) : SV_TARGET
 {
     int2 coords = int2(Input.Position.xy);
     float depth = DepthTarget.Load(int3(coords, 0)).r;
-    // Display raw depth; the selected range only adjusts grayscale contrast.
-    float gray = saturate((depth - MinDepth) / max(MaxDepth - MinDepth, 0.000001f));
-    return float4(gray, gray, gray, 1.0f);
+    return float4(depth.x, depth.x, depth.x, 1.0f);
 }

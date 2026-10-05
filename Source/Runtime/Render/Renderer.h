@@ -5,8 +5,21 @@
 #include "Text/Font.h"
 #include "SceneView.h"
 #include "Occlusion/GPUOcclusion.h"
+#include "Component/HeightFogComponent.h"
 
 constexpr uint32 ObjectSlotBytes = 256;
+
+struct FExponentialFogConstants
+{
+	float FogDensity;
+	float FogHeightFalloff;
+	float StartDistance;
+	float FogCutoffDistance;
+	float FogMaxOpacity;
+	float Pad[3]{};
+
+	float FogInscatteringColor[4];
+};
 
 struct FDepthDisplayConstants
 {
@@ -63,7 +76,7 @@ public:
 	void RenderSceneDepth(FTexture2D* DepthTarget, float DepthDisplayMin = 0.0f, float DepthDisplayMax = 1.0f);
 
 	// Scene Depth 렌더링
-	void RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget);
+	void RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget, UHeightFogComponent* FogComp);
 
 	// 오클루전 객체 조회
 	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }

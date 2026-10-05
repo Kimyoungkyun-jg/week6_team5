@@ -8,6 +8,7 @@
 #include "GameFramework/DefaultPawn.h"
 #include "Component/PrimitiveComponent.h"
 #include "Component/TextRenderComponent.h"
+#include "Component/HeightFogComponent.h"
 #include "Math/Transform.h"
 #include "Render/Renderer.h"
 #include "PathTracker.h"

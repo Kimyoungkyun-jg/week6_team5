@@ -25,6 +25,8 @@
 #include "Editor/Rendering/OutLineRenderer.h"
 #include "Editor/Outliner/OutlinerPanel.h"
 
+#include "Editor/Rendering/SceneDepthRenderer.h"
+
 #include "Render/SkyboxRenderer.h"
 
 #include "Serialization/JsonArchive.h"
@@ -94,6 +96,7 @@ private:
 	TUniquePtr<FOutline> Outline;
 	TUniquePtr<FOutlineRenderer> OutlineRenderer;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
+	TUniquePtr<FSceneDepthRenderer> SceneDepthRenderer;
 
 	UFont* SystemFont;
 

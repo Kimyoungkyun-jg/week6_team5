@@ -147,6 +147,9 @@ bool UEditorEngine::Init() {
 	OutlineRenderer = MakeUnique<FOutlineRenderer>();
 	OutlineRenderer->Init(Renderer);
 
+	SceneDepthRenderer = MakeUnique<FSceneDepthRenderer>();
+	SceneDepthRenderer->Init(Renderer);
+
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
 	Outline = MakeUnique<FOutline>();
@@ -608,6 +611,18 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				TextComponent->GetText(), TextComponent->GetWorldMatrix(),
 				TextComponent->GetTextSize(), *TextComponent->GetFont(),
 				SceneView.ViewProjectionMatrix);
+	}
+
+	// 씬 깊이 뷰 모드 렌더링
+	if (ViewClient && ViewClient->GetViewMode() == EviewMode::SceneDepth)
+	{
+		ID3D11RenderTargetView* RTV = ColorTarget ? ColorTarget->GetRTV() : nullptr;
+		RenderCommand::GetContext()->OMSetRenderTargets(1, &RTV, nullptr);
+
+		SceneDepthRenderer->OnRender(DepthTarget, SceneView, ViewportSetting, SettingsPanel->GetSettings().SceneDepthMaxDistance);
+
+		ID3D11DepthStencilView* DSV = DepthTarget ? DepthTarget->GetDSV() : nullptr;
+		RenderCommand::GetContext()->OMSetRenderTargets(1, &RTV, DSV);
 	}
 
 	// 에디터 오버레이 렌더링

@@ -18,7 +18,7 @@ class FSceneDepthRenderer
 {
 public:
 	void Init(FRenderer* InRenderer);
-	void OnRender(FTexture2D* DepthTarget, const FSceneView& SceneView, const FViewportSettings& Viewport);
+	void OnRender(FTexture2D* DepthTarget, const FSceneView& SceneView, const FViewportSettings& Viewport, const float MaxVisualizeDist = 30.0f);
 
 private:
 	FRenderer* Renderer;

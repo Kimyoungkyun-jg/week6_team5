@@ -19,7 +19,7 @@ void FSceneDepthRenderer::Init(FRenderer* InRenderer)
 	ConstantBuffer = RenderCommand::CreateConstantBuffer(sizeof(FSceneDepthData));
 }
 
-void FSceneDepthRenderer::OnRender(FTexture2D* DepthTarget, const FSceneView& SceneView, const FViewportSettings& Viewport)
+void FSceneDepthRenderer::OnRender(FTexture2D* DepthTarget, const FSceneView& SceneView, const FViewportSettings& Viewport, const float MaxVisualizeDist)
 {
 	if (!DepthTarget || Viewport.Width == 0 || Viewport.Height == 0)
 	{
@@ -30,7 +30,7 @@ void FSceneDepthRenderer::OnRender(FTexture2D* DepthTarget, const FSceneView& Sc
 	FSceneDepthData SceneDepthData;
 	SceneDepthData.DepthA = 1.0f / SceneView.FarClip - 1.0f / SceneView.NearClip;
 	SceneDepthData.DepthB = 1.0f / SceneView.NearClip;
-	SceneDepthData.InvMaxVisualizeDist = 1.0f / 3000.0f;
+	SceneDepthData.InvMaxVisualizeDist = 1.0f / MaxVisualizeDist;
 	SceneDepthData.Padding = 0.0f;
 	// 상수 버퍼에 값 업데이트
 	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &SceneDepthData, sizeof(FSceneDepthData));

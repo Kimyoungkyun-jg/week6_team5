@@ -37,6 +37,9 @@ struct FEditorSettings
     FQuat ViewRotation[4]{};
     bool bViewLocationSaved[4]{};
     bool bViewRotationSaved[4]{};
+
+	// 씬 깊이 테스트용 최대 거리
+	float SceneDepthMaxDistance = 30.0f;
 };
 
 

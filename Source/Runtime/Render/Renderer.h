@@ -47,9 +47,6 @@ class FRenderer
 public:
 	bool Init();
 
-	void RenderFog(const FSceneView& View, FTexture2D* DepthTarget,
-		float DepthDisplayMin = 0.0f, float DepthDisplayMax = 1.0f);
-
 	// 시점 상수 버퍼 및 렌더링 상태 설정
 	void SetupView(const FSceneView& View);
 
@@ -61,6 +58,12 @@ public:
 
 	// 반투명 요소 렌더링
 	void RenderTranslucent(const FSceneView& View, const FRenderQueue& InQueue);
+
+	// Scene Depth 렌더링
+	void RenderSceneDepth(FTexture2D* DepthTarget, float DepthDisplayMin = 0.0f, float DepthDisplayMax = 1.0f);
+
+	// Scene Depth 렌더링
+	void RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget);
 
 	// 오클루전 객체 조회
 	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }
@@ -113,5 +116,6 @@ private:
 	UStaticMesh* FullScreenQuad;
 	FPipelineState FSQuadPipelineState;
 	FShaderProgram* DepthShader;
-
+	FShaderProgram* FogShader;
+	FTexture2D* nullDSV = nullptr;
 };

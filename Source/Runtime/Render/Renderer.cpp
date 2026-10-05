@@ -478,11 +478,10 @@ void FRenderer::UpdatePerObjectConstants(const FMatrix& World)
 	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
 }
 
-void FRenderer::RenderFog(const FSceneView& View, FTexture2D* DepthTarget,
-	float DepthDisplayMin, float DepthDisplayMax)
+void FRenderer::RenderSceneDepth(FTexture2D* DepthTarget,float DepthDisplayMin, float DepthDisplayMax)
 {
 	FullScreenQuad = UAssetManager::GetAssetByPath<UStaticMesh>("FullScreenQuad");
-	DepthShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/FogQuadShader.hlsl");
+	DepthShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/SceneDepthShader.hlsl");
 	
 	FSQuadPipelineState.Shader = DepthShader;
 	FSQuadPipelineState.Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -499,6 +498,24 @@ void FRenderer::RenderFog(const FSceneView& View, FTexture2D* DepthTarget,
 	RenderCommand::BindConstantBuffer(0, DepthDisplayCB.get(), EShaderBindFlagBits::Pixel);
 	RenderCommand::BindShaderResource(0,DepthTarget, EShaderBindFlagBits::Pixel);
 	RenderCommand::DrawIndexed(FullScreenQuad->GetIndexBuffer(0)->GetIndexCount(),0,0);
-	FTexture2D* ResetDSVTarget = nullptr;
-	RenderCommand::BindShaderResource(0, ResetDSVTarget, EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(0, nullDSV, EShaderBindFlagBits::Pixel);
+}
+
+void FRenderer::RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget)
+{
+	FullScreenQuad = UAssetManager::GetAssetByPath<UStaticMesh>("FullScreenQuad");
+	FShaderProgram* FogShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/ExponentialFogShader.hlsl");
+
+	FSQuadPipelineState.Shader = FogShader;
+	FSQuadPipelineState.Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	FSQuadPipelineState.RasterizerState = ERasterizerState::SolidNone;
+	FSQuadPipelineState.BlendState = EBlendState::Opaque;
+	FSQuadPipelineState.DepthStencilState = EDepthStencilState::Disabled;
+
+	RenderCommand::BindMesh(FullScreenQuad);
+	RenderCommand::BindPipelineState(FSQuadPipelineState);
+	RenderCommand::BindShaderResource(0, ColorTarget, EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(0, DepthTarget, EShaderBindFlagBits::Pixel);
+	RenderCommand::DrawIndexed(FullScreenQuad->GetIndexBuffer(0)->GetIndexCount(), 0, 0);
+	RenderCommand::BindShaderResource(0, nullDSV, EShaderBindFlagBits::Pixel);
 }

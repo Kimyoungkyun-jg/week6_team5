@@ -14,7 +14,8 @@ enum class EPSOType : uint8
 	Skybox,                  
 	Grid,                    
 	Outline_Mask,            
-	Outline_Draw,            
+	Outline_Draw,
+	FireBall,
 	Count
 };
 

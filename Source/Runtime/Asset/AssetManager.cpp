@@ -16,6 +16,8 @@
 
 #include "Render/ImageLoader.h"
 
+#include "Component/FireBallComponent.h"
+
 
 namespace
 {
@@ -116,6 +118,7 @@ void UAssetManager::Init(const FAssetLoadProgress& OnProgress)
 	Get().ScanAssets("Assets", OnProgress);
 	Get().CreateDefaultMeshes();
 	Get().CreateParticleMaterial();
+	Get().CreateFireBallMaterial();
 }
 
 void UAssetManager::ScanAssets(const fs::path& AssetRoot, const FAssetLoadProgress& OnProgress)
@@ -291,6 +294,14 @@ void UAssetManager::CreateParticleMaterial()
 	ParticleMat->Textures.Add(GetAssetByPath<UTexture2D>("Assets/SubUV/StarParticle.png"));
 	ParticleMat->ParamBuffer = RenderCommand::CreateConstantBuffer(256);
 	RegisterAsset("SubUVMaterial", ParticleMat);
+}
+
+void UAssetManager::CreateFireBallMaterial()
+{
+	UMaterial* FireBallMat = FObjectFactory::ConstructObject<UMaterial>();
+	FireBallMat->PSOType = EPSOType::FireBall;
+	FireBallMat->ParamBuffer = RenderCommand::CreateConstantBuffer(sizeof(FFireBallMaterialParams));
+	RegisterAsset("FireBallMaterial", FireBallMat);
 }
 
 void UAssetManager::Shutdown()

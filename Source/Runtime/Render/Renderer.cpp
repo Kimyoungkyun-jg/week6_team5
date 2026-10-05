@@ -452,6 +452,15 @@ void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 		}
 		break;
 	}
+	case EPSOType::FireBall:
+	{
+		if (RenderPacket.MaterialParamData != nullptr)
+		{
+			RenderCommand::UpdateBufferData(RenderPacket.Material->ParamBuffer.get(), RenderPacket.MaterialParamData, RenderPacket.MaterialParamDataSize);
+			RenderCommand::BindConstantBuffer(1, RenderPacket.Material->ParamBuffer.get(), EShaderBindFlagBits::Pixel);
+		}
+		break;
+	}
 	default:
 		break;
 	}

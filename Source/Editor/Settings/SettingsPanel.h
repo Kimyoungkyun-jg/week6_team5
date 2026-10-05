@@ -19,6 +19,8 @@ struct FEditorSettings
 	bool bDrawPSGrid = false;
 
 	// Values
+	float DepthDisplayMin = 0.0f;
+	float DepthDisplayMax = 1.0f;
 	float CameraSpeed = 1.0f;
 	float MouseSensitivity = 1.0f;
 	int32 GridSpacing = 1;

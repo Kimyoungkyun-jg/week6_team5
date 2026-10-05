@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/Viewports/EditorViewportClient.h"
+#include <cmath>
 
 // 종료 시 렌더·에디터·뷰포트 설정을 함께 저장한다.
 FSettingsPanel::~FSettingsPanel()
@@ -42,6 +43,21 @@ void FSettingsPanel::OnRender()
 	ImGui::Checkbox("Draw Primitives", &Settings.bDrawPrimitives);
 	ImGui::Checkbox("Draw Bounding Box", &Settings.bDrawBoundingBox);
 	ImGui::Checkbox("Show Object UUID", &Settings.bShowUUID);
+
+	ImGui::Dummy(ImVec2(0.0f, SectionGap));
+	ImGui::SeparatorText("Scene Depth");
+	ImGui::SetNextItemWidth(200.0f);
+	ImGui::DragFloat("Black Depth", &Settings.DepthDisplayMin, 0.0001f,
+		0.0f, Settings.DepthDisplayMax - 0.000001f, "%.6f", ImGuiSliderFlags_AlwaysClamp);
+	ImGui::SetNextItemWidth(200.0f);
+	ImGui::DragFloat("White Depth", &Settings.DepthDisplayMax, 0.0001f,
+		Settings.DepthDisplayMin + 0.000001f, 1.0f, "%.6f", ImGuiSliderFlags_AlwaysClamp);
+	ImGui::TextDisabled("Raw depth (0..1). Adjust the range to increase contrast.");
+	if (ImGui::Button("Reset Depth Range"))
+	{
+		Settings.DepthDisplayMin = 0.0f;
+		Settings.DepthDisplayMax = 1.0f;
+	}
 
 	//////////////////////////////////////////////////////////
 
@@ -116,6 +132,10 @@ bool FSettingsPanel::SaveSettings() const
 	File << "ShowUUID=" << Settings.bShowUUID << "\n";
 	File << "DrawBatchLine=" << Settings.bDrawBatchLine << "\n";
 	File << "DrawPSGrid=" << Settings.bDrawPSGrid << "\n";
+	const auto PreviousPrecision = File.precision(9);
+	File << "RawDepthMin=" << Settings.DepthDisplayMin << "\n";
+	File << "RawDepthMax=" << Settings.DepthDisplayMax << "\n";
+	File.precision(PreviousPrecision);
 	File << "\n";
 
 	File << "[Editor]\n";
@@ -236,6 +256,8 @@ bool FSettingsPanel::LoadSettings()
 				else if (Key == "ShowUUID") Settings.bShowUUID = std::stoi(ValueStr);
 				else if (Key == "DrawBatchLine") Settings.bDrawBatchLine = std::stoi(ValueStr);
 				else if (Key == "DrawPSGrid") Settings.bDrawPSGrid = std::stoi(ValueStr);
+				else if (Key == "RawDepthMin") Settings.DepthDisplayMin = std::stof(ValueStr);
+				else if (Key == "RawDepthMax") Settings.DepthDisplayMax = std::stof(ValueStr);
 
 				else if (Key == "CameraMoveSpeed") Settings.CameraSpeed = std::stof(ValueStr);
 				else if (Key == "CameraRotateSensitivity") Settings.MouseSensitivity = std::stof(ValueStr);
@@ -253,6 +275,11 @@ bool FSettingsPanel::LoadSettings()
 	}
 
 	File.close();
+	if (!std::isfinite(Settings.DepthDisplayMin)) Settings.DepthDisplayMin = 0.0f;
+	if (!std::isfinite(Settings.DepthDisplayMax)) Settings.DepthDisplayMax = 1.0f;
+	Settings.DepthDisplayMin = FMath::Clamp(Settings.DepthDisplayMin, 0.0f, 1.0f - 0.000001f);
+	Settings.DepthDisplayMax = FMath::Clamp(Settings.DepthDisplayMax,
+		Settings.DepthDisplayMin + 0.000001f, 1.0f);
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		Settings.bViewLocationSaved[Index] = LocationComponentMasks[Index] == 0x7;

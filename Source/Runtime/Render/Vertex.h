@@ -22,6 +22,12 @@ struct FParticleVertex
 	FVector2 UV;
 };
 
+struct FQuadFogVertex
+{
+	FVector Position;
+	FVector2 UV;
+};
+
 // StaticMesh용 PNCT Vertex: Position / Normal / Color / Texcoord(UV)
 struct FVertexPNCT
 {

@@ -9,8 +9,10 @@
 #include "Engine/PrimitiveSceneProxy.h"
 
 #include "RenderCommand.h"
-
+#include "RenderResourceManager.h"
 #include "Camera/CameraComponent.h"
+
+#include "Asset/AssetManager.h"
 
 #include <algorithm>
 #include <chrono>
@@ -48,6 +50,7 @@ bool FRenderer::Init()
 	bUsePerObjectSlots = RenderCommand::SupportsConstantBufferOffsets();
 	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
+	DepthDisplayCB = RenderCommand::CreateConstantBuffer(sizeof(FDepthDisplayConstants));
 
 	GPUOcclusion.Init();   // 실패해도 오클루전만 못 쓸 뿐 렌더링은 된다
 
@@ -473,4 +476,29 @@ void FRenderer::UpdatePerObjectConstants(const FMatrix& World)
 	Constants.World = World;
 
 	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
+}
+
+void FRenderer::RenderFog(const FSceneView& View, FTexture2D* DepthTarget,
+	float DepthDisplayMin, float DepthDisplayMax)
+{
+	FullScreenQuad = UAssetManager::GetAssetByPath<UStaticMesh>("FullScreenQuad");
+	DepthShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/FogQuadShader.hlsl");
+	
+	FSQuadPipelineState.Shader = DepthShader;
+	FSQuadPipelineState.Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	FSQuadPipelineState.RasterizerState = ERasterizerState::SolidNone;
+	FSQuadPipelineState.BlendState = EBlendState::Opaque;
+	FSQuadPipelineState.DepthStencilState = EDepthStencilState::Disabled;
+
+	RenderCommand::BindMesh(FullScreenQuad);
+	RenderCommand::BindPipelineState(FSQuadPipelineState);
+	FDepthDisplayConstants Constants{};
+	Constants.MinDepth = DepthDisplayMin;
+	Constants.MaxDepth = std::max(DepthDisplayMax, DepthDisplayMin + 0.000001f);
+	RenderCommand::UpdateBufferData(DepthDisplayCB.get(), &Constants);
+	RenderCommand::BindConstantBuffer(0, DepthDisplayCB.get(), EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(0,DepthTarget, EShaderBindFlagBits::Pixel);
+	RenderCommand::DrawIndexed(FullScreenQuad->GetIndexBuffer(0)->GetIndexCount(),0,0);
+	FTexture2D* ResetDSVTarget = nullptr;
+	RenderCommand::BindShaderResource(0, ResetDSVTarget, EShaderBindFlagBits::Pixel);
 }

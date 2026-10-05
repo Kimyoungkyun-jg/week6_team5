@@ -8,6 +8,13 @@
 
 constexpr uint32 ObjectSlotBytes = 256;
 
+struct FDepthDisplayConstants
+{
+	float MinDepth;
+	float MaxDepth;
+	float Padding[2]{};
+};
+
 struct FPerObjectConstants
 {
 	FMatrix World;
@@ -40,6 +47,9 @@ class FRenderer
 public:
 	bool Init();
 
+	void RenderFog(const FSceneView& View, FTexture2D* DepthTarget,
+		float DepthDisplayMin = 0.0f, float DepthDisplayMax = 1.0f);
+
 	// 시점 상수 버퍼 및 렌더링 상태 설정
 	void SetupView(const FSceneView& View);
 
@@ -68,6 +78,8 @@ public:
 private:
 	TUniquePtr<FConstantBuffer> PerObjectCB;
 	TUniquePtr<FConstantBuffer> ViewCB;
+	TUniquePtr<FConstantBuffer> DepthDisplayCB;
+	TUniquePtr<FConstantBuffer> FogDisplayCB;
 
 	// 오브젝트 상수 버퍼
 	TUniquePtr<FConstantBuffer> PerObjectSlotCB;
@@ -96,4 +108,10 @@ private:
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
 	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
 	void UploadPerObjectConstants(const FRenderQueue& InQueue);
+
+	// Scene Depth, Fog용 Quad
+	UStaticMesh* FullScreenQuad;
+	FPipelineState FSQuadPipelineState;
+	FShaderProgram* DepthShader;
+
 };

@@ -58,9 +58,22 @@ FTexture2D::FTexture2D(ID3D11Device* Device, ComPtr<ID3D11Resource> SwapchainTex
 void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& InDesc)
 {
 	HRESULT hr;
+	D3D11_SHADER_RESOURCE_VIEW_DESC SRVViewDesc{};
+	SRVViewDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	SRVViewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	SRVViewDesc.Texture2D.MostDetailedMip = 0;
+	SRVViewDesc.Texture2D.MipLevels = 1;
+	D3D11_DEPTH_STENCIL_VIEW_DESC DSVViewDesc{};
+	DSVViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	DSVViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	DSVViewDesc.Texture2D.MipSlice = 0;
 	if (InDesc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
 	{
-		hr = Device->CreateShaderResourceView(Texture.Get(), nullptr, SRV.GetAddressOf());
+		if (InDesc.Format == DXGI_FORMAT_R24G8_TYPELESS)
+		{
+			hr = Device->CreateShaderResourceView(Texture.Get(), &SRVViewDesc, SRV.GetAddressOf());
+		}
+		else hr = Device->CreateShaderResourceView(Texture.Get(), nullptr, SRV.GetAddressOf());
 		if (FAILED(hr))
 			HTR_LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
 	}
@@ -75,11 +88,16 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 
 	if (InDesc.BindFlags & D3D11_BIND_DEPTH_STENCIL)
 	{
-		hr = Device->CreateDepthStencilView(Texture.Get(), nullptr, DSV.GetAddressOf());
+		if (InDesc.Format == DXGI_FORMAT_R24G8_TYPELESS)
+		{
+			hr = Device->CreateDepthStencilView(Texture.Get(), &DSVViewDesc, DSV.GetAddressOf());
+		}
+		else hr = Device->CreateDepthStencilView(Texture.Get(), nullptr, DSV.GetAddressOf());
 		if (FAILED(hr))
 			HTR_LOG(Error, "[Texture2D] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)hr);
 	}
 }
+
 
 UTexture2D::UTexture2D()
 {

@@ -609,6 +609,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				TextComponent->GetTextSize(), *TextComponent->GetFont(),
 				SceneView.ViewProjectionMatrix);
 	}
+	RenderCommand::EndRenderPass();
+	// FTexture2D* SecondColorTarget = nullptr;
+	FTexture2D* SecondDepthTarget = nullptr;
+	RenderCommand::BeginRenderPass(ColorTarget, SecondDepthTarget, Width, Height);
+	Renderer->RenderFog(SceneView, DepthTarget,SettingsPanel->GetSettings().DepthDisplayMin,SettingsPanel->GetSettings().DepthDisplayMax);
 
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE || ViewIndex != 0) {

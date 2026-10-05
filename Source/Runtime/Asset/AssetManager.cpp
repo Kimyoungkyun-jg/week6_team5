@@ -250,7 +250,7 @@ void UAssetManager::CreateDefaultMeshes()
 	UStaticMesh* Mesh = FObjectFactory::ConstructObject<UStaticMesh>();
 	Mesh->VertexBuffer = RenderCommand::CreateStaticVertexBuffer(
 		Vertices,
-		sizeof(Vertices), sizeof(FParticleVertex));
+		sizeof(Vertices), sizeof(FVertexPNCT));
 	Mesh->IndexBuffer = RenderCommand::CreateStaticIndexBuffer(
 		Indices,
 		ARRAYSIZE(Indices));
@@ -272,6 +272,46 @@ void UAssetManager::CreateDefaultMeshes()
 	Mesh->RebuildRenderData();
 
 	RegisterAsset("ParticleQuad", Mesh);
+
+	const FParticleVertex FogVertices[] =
+	{
+		{ FVector(-1.0f,  1.0f, 0.0f), FVector2(0.0f, 0.0f) },
+		{ FVector(1.0f,  1.0f, 0.0f), FVector2(1.0f, 0.0f) },
+		{ FVector(1.0f, -1.0f, 0.0f), FVector2(1.0f, 1.0f) },
+		{ FVector(-1.0f, -1.0f, 0.0f), FVector2(0.0f, 1.0f) }
+	};
+
+	const uint32 FogIndices[] =
+	{
+		0, 1, 2,
+		0, 2, 3
+	};
+
+	UStaticMesh* FullScreenQuad = FObjectFactory::ConstructObject<UStaticMesh>();
+	FullScreenQuad->VertexBuffer = RenderCommand::CreateStaticVertexBuffer(
+		FogVertices,
+		sizeof(FogVertices), sizeof(FParticleVertex));
+	FullScreenQuad->IndexBuffer = RenderCommand::CreateStaticIndexBuffer(
+		FogIndices,
+		ARRAYSIZE(FogIndices));
+
+	FVertexPNCT FogVertex{};
+	FogVertex.Position = FVector(-1.0f, 1.0f, 0.0f);
+	FullScreenQuad->MeshData.Vertices.Add(FogVertex);
+	FogVertex.Position = FVector(1.0f, 1.0f, 0.0f);
+	FullScreenQuad->MeshData.Vertices.Add(FogVertex);
+	FogVertex.Position = FVector(1.0f, -1.0f, 0.0f);
+	FullScreenQuad->MeshData.Vertices.Add(FogVertex);
+	FogVertex.Position = FVector(-1.0f, -1.0f, 0.0f);
+	FullScreenQuad->MeshData.Vertices.Add(FogVertex);
+
+	FullScreenQuad->MeshData.Indices = { 0, 1, 2, 0, 2, 3, 0,2,1, 0,3,2 };
+
+	FullScreenQuad->MeshData.AABB.Min = FVector(-0.001f, -0.5, -0.5);
+	FullScreenQuad->MeshData.AABB.Max = FVector(0.001f, 0.5, 0.5);
+	FullScreenQuad->RebuildRenderData();
+
+	RegisterAsset("FullScreenQuad", FullScreenQuad);
 }
 
 void UAssetManager::CreateDefaultMaterial()

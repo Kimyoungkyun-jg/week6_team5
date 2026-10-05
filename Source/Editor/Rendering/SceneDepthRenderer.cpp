@@ -1,6 +1,5 @@
 #include "EnginePCH.h"
 #include "SceneDepthRenderer.h"
-#include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
 #include "Render/RenderResourceManager.h"
 

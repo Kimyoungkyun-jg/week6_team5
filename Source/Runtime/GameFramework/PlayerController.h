@@ -2,6 +2,7 @@
 
 #include "EnginePCH.h"
 #include "GameFramework/Actor.h"
+#include "Input/InputSystem.h"
 
 class APawn;
 
@@ -32,12 +33,12 @@ public:
     void UnPossess();
     APawn* GetPawn() const { return PossessedPawn; }
 
-	// 입력 활성화 설정
-	void SetInputEnabled(bool bInEnabled) { bInputEnabled = bInEnabled; }
-	bool IsInputEnabled() const { return bInputEnabled; }
-
 	virtual void DuplicateSubobjects(UObject* SourceObject) override;
 
+
+    void InputKey(int32 Key, bool bDown);
+    void InputAxis(EGameInputAxis AxisKey, float Delta);
+    void ClearInputState();
 protected:
     // 카메라 시점 데이터
     FVector CameraLocation = FVector::ZeroVector;
@@ -50,6 +51,7 @@ protected:
     // 현재 조종 중인 대상
     APawn* PossessedPawn = nullptr;
 
-	// 입력 허용 여부
-	bool bInputEnabled = true;
+    bool bKeyDown[256]{};
+    float MouseAxisX = 0.0f;
+    float MouseAxisY = 0.0f;
 };

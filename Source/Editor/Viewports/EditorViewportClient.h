@@ -32,8 +32,7 @@ public:
   // 입력 이벤트
   virtual void MouseMove(FViewport *Viewport, int32 X, int32 Y) override;
   virtual bool InputKey(FViewport *Viewport, int32 Key, bool bDown) override;
-  virtual bool InputAxis(FViewport *Viewport, int32 ControllerId, float Delta,
-                         float DeltaTime) override;
+  virtual bool InputAxis(FViewport* Viewport, int32 ControllerId, EGameInputAxis AxisKey, float Delta, float DeltaTime) override;
 
   // 뷰포트 상태
   int32 GetViewIndex() const { return ViewIndex; }

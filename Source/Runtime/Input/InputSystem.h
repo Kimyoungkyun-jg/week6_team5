@@ -4,6 +4,14 @@
 #include "MouseButton.h"
 #include "Core/Types.h"
 
+enum class EGameInputAxis
+{
+    MouseX,
+    MouseY,
+    MouseWheel
+};
+
+
 class FInputSystem
 {
 public:

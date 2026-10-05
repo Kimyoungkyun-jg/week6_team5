@@ -65,7 +65,7 @@ void UGameInstance::InitializeForPlayInEditor(int32 PIEInstanceIndex)
 
 	// 에디터 월드 복제
 	Engine->CreatePIEWorldByDuplication(*WorldContext, EditorWorld);
-
+	
 	// 세션 초기화
 	Init();
 }
@@ -91,7 +91,6 @@ bool UGameInstance::StartPlayInEditorGameInstance()
 	{
 		WorldContext->GameViewport = MakeShared<FGameViewportClient>();
 		WorldContext->GameViewport->Init(*WorldContext, GetEngine());
-		
 	}
 
 	// 월드 재생 시작

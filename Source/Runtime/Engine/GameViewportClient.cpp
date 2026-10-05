@@ -5,10 +5,12 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/DefaultPawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Math/Frustum.h"
 #include "Render/RenderCommand.h"
+
 
 FGameViewportClient::FGameViewportClient()
 {
@@ -37,14 +39,61 @@ UWorld* FGameViewportClient::GetWorld() const
 
 void FGameViewportClient::MouseMove(FViewport* Viewport, int32 X, int32 Y)
 {
+	HandleUIMouseMove(X, Y);
 }
 
 bool FGameViewportClient::InputKey(FViewport* Viewport, int32 Key, bool bDown)
 {
+	if (HandleUIKey(Key, bDown))
+		return true;
+
+	if (World)
+	{
+		if (APlayerController* PC = World->GetPlayerController())
+		{
+			PC->InputKey(Key, bDown);
+			return true;
+		}
+	}
 	return false;
 }
 
-bool FGameViewportClient::InputAxis(FViewport* Viewport, int32 ControllerId, float Delta, float DeltaTime)
+bool FGameViewportClient::InputAxis(FViewport* Viewport, int32 ControllerId, EGameInputAxis AxisKey, float Delta, float DeltaTime)
+{
+	if (HandleUIAxis(AxisKey, Delta))
+		return true;
+
+	if (World)
+	{
+		if (APlayerController* PC = World->GetPlayerController())
+		{
+			PC->InputAxis(AxisKey, Delta);
+			return true;
+		}
+	}
+	return false;
+}
+
+void FGameViewportClient::LostFocus()
+{
+	if (World)
+	{
+		if (APlayerController* PC = World->GetPlayerController())
+			PC->ClearInputState();
+	}
+}
+
+bool FGameViewportClient::HandleUIKey(int32 Key, bool bDown)
+{
+	return false;
+}
+
+bool FGameViewportClient::HandleUIAxis(EGameInputAxis AxisKey, float Delta)
+{
+	return false;
+}
+
+bool FGameViewportClient::HandleUIMouseMove(int32 X, int32 Y)
 {
 	return false;
 }

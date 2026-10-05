@@ -41,39 +41,35 @@ void APlayerController::Tick(float DeltaTime)
 
 void APlayerController::ProcessPlayerInput(float DeltaTime)
 {
-	// 입력 허용 검사
-	if (!bInputEnabled)
-	{
-		return;
-	}
-
 	// 입력 처리
 	float ForwardInput = 0.0f;
 	float RightInput = 0.0f;
 
-	if (FInputSystem::IsKeyDown(EKeyCode::W))
+	if (bKeyDown[static_cast<int32>(EKeyCode::W)])
 	{
 		ForwardInput = 1.0f;
 	}
-	if (FInputSystem::IsKeyDown(EKeyCode::S))
+	if (bKeyDown[static_cast<int32>(EKeyCode::S)])
 	{
 		ForwardInput = -1.0f;
 	}
-	if (FInputSystem::IsKeyDown(EKeyCode::A))
+	if (bKeyDown[static_cast<int32>(EKeyCode::A)])
 	{
 		RightInput = -1.0f;
 	}
-	if (FInputSystem::IsKeyDown(EKeyCode::D))
+	if (bKeyDown[static_cast<int32>(EKeyCode::D)])
 	{
 		RightInput = 1.0f;
 	}
 
-	float YawDelta = FInputSystem::GetMouseDeltaX() * LookSensitivity;
-	float PitchDelta = FInputSystem::GetMouseDeltaY() * LookSensitivity;
+	const float YawDelta = MouseAxisX * LookSensitivity;
+	const float PitchDelta = MouseAxisY * LookSensitivity;
+	MouseAxisX = 0.0f;
+	MouseAxisY = 0.0f;
 
 	if (PossessedPawn)
 	{
-		if (FInputSystem::IsMouseDown(EMouseButton::Right))
+		if (bKeyDown[static_cast<int32>(EKeyCode::RButton)])
 		{
 			PossessedPawn->AddControllerYawInput(YawDelta);
 			PossessedPawn->AddControllerPitchInput(PitchDelta);
@@ -128,5 +124,26 @@ void APlayerController::DuplicateSubobjects(UObject* SourceObject)
 		FOV = SourceController->FOV;
 		LookSensitivity = SourceController->LookSensitivity;
 	}
+}
+
+void APlayerController::InputKey(int32 Key, bool bDown)
+{
+	if (Key >= 0 && Key < 256)
+		bKeyDown[Key] = bDown;
+}
+
+void APlayerController::InputAxis(EGameInputAxis AxisKey, float Delta)
+{
+	if (AxisKey == EGameInputAxis::MouseX)
+		MouseAxisX += Delta;
+	else if (AxisKey == EGameInputAxis::MouseY)
+		MouseAxisY += Delta;
+}
+
+void APlayerController::ClearInputState()
+{
+	std::memset(bKeyDown, 0, sizeof(bKeyDown));
+	MouseAxisX = 0.0f;
+	MouseAxisY = 0.0f;
 }
 

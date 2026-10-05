@@ -228,15 +228,10 @@ void UEditorEngine::Tick(const float DeltaTime) {
 	EndFrame();
 }
 
-// DeltaTime을 패널에 전달하고 에디터 단축키를 처리한다.
+// DeltaTime을 패널에 전달한다.
 void UEditorEngine::BeginFrame(const float DeltaTime) {
 	FStatOverlay::Tick(DeltaTime);
 	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
-
-	if (!ImGui::GetIO().WantTextInput &&
-			FInputSystem::IsKeyPressed(EKeyCode::Delete)) {
-		DeleteActor(OutlinerPanel->GetSelectedActor());
-	}
 }
 
 // 패널의 Layout·Preset 요청과 입력을 Adapter에 반영한다.
@@ -322,16 +317,35 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 		ViewportsPanel->SetActiveViewIndex(HoveredViewIndex);
 	}
 
-	const int32 WheelDelta = FInputSystem::GetWheelDelta();
+	UpdateInputOwner();
+	if (InputOwnerPIEInstance == -1 && !ImGui::GetIO().WantTextInput &&
+		FInputSystem::IsKeyPressed(EKeyCode::Delete)) {
+		DeleteActor(OutlinerPanel->GetSelectedActor());
+	}
+	PendingWheelDelta = FInputSystem::GetWheelDelta();
 	const float MoveSpeed = 10.0f * SettingsPanel->GetSettings().CameraSpeed;
 	const float MouseSens = 0.2f * SettingsPanel->GetSettings().MouseSensitivity;
 
-	// 뷰포트 입력 처리
-	for (int32 i = 0; i < 4; ++i) {
-		if (FEditorViewportClient *Client = ViewportsPanel->GetViewportClient(i)) {
-			if (Client->IsActive()) {
-				Client->TickInput(DeltaTime, i == CapturedViewportIndex, i == HoveredViewIndex, WheelDelta, MoveSpeed, MouseSens);
+	// PIE 게임 화면으로 사용 중인 에디터 뷰포트는 조작하지 않는다.
+	const EPIEMode PIEMode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
+	const int32 PIEPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
+
+	// PIE가 입력을 소유할 때는 에디터 카메라가 전역 입력을 읽지 않는다.
+	if (InputOwnerPIEInstance == -1) {
+		for (int32 i = 0; i < 4; ++i) {
+			FEditorViewportClient* Client = ViewportsPanel->GetViewportClient(i);
+			if (!Client || !Client->IsActive())
+				continue;
+
+			bool bGameView = false;
+			if (PlayWorld && PIEMode == EPIEMode::SelectedViewport) {
+				bGameView = (PIEPlayers == 1) ? (i == PIEStartViewportIndex) : (i < PIEPlayers);
 			}
+			if (bGameView)
+				continue;
+
+			Client->TickInput(DeltaTime, i == CapturedViewportIndex,
+				i == HoveredViewIndex, PendingWheelDelta, MoveSpeed, MouseSens);
 		}
 	}
 
@@ -350,36 +364,84 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 	}
 }
 
+// 전역 입력의 이번 프레임 변화량을 입력 소유 PIE 인스턴스 하나에만 보낸다.
+void UEditorEngine::DispatchGameInput(float DeltaTime) {
+	FGameViewportClient* Client = FindPIEGameClient(InputOwnerPIEInstance);
+	if (!Client)
+		return;
+
+	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
+	if (Mode == EPIEMode::NewWindow) {
+		const FRect& Image = PIEImageScreenRects[InputOwnerPIEInstance];
+		if (Image.Width > 0.0f && Image.Height > 0.0f) {
+			const ImVec2 Mouse = ImGui::GetMousePos();
+			Client->MouseMove(nullptr, static_cast<int32>(Mouse.x - Image.X),
+				static_cast<int32>(Mouse.y - Image.Y));
+		}
+	} else if (ViewportsPanel) {
+		const int32 NumPlayers = EditorUI
+			? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
+		const int32 ViewIndex = NumPlayers == 1
+			? PIEStartViewportIndex : InputOwnerPIEInstance;
+		if (FEditorViewportClient* View = ViewportsPanel->GetViewportClient(ViewIndex)) {
+			const FVector2 Mouse = ViewportsPanel->GetLocalMousePosition();
+			const FRect& Rect = View->GetRect();
+			Client->MouseMove(nullptr, static_cast<int32>(Mouse.X - Rect.X),
+				static_cast<int32>(Mouse.Y - Rect.Y));
+		}
+	}
+
+	// 텍스트 편집으로 전환할 때 누르고 있던 게임 키도 해제한다.
+	if (ImGui::GetIO().WantTextInput) {
+		Client->LostFocus();
+		return;
+	}
+
+	for (int32 Key = 0; Key < 256; ++Key) {
+		const EKeyCode Code = static_cast<EKeyCode>(Key);
+		if (FInputSystem::IsKeyPressed(Code))
+			Client->InputKey(nullptr, Key, true);
+		if (FInputSystem::IsKeyReleased(Code))
+			Client->InputKey(nullptr, Key, false);
+	}
+
+	struct FMouseKey { EMouseButton Button; int32 Key; };
+	constexpr FMouseKey MouseKeys[] = {
+		{EMouseButton::Left, 0x01},
+		{EMouseButton::Right, 0x02},
+		{EMouseButton::Middle, 0x04},
+	};
+	for (const FMouseKey& Mouse : MouseKeys) {
+		if (FInputSystem::IsMousePressed(Mouse.Button))
+			Client->InputKey(nullptr, Mouse.Key, true);
+		if (FInputSystem::IsMouseReleased(Mouse.Button))
+			Client->InputKey(nullptr, Mouse.Key, false);
+	}
+
+	const float DX = static_cast<float>(FInputSystem::GetMouseDeltaX());
+	const float DY = static_cast<float>(FInputSystem::GetMouseDeltaY());
+	if (DX != 0.0f)
+		Client->InputAxis(nullptr, 0, EGameInputAxis::MouseX, DX, DeltaTime);
+	if (DY != 0.0f)
+		Client->InputAxis(nullptr, 0, EGameInputAxis::MouseY, DY, DeltaTime);
+	if (PendingWheelDelta != 0)
+		Client->InputAxis(nullptr, 0, EGameInputAxis::MouseWheel,
+			static_cast<float>(PendingWheelDelta), DeltaTime);
+	PendingWheelDelta = 0;
+}
+
 // 월드를 한 번 Tick·Capture한 뒤 에디터와 피킹을 갱신한다.
 void UEditorEngine::TickWorld(const float DeltaTime) {
 	if (PlayWorld) {
+		DispatchGameInput(DeltaTime);
 		{
 			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
 
 			// PIE 모드 월드 틱 순회
-			const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
-			const int32 NumPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
-			const int32 ActiveIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : 0;
-
 			bool bTicked = false;
 			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
 				FWorldContext &Context = WorldContextlist[WorldIdx];
 				if (Context.WorldType == EWorldType::PIE && Context.World()) {
-					if (Mode == EPIEMode::SelectedViewport)
-					{
-						// 활성 뷰포트 플레이어만 입력 활성화
-						if (APlayerController* PC = Context.World()->GetPlayerController())
-						{
-							if (NumPlayers == 1)
-							{
-								PC->SetInputEnabled(ActiveIndex == PIEStartViewportIndex);
-							}
-							else
-							{
-								PC->SetInputEnabled(Context.PIEInstance == ActiveIndex);
-							}
-						}
-					}
 					Context.World()->Tick(EWorldTick::All, DeltaTime);
 					bTicked = true;
 				}
@@ -566,8 +628,8 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 // 새 창 모드의 피아이이 윈도우 UI를 그린다
 void UEditorEngine::DrawPIEWindows()
 {
-	const bool bIsPIE = (PlayWorld != nullptr);
-	if (!bIsPIE)
+	PendingFocusedPIEInstance = -1;
+	if (!PlayWorld)
 		return;
 
 	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
@@ -584,34 +646,50 @@ void UEditorEngine::DrawPIEWindows()
 			bool bOpen = true;
 
 			ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
-			if (ImGui::Begin(WindowTitle.c_str(), &bOpen))
-			{
-				// 포커스된 창의 플레이어만 입력 활성화
-				const bool bFocused = ImGui::IsWindowFocused();
-				if (Context.World())
-				{
-					if (APlayerController* PC = Context.World()->GetPlayerController())
-					{
-						PC->SetInputEnabled(bFocused);
-					}
-				}
+			const bool bVisible = ImGui::Begin(WindowTitle.c_str(), &bOpen);
 
-				ImVec2 ContentSize = ImGui::GetContentRegionAvail();
+			// 창이 뒤에 있어도 포커스 여부는 확인한다.
+			if (bOpen && ImGui::IsWindowFocused())
+				PendingFocusedPIEInstance = Context.PIEInstance;
+
+			FRect& ImageRect = PIEImageScreenRects[Context.PIEInstance];
+			ImageRect = {};
+
+
+			if (bVisible && bOpen)
+			{
+				const ImVec2 ContentSize = ImGui::GetContentRegionAvail();
 				if (ContentSize.x > 1.0f && ContentSize.y > 1.0f)
 				{
 					const uint32 DesiredW = static_cast<uint32>(ContentSize.x);
 					const uint32 DesiredH = static_cast<uint32>(ContentSize.y);
-					if (DesiredW != GameClient->GetWidth() || DesiredH != GameClient->GetHeight())
+
+					if (DesiredW != GameClient->GetWidth() ||
+						DesiredH != GameClient->GetHeight())
 					{
 						GameClient->Resize(DesiredW, DesiredH);
 					}
 
-					if (GameClient->GetColorTarget() && GameClient->GetColorTarget()->GetSRV())
+					if (GameClient->GetColorTarget() &&
+						GameClient->GetColorTarget()->GetSRV())
 					{
-						ImGui::Image(GameClient->GetColorTarget()->GetSRV(), ContentSize);
+						// Image가 그려질 화면상 위치를 보관한다.
+						const ImVec2 ImageMin = ImGui::GetCursorScreenPos();
+						ImageRect = {
+							ImageMin.x,
+							ImageMin.y,
+							ContentSize.x,
+							ContentSize.y
+						};
+
+						ImGui::Image(
+							GameClient->GetColorTarget()->GetSRV(),
+							ContentSize);
 					}
 				}
 			}
+
+
 			ImGui::End();
 
 			if (!bOpen)
@@ -919,8 +997,6 @@ void UEditorEngine::CreatePIESession()
 	// 피아이이 시작 뷰포트 지정
 	PIEStartViewportIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : 0;
 
-	PIEGameInstances.Reset();
-
 	const int32 NumPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
 	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
 
@@ -938,12 +1014,10 @@ void UEditorEngine::CreatePIESession()
 		GI->InitializeForPlayInEditor(i);
 		GI->StartPlayInEditorGameInstance();
 
-		PIEGameInstances.Add(GI);
+		Context.OwningGameInstance = GI;
 
 		if (i == 0)
 		{
-			// 패널용 대표 월드 지정
-			GameInstance = GI;
 			PlayWorld = GI->GetWorld();
 		}
 
@@ -971,22 +1045,20 @@ void UEditorEngine::CreatePIESession()
 
 void UEditorEngine::StopPIESession()
 {
+	if (FGameViewportClient* Client = FindPIEGameClient(InputOwnerPIEInstance))
+		Client->LostFocus();
+	InputOwnerPIEInstance = -1;
+	PendingFocusedPIEInstance = -1;
+	PendingWheelDelta = 0;
+	for (FRect& ImageRect : PIEImageScreenRects)
+		ImageRect = {};
+
 	PIEState = EPIEState::Stopped;
 
 	// 선택 해제
 	ResetSceneSelection();
 
-	// 게임 세션 종료 먼저 수행
-	for (UGameInstance* GI : PIEGameInstances)
-	{
-		if (GI)
-		{
-			GI->Shutdown();
-		}
-	}
 
-	PIEGameInstances.Reset();
-	GameInstance = nullptr;
 	PlayWorld = nullptr;
 
 	// 피아이이 월드 및 컨텍스트 정리
@@ -1004,6 +1076,7 @@ void UEditorEngine::StopPIESession()
 				}
 				delete World;
 			}
+			WorldContextlist[Index].OwningGameInstance->Shutdown();
 			WorldContextlist.RemoveAt(Index, 1);
 		}
 	}
@@ -1195,4 +1268,63 @@ UWorld* UEditorEngine::RecoverPIEWorldReferences(UWorld* InEditorWorld, UWorld* 
 	InPIEWorld->GetWorldType() = EWorldType::PIE;
 
 	return InPIEWorld;
+}
+
+void UEditorEngine::UpdateInputOwner()
+{
+	int32 NewOwner = -1;
+
+	if (PlayWorld && ViewportsPanel)
+	{
+		const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode(): EPIEMode::SelectedViewport;
+		const int32 NumPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16): 1;
+
+		if (Mode == EPIEMode::NewWindow)
+		{
+			NewOwner = PendingFocusedPIEInstance;
+		}
+		else
+		{
+			const int32 Active = ViewportsPanel->GetActiveViewIndex();
+			if (NumPlayers == 1)
+			{
+				if (Active == PIEStartViewportIndex)
+					NewOwner = 0;
+			}
+			else if (Active >= 0 && Active < NumPlayers)
+			{
+				NewOwner = Active;
+			}
+		}
+
+		if (NewOwner >= 0 && !FindPIEGameClient(NewOwner))
+			NewOwner = -1;
+	}
+
+	if (NewOwner == InputOwnerPIEInstance)
+		return;
+
+	if (FGameViewportClient* OldClient = FindPIEGameClient(InputOwnerPIEInstance))
+		OldClient->LostFocus();
+
+	InputOwnerPIEInstance = NewOwner;
+
+	if (FGameViewportClient* NewClient = FindPIEGameClient(InputOwnerPIEInstance))
+		NewClient->ReceivedFocus();
+}
+
+FGameViewportClient* UEditorEngine::FindPIEGameClient(int32 PIEInstance) const
+{
+	for (int32 i = 0; i < WorldContextlist.Num(); ++i)
+	{
+		const FWorldContext& Context = WorldContextlist[i];
+		if (Context.WorldType == EWorldType::PIE &&
+			Context.PIEInstance == PIEInstance &&
+			Context.World() &&
+			Context.GameViewport)
+		{
+			return Context.GameViewport.get();
+		}
+	}
+	return nullptr;
 }

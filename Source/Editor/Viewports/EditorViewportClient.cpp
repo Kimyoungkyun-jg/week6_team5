@@ -143,8 +143,7 @@ bool FEditorViewportClient::InputKey(FViewport *Viewport, int32 Key,
   return false;
 }
 
-bool FEditorViewportClient::InputAxis(FViewport *Viewport, int32 ControllerId,
-                                      float Delta, float DeltaTime) {
+bool FEditorViewportClient::InputAxis(FViewport* Viewport, int32 ControllerId, EGameInputAxis AxisKey, float Delta, float DeltaTime) {
   return false;
 }
 

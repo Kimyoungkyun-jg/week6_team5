@@ -29,7 +29,7 @@ public:
 
 	virtual void MouseMove(FViewport* Viewport, int32 X, int32 Y) override;
 	virtual bool InputKey(FViewport* Viewport, int32 Key, bool bDown) override;
-	virtual bool InputAxis(FViewport* Viewport, int32 ControllerId, float Delta, float DeltaTime) override;
+	virtual bool InputAxis(FViewport* Viewport, int32 ControllerId, EGameInputAxis AxisKey, float Delta, float DeltaTime) override;
 
 	// 게임 카메라 시점 계산
 	FSceneView CalcSceneView(const FRect& InViewRect);
@@ -50,7 +50,15 @@ public:
 	void SetCameraComponent(UCameraComponent* InCameraComponent);
 
 	void Reset();
+
+	virtual void LostFocus() override;
+
 private:
+	bool HandleUIKey(int32 Key, bool bDown);
+	bool HandleUIAxis(EGameInputAxis AxisKey, float Delta);
+	bool HandleUIMouseMove(int32 X, int32 Y);
+
+
 	UWorld* World = nullptr;
 	UGameInstance* GameInstance = nullptr;
 	UEngine* Engine = nullptr;

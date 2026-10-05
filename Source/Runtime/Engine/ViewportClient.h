@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Types.h"
+#include "Input/InputSystem.h"
 
 class FViewport;
 class UWorld;
@@ -35,15 +36,15 @@ public:
 	// 키 입력
 	virtual bool InputKey(FViewport* Viewport, int32 Key, bool bDown) { return false; }
 
-	// 축 입력
-	virtual bool InputAxis(FViewport* Viewport, int32 ControllerId, float Delta, float DeltaTime) { return false; }
-
 	// 포커스 획득
-	virtual void ReceivedFocus(FViewport* Viewport) {}
+	virtual void ReceivedFocus() {}
 
 	// 포커스 해제
-	virtual void LostFocus(FViewport* Viewport) {}
+	virtual void LostFocus() {}
 
 	// 크기 변경
 	virtual void Resize(FViewport* Viewport, uint32 NewWidth, uint32 NewHeight) {}
+
+	virtual bool InputAxis(FViewport* Viewport, int32 ControllerId, EGameInputAxis AxisKey,
+		float Delta, float DeltaTime) { return false; }
 };

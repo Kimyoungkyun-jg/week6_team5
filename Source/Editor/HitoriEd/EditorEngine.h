@@ -115,8 +115,6 @@ private:
 
 	TArray<FEditorViewportClient*> AllViewportClients;
 
-	UGameInstance* GameInstance = nullptr;
-	TArray<UGameInstance*> PIEGameInstances;
 
 	EPIEState PIEState = EPIEState::Stopped;
 	bool bIsStep = false;
@@ -140,4 +138,16 @@ private:
 	virtual UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld) override;
 	void SerializeWorldForPIE(UWorld* editorWorld, UWorld* PIEWorld);
 	UWorld* RecoverPIEWorldReferences(UWorld* editorWorlds, UWorld* PIEWorld);
+
+private:
+	int32 InputOwnerPIEInstance = -1;
+	int32 PendingFocusedPIEInstance = -1;
+	int32 PendingWheelDelta = 0;
+
+	// ImGui 화면 좌표. NewWindow는 이전 렌더 프레임의 영역을 사용한다.
+	FRect PIEImageScreenRects[16]{};
+
+	void UpdateInputOwner();
+	void DispatchGameInput(float DeltaTime);
+	FGameViewportClient* FindPIEGameClient(int32 PIEInstance) const;
 };

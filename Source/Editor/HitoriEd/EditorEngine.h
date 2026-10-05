@@ -26,6 +26,7 @@
 #include "Editor/Outliner/OutlinerPanel.h"
 
 #include "Editor/Rendering/SceneDepthRenderer.h"
+#include "Editor/Rendering/HeightFogRenderer.h"
 
 #include "Render/SkyboxRenderer.h"
 
@@ -97,6 +98,7 @@ private:
 	TUniquePtr<FOutlineRenderer> OutlineRenderer;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
 	TUniquePtr<FSceneDepthRenderer> SceneDepthRenderer;
+	TUniquePtr<FHeightFogRenderer> HeightFogRenderer;
 
 	UFont* SystemFont;
 

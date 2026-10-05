@@ -39,12 +39,12 @@
 #include "Core/Stats/LightweightStats.h"
 
 namespace {
-DECLARE_CYCLE_STAT("Viewport Update", STAT_ViewportUpdate);
-DECLARE_CYCLE_STAT("World Tick", STAT_WorldTick);
-DECLARE_CYCLE_STAT("Editor Tick", STAT_EditorTick);
-DECLARE_CYCLE_STAT("Capture World", STAT_CaptureWorld);
-DECLARE_CYCLE_STAT("Build Render Queue", STAT_BuildRenderQueue);
-DECLARE_CYCLE_STAT("ImGui", STAT_ImGui);
+	DECLARE_CYCLE_STAT("Viewport Update", STAT_ViewportUpdate);
+	DECLARE_CYCLE_STAT("World Tick", STAT_WorldTick);
+	DECLARE_CYCLE_STAT("Editor Tick", STAT_EditorTick);
+	DECLARE_CYCLE_STAT("Capture World", STAT_CaptureWorld);
+	DECLARE_CYCLE_STAT("Build Render Queue", STAT_BuildRenderQueue);
+	DECLARE_CYCLE_STAT("ImGui", STAT_ImGui);
 } // namespace
 
 #include "Core/SplashScreen.h"
@@ -73,7 +73,7 @@ bool UEditorEngine::Init() {
 	MainWindow = GetEngineLoop().GetMainWindow();
 	MainWindowSC = GetEngineLoop().GetSwapchain();
 	Renderer = GetEngineLoop().GetRenderer();
-	FRenderDevice *RenderDevice = GetEngineLoop().GetRenderDevice();
+	FRenderDevice* RenderDevice = GetEngineLoop().GetRenderDevice();
 
 	EditorUI = MakeUnique<FEditorUI>();
 	EditorUI->Init();
@@ -114,7 +114,7 @@ bool UEditorEngine::Init() {
 		default:
 			break;
 		}
-	});
+		});
 
 	OutputLogPanel = EditorUI->AddEditorPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
@@ -123,7 +123,7 @@ bool UEditorEngine::Init() {
 	HTR_LOG(Info, "Initialize ImGui...");
 	ImGuiRenderer = MakeUnique<FImGuiRenderer>();
 	if (!ImGuiRenderer->Init(MainWindow->GetHandle(), RenderDevice->GetDevice(),
-			RenderDevice->GetContext())) {
+		RenderDevice->GetContext())) {
 		HTR_LOG(Error, "Failed To Initialize ImGui!");
 	}
 	HTR_LOG(Info, "Initialize ImGui Success!");
@@ -150,6 +150,9 @@ bool UEditorEngine::Init() {
 	SceneDepthRenderer = MakeUnique<FSceneDepthRenderer>();
 	SceneDepthRenderer->Init(Renderer);
 
+	HeightFogRenderer = MakeUnique<FHeightFogRenderer>();
+	HeightFogRenderer->Init(Renderer);
+
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
 	Outline = MakeUnique<FOutline>();
@@ -160,28 +163,28 @@ bool UEditorEngine::Init() {
 	TextRenderer->Init();
 
 	// 화면 나눔 비율 설정 가져오기
-	ViewportSplitRatio = {SettingsPanel->GetSettings().MultipleViewportsHorizontal,
-			SettingsPanel->GetSettings().MultipleViewportsVertical};
+	ViewportSplitRatio = { SettingsPanel->GetSettings().MultipleViewportsHorizontal,
+			SettingsPanel->GetSettings().MultipleViewportsVertical };
 	// SingleView에 사용할 인덱스 설정
 	SingleViewportIndex =
-			SettingsPanel->GetSettings().MultipleViewportsSingleViewIndex;
+		SettingsPanel->GetSettings().MultipleViewportsSingleViewIndex;
 	// 뷰포트 레이아웃 설정
 	ViewportLayoutMode = SettingsPanel->GetSettings().bMultipleViewportsSingle
-			? ELayoutMode::Single
-			: ELayoutMode::QuadSplit;
+		? ELayoutMode::Single
+		: ELayoutMode::QuadSplit;
 	EditorWorld->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(
-			true);
+		true);
 
 	OutlinerPanel = EditorUI->AddEditorPanel<FOutlinerPanel>();
 	OutlinerPanel->SetWorld(EditorWorld);
-	OutlinerPanel->SetSelectionCallback([this](UPrimitiveComponent *Primitive) {
+	OutlinerPanel->SetSelectionCallback([this](UPrimitiveComponent* Primitive) {
 		Gizmo->SetTarget(Primitive);
 		Outline->SetTarget(Primitive);
 		DetailsPanel->SetTarget(Primitive);
-	});
+		});
 
 	OutlinerPanel->SetDeleteActorCallback(
-			[this](AActor *Actor) { DeleteActor(Actor); });
+		[this](AActor* Actor) { DeleteActor(Actor); });
 
 	LineBatcher = MakeUnique<FLineBatcher>();
 	LineBatcher->Init(Renderer, EditorWorld);
@@ -197,7 +200,7 @@ bool UEditorEngine::Init() {
 	ViewportsPanel->SetLayoutMode(ViewportLayoutMode, SingleViewportIndex);
 
 	for (int32 i = 0; i < 4; ++i) {
-		if (FEditorViewportClient *Client = ViewportsPanel->GetViewportClient(i)) {
+		if (FEditorViewportClient* Client = ViewportsPanel->GetViewportClient(i)) {
 			Client->SetWorld(EditorWorld);
 			AllViewportClients.Add(Client);
 		}
@@ -228,7 +231,7 @@ void UEditorEngine::BeginFrame(const float DeltaTime) {
 	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
 
 	if (!ImGui::GetIO().WantTextInput &&
-			FInputSystem::IsKeyPressed(EKeyCode::Delete)) {
+		FInputSystem::IsKeyPressed(EKeyCode::Delete)) {
 		DeleteActor(OutlinerPanel->GetSelectedActor());
 	}
 }
@@ -244,12 +247,12 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 	int32 RequestedSingleViewIndex = SingleViewportIndex;
 
 	if (ViewportsPanel->ConsumeLayoutRequest(RequestedLayout,
-			RequestedSingleViewIndex)) {
+		RequestedSingleViewIndex)) {
 		if (RequestedLayout == ELayoutMode::Single)
 			SingleViewportIndex = RequestedSingleViewIndex;
 		ViewportLayoutMode = RequestedLayout;
 
-		FEditorSettings &Settings = SettingsPanel->GetMutableSettings();
+		FEditorSettings& Settings = SettingsPanel->GetMutableSettings();
 		Settings.bMultipleViewportsSingle = RequestedLayout == ELayoutMode::Single;
 		Settings.MultipleViewportsSingleViewIndex = RequestedSingleViewIndex;
 	}
@@ -296,19 +299,20 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 			VerticalDrag, ViewportSize, 0.1f);
 	if (HorizontalDrag != 0.0f || VerticalDrag != 0.0f) {
 		SettingsPanel->GetMutableSettings().MultipleViewportsHorizontal =
-				ViewportSplitRatio.Horizontal;
+			ViewportSplitRatio.Horizontal;
 		SettingsPanel->GetMutableSettings().MultipleViewportsVertical =
-				ViewportSplitRatio.Vertical;
+			ViewportSplitRatio.Vertical;
 	}
 
 	FRect ViewRects[4]{};
 	if (ViewportLayoutMode == ELayoutMode::Single) {
 		for (int32 i = 0; i < 4; ++i) {
 			ViewRects[i] = (i == SingleViewportIndex)
-			? FRect{0.0f, 0.0f, ViewportSize.X, ViewportSize.Y}
+				? FRect{ 0.0f, 0.0f, ViewportSize.X, ViewportSize.Y }
 			: FRect{};
 		}
-	} else {
+	}
+	else {
 		ComputeViewRects(ViewportSplitRatio, ViewportSize, ViewRects);
 	}
 
@@ -324,10 +328,10 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 	if (ViewportsPanel->IsHovered()) {
 		for (int32 i = 0; i < 4; ++i) {
 			if (ViewRects[i].Width > 0.0f && ViewRects[i].Height > 0.0f &&
-					LocalMousePosition.X >= ViewRects[i].X &&
-					LocalMousePosition.X < ViewRects[i].X + ViewRects[i].Width &&
-					LocalMousePosition.Y >= ViewRects[i].Y &&
-					LocalMousePosition.Y < ViewRects[i].Y + ViewRects[i].Height) {
+				LocalMousePosition.X >= ViewRects[i].X &&
+				LocalMousePosition.X < ViewRects[i].X + ViewRects[i].Width &&
+				LocalMousePosition.Y >= ViewRects[i].Y &&
+				LocalMousePosition.Y < ViewRects[i].Y + ViewRects[i].Height) {
 				HoveredViewIndex = i;
 				break;
 			}
@@ -344,7 +348,8 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 	}
 	if (CapturedViewportIndex != -1) {
 		ViewportsPanel->SetActiveViewIndex(CapturedViewportIndex);
-	} else if (FInputSystem::IsMousePressed(EMouseButton::Left) && HoveredViewIndex != -1) {
+	}
+	else if (FInputSystem::IsMousePressed(EMouseButton::Left) && HoveredViewIndex != -1) {
 		ViewportsPanel->SetActiveViewIndex(HoveredViewIndex);
 	}
 
@@ -354,7 +359,7 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 
 	// 뷰포트 입력 처리
 	for (int32 i = 0; i < 4; ++i) {
-		if (FEditorViewportClient *Client = ViewportsPanel->GetViewportClient(i)) {
+		if (FEditorViewportClient* Client = ViewportsPanel->GetViewportClient(i)) {
 			if (Client->IsActive()) {
 				Client->TickInput(DeltaTime, i == CapturedViewportIndex, i == HoveredViewIndex, WheelDelta, MoveSpeed, MouseSens);
 			}
@@ -363,9 +368,9 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 
 	// 활성 뷰포트 시점 동기화
 	const int32 ActiveIndex = ViewportsPanel->GetActiveViewIndex();
-	if (FEditorViewportClient *ActiveClient = ViewportsPanel->GetViewportClient(ActiveIndex)) {
-		if (ACameraActor *MainCam = EditorWorld->GetMainCamera()) {
-			if (UCameraComponent *CamCom = MainCam->GetCameraComponent()) {
+	if (FEditorViewportClient* ActiveClient = ViewportsPanel->GetViewportClient(ActiveIndex)) {
+		if (ACameraActor* MainCam = EditorWorld->GetMainCamera()) {
+			if (UCameraComponent* CamCom = MainCam->GetCameraComponent()) {
 				CamCom->SetRelativeLocation(ActiveClient->GetViewLocation());
 				CamCom->SetRelativeRotation(ActiveClient->GetViewRotation());
 				CamCom->SetFieldOfView(ActiveClient->GetViewFOV());
@@ -385,7 +390,7 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			// PIE 모드 월드 틱 순회
 			bool bTicked = false;
 			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
-				FWorldContext &Context = WorldContextlist[WorldIdx];
+				FWorldContext& Context = WorldContextlist[WorldIdx];
 				if (Context.WorldType == EWorldType::PIE && Context.World()) {
 					Context.World()->Tick(EWorldTick::All, DeltaTime);
 					bTicked = true;
@@ -398,7 +403,7 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			// 단일 프레임 진행 후 일시정지 복구
 			if (bIsStep) {
 				for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
-					FWorldContext &Context = WorldContextlist[WorldIdx];
+					FWorldContext& Context = WorldContextlist[WorldIdx];
 					if (Context.WorldType == EWorldType::PIE && Context.World()) {
 						Context.World()->GetbIsTickEnable() = false;
 					}
@@ -413,8 +418,8 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			SCOPE_CYCLE_COUNTER(STAT_EditorTick);
 			EditorUI->Tick(DeltaTime);
 		}
-	} 
-	else 
+	}
+	else
 	{
 		{
 			SCOPE_CYCLE_COUNTER(STAT_WorldTick);
@@ -434,26 +439,26 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 // 뷰포트 클라이언트를 순회하며 씬 렌더러를 통해 렌더링한다
 void UEditorEngine::RenderViewports() {
 	for (int32 ViewIndex = 0; ViewIndex < AllViewportClients.Num(); ++ViewIndex) {
-		
-		
-		FEditorViewportClient *ViewClient = AllViewportClients[ViewIndex];
+
+
+		FEditorViewportClient* ViewClient = AllViewportClients[ViewIndex];
 		if (!ViewClient || !ViewClient->IsActive())
 			continue;
 
-		const FRect &ViewRect = ViewClient->GetRect();
+		const FRect& ViewRect = ViewClient->GetRect();
 		if (ViewRect.Width <= 0.0f || ViewRect.Height <= 0.0f)
 			continue;
 
 		const bool bIsPIE = PlayWorld != nullptr;
-		UWorld *CurrentWorld = bIsPIE ? PlayWorld : EditorWorld;
+		UWorld* CurrentWorld = bIsPIE ? PlayWorld : EditorWorld;
 
 		// 뷰 사각형과 시점 정보 생성
 		FSceneView SceneView;
 		if (bIsPIE && ViewIndex == 0) {
-			FGameViewportClient *GameClient = nullptr;
+			FGameViewportClient* GameClient = nullptr;
 			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
 				if (WorldContextlist[WorldIdx].WorldType == EWorldType::PIE &&
-						WorldContextlist[WorldIdx].GameViewport) {
+					WorldContextlist[WorldIdx].GameViewport) {
 					GameClient = WorldContextlist[WorldIdx].GameViewport.get();
 					break;
 				}
@@ -461,10 +466,12 @@ void UEditorEngine::RenderViewports() {
 			if (GameClient) {
 				// 플레이 모드 게임 뷰포트 시점 계산
 				SceneView = GameClient->CalcSceneView(ViewRect);
-			} else {
+			}
+			else {
 				SceneView = ViewClient->CalcSceneView(ViewRect);
 			}
-		} else {
+		}
+		else {
 			SceneView = ViewClient->CalcSceneView(ViewRect);
 		}
 
@@ -492,39 +499,39 @@ void UEditorEngine::UpdateGizmoAndPicking() {
 	if (ViewIndex < 0 || ViewIndex >= 4 || !ViewportsPanel->IsHovered())
 		return;
 
-	FEditorViewportClient *ViewClient =
-			ViewportsPanel->GetViewportClient(ViewIndex);
+	FEditorViewportClient* ViewClient =
+		ViewportsPanel->GetViewportClient(ViewIndex);
 	if (!ViewClient || !ViewClient->IsActive())
 		return;
 
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
-	ViewClient->UpdateGizmoAndPicking(Gizmo.get(), LocalMousePosition, [this](AActor *SelectedActor) {
+	ViewClient->UpdateGizmoAndPicking(Gizmo.get(), LocalMousePosition, [this](AActor* SelectedActor) {
 		OutlinerPanel->SelectActor(SelectedActor);
-	});
+		});
 }
 
 // 뷰포트 하나의 씬과 에디터 요소를 렌더링한다
-void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
-			const FSceneView &SceneView,
-			FSceneRenderer &SceneRenderer,
-			const bool bIsPIE) {
-  
+void UEditorEngine::RenderFrame(FEditorViewportClient* ViewClient,
+	const FSceneView& SceneView,
+	FSceneRenderer& SceneRenderer,
+	const bool bIsPIE) {
+
 	const int32 ViewIndex = SceneView.ViewIndex;
-	FTexture2D *ColorTarget = ViewClient ? ViewClient->GetColorTarget() : nullptr;
-	FTexture2D *DepthTarget = ViewClient ? ViewClient->GetDepthTarget() : nullptr;
+	FTexture2D* ColorTarget = ViewClient ? ViewClient->GetColorTarget() : nullptr;
+	FTexture2D* DepthTarget = ViewClient ? ViewClient->GetDepthTarget() : nullptr;
 	const uint32 Width = ViewClient
-			? ViewClient->GetWidth()
-			: static_cast<uint32>(SceneView.ViewRect.Width);
+		? ViewClient->GetWidth()
+		: static_cast<uint32>(SceneView.ViewRect.Width);
 	const uint32 Height = ViewClient
-			? ViewClient->GetHeight()
-			: static_cast<uint32>(SceneView.ViewRect.Height);
-	const FViewportSettings ViewportSetting{0, 0, Width, Height, 0.0f, 1.0f};
+		? ViewClient->GetHeight()
+		: static_cast<uint32>(SceneView.ViewRect.Height);
+	const FViewportSettings ViewportSetting{ 0, 0, Width, Height, 0.0f, 1.0f };
 
 	RenderCommand::BeginRenderPass(ColorTarget, DepthTarget, Width, Height);
 
 	// 라인 배처 렌더링
 	if ((!bIsPIE || ViewIndex != 0) &&
-			SettingsPanel->GetSettings().bDrawBatchLine) {
+		SettingsPanel->GetSettings().bDrawBatchLine) {
 		LineBatcher->BeginFrame();
 
 		if (SettingsPanel->GetSettings().bDrawBoundingBox) {
@@ -533,8 +540,8 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		}
 
 		if (Gizmo->GetTarget()) {
-			if (ALightActor *LightActor =
-			Cast<ALightActor>(Gizmo->GetTarget()->GetOwner())) {
+			if (ALightActor* LightActor =
+				Cast<ALightActor>(Gizmo->GetTarget()->GetOwner())) {
 				LightActor->GetSpotLightComponent()->DrawDebug(LineBatcher.get());
 			}
 		}
@@ -543,11 +550,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	}
 
 	const bool bDrawPrimitives =
-			bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
+		bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
 
 	// 스카이박스 렌더링
 	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix,
-			SceneView.ViewLocation);
+		SceneView.ViewLocation);
 
 	// 불투명 메시 렌더링
 	if (bDrawPrimitives) {
@@ -556,7 +563,7 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 
 	// 에디터 그리드 렌더링
 	if ((!bIsPIE || ViewIndex != 0) &&
-			SettingsPanel->GetSettings().bDrawBatchLine) {
+		SettingsPanel->GetSettings().bDrawBatchLine) {
 		EGridPlane GridPlane = EGridPlane::XY;
 		if (ViewClient) {
 			switch (ViewClient->GetViewportType()) {
@@ -577,14 +584,15 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 
 		if (SettingsPanel->GetSettings().bDrawPSGrid && SceneView.bIsPerspective) {
 			GridRenderer->OnRenderPSGrid(
-					SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
-					SettingsPanel->GetSettings(), ViewportSetting);
-		} else {
+				SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+				SettingsPanel->GetSettings(), ViewportSetting);
+		}
+		else {
 			GridRenderer->OnRenderBatchGrid(
-					SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
-					SceneView.ViewForward, GridPlane,
-					static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
-					SceneView.bIsPerspective, ViewportSetting);
+				SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+				SceneView.ViewForward, GridPlane,
+				static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
+				SceneView.bIsPerspective, ViewportSetting);
 		}
 	}
 
@@ -594,23 +602,23 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	}
 
 	// 텍스트 컴포넌트 렌더링
-	UWorld *TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
+	UWorld* TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
 	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent;
-			 ++TextComponent) {
+		++TextComponent) {
 		if (!TextComponent || !TextComponent->GetFont() ||
-				!TextComponent->IsVisible()) {
+			!TextComponent->IsVisible()) {
 			continue;
 		}
 
 		if (TextComponent->GetOwner() &&
-				TextComponent->GetOwner()->GetWorld() != TargetWorld) {
+			TextComponent->GetOwner()->GetWorld() != TargetWorld) {
 			continue;
 		}
 
 		TextRenderer->OnRender(
-				TextComponent->GetText(), TextComponent->GetWorldMatrix(),
-				TextComponent->GetTextSize(), *TextComponent->GetFont(),
-				SceneView.ViewProjectionMatrix);
+			TextComponent->GetText(), TextComponent->GetWorldMatrix(),
+			TextComponent->GetTextSize(), *TextComponent->GetFont(),
+			SceneView.ViewProjectionMatrix);
 	}
 
 	// 씬 깊이 뷰 모드 렌더링
@@ -624,6 +632,31 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		ID3D11DepthStencilView* DSV = DepthTarget ? DepthTarget->GetDSV() : nullptr;
 		RenderCommand::GetContext()->OMSetRenderTargets(1, &RTV, DSV);
 	}
+	else if (ViewClient && ViewClient->GetViewMode() == EviewMode::Lit)
+	{
+		UExponentialHeightFogComponent* FogComp = nullptr;
+
+		UWorld* CurrentWorld = bIsPIE ? PlayWorld : EditorWorld;
+
+		for (TObjectIterator<UExponentialHeightFogComponent> FogIter; FogIter; ++FogIter)
+		{
+			if (!FogIter || !FogIter->IsVisible())
+				continue;
+			if (FogIter->GetOwner() && FogIter->GetOwner()->GetWorld() != CurrentWorld)
+				continue;
+			FogComp = *FogIter;
+			break;
+		}
+
+		if (FogComp)
+		{
+			HeightFogRenderer->OnRender(ColorTarget, DepthTarget, SceneView, ViewportSetting, FogComp);
+
+			ID3D11RenderTargetView* RTV = ColorTarget ? ColorTarget->GetRTV() : nullptr;
+			ID3D11DepthStencilView* DSV = DepthTarget ? DepthTarget->GetDSV() : nullptr;
+			RenderCommand::GetContext()->OMSetRenderTargets(1, &RTV, DSV);
+		}
+	}
 
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE || ViewIndex != 0) {
@@ -631,14 +664,14 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		const bool bIsActiveViewport = (ViewportsPanel && ViewIndex == ViewportsPanel->GetActiveViewIndex());
 		if (Outline->GetTarget() && bIsActiveViewport) {
 			OutlineRenderer->OnRender(*Outline, SceneView.ViewProjectionMatrix,
-			ViewportSetting);
+				ViewportSetting);
 		}
 
 		if (Gizmo->GetTarget() && bIsActiveViewport) {
 			RenderCommand::ClearDepthStencil(DepthTarget);
 			GizmoRenderer->OnRender(*Gizmo, SceneView.ViewProjectionMatrix,
-			SceneView.ViewLocation,
-			!SceneView.bIsPerspective);
+				SceneView.ViewLocation,
+				!SceneView.bIsPerspective);
 		}
 
 		RenderCommand::ClearDepthStencil(DepthTarget);
@@ -656,8 +689,8 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 void UEditorEngine::PresentFrame() {
 	// Swapchain 렌더링
 	RenderCommand::BeginRenderPass(MainWindowSC->GetBackbuffer(), nullptr,
-			MainWindow ? MainWindow->GetWidth() : 0,
-			MainWindow ? MainWindow->GetHeight() : 0);
+		MainWindow ? MainWindow->GetWidth() : 0,
+		MainWindow ? MainWindow->GetHeight() : 0);
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_ImGui);
@@ -686,7 +719,7 @@ void UEditorEngine::PreExit() {
 }
 
 // 선택과 Gizmo 참조를 정리한 뒤 Actor를 삭제한다.
-void UEditorEngine::DeleteActor(AActor *Actor) {
+void UEditorEngine::DeleteActor(AActor* Actor) {
 	if (!Actor)
 		return;
 
@@ -729,15 +762,15 @@ void UEditorEngine::SaveSceneAs() {
 	FEditorFileUtils::SaveSceneAs(EditorWorld);
 }
 
-void UEditorEngine::RenderActorUUIDs(const FSceneView &SceneView) {
+void UEditorEngine::RenderActorUUIDs(const FSceneView& SceneView) {
 	const bool bOrtho = !SceneView.bIsPerspective;
-	UWorld *TargetWorld = PlayWorld ? PlayWorld : EditorWorld;
+	UWorld* TargetWorld = PlayWorld ? PlayWorld : EditorWorld;
 
-	for (AActor *Actor : TargetWorld->GetPersistentLevel()->GetActors()) {
+	for (AActor* Actor : TargetWorld->GetPersistentLevel()->GetActors()) {
 		if (!Actor)
 			continue;
-		UPrimitiveComponent *Primitive =
-				Cast<UPrimitiveComponent>(Actor->GetRootComponent());
+		UPrimitiveComponent* Primitive =
+			Cast<UPrimitiveComponent>(Actor->GetRootComponent());
 
 		if (!Primitive)
 			continue;
@@ -787,7 +820,7 @@ void UEditorEngine::CreatePIESession()
 
 	if (GameInstance)
 	{
-		GameInstance->InitializeForPlayInEditor(WorldContextlist.size()-1); 
+		GameInstance->InitializeForPlayInEditor(WorldContextlist.size() - 1);
 		GameInstance->StartPlayInEditorGameInstance();
 		PlayWorld = GameInstance->GetWorld();
 	}

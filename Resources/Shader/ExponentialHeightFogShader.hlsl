@@ -2,7 +2,7 @@
 
 Texture2D SceneColorTexture : register(t0);
 Texture2D SceneDepthTexture : register(t1);
-SamplerState PointSampler : register(s0);
+SamplerState LinearSampler : register(s0);
 
 cbuffer ExponentialHeightFogConstants : register(b0)
 {
@@ -36,7 +36,9 @@ VS_OUTPUT mainVS(uint VertexID : SV_VertexID)
 float4 mainPS(VS_OUTPUT Input) : SV_TARGET
 {
     // 0. 깊이 샘플링
-    float DeviceZ = SceneDepthTexture.Sample(PointSampler, Input.UV).r;
+    float DeviceZ = SceneDepthTexture.Sample(LinearSampler, Input.UV).r;
+    if (DeviceZ >= 0.9999f)
+        return SceneColorTexture.Sample(LinearSampler, Input.UV);
 
     // 1. 월드 좌표 복원에 필요한 변수
     float4 ClipPosition = float4(Input.UV * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f), DeviceZ, 1.0f); // UV와 DeviceZ로 만든 4차원 동차 클립 좌표 (-1~1 범위)
@@ -59,9 +61,10 @@ float4 mainPS(VS_OUTPUT Input) : SV_TARGET
     float Transmittance = exp(-OpticalDepth); // 빛의 투과율
     float FogFactor = saturate(1.0f - Transmittance); // 최종 안개 블렌딩 비율 (0.0 ~ 1.0)
     FogFactor *= FogMaxOpacity; // 안개 최대 불투명도 적용
+    FogFactor = FogCutoffDistance > 0.0f && FogCutoffDistance < RayLength ? 0.0f : FogFactor; // 안개 컷오프 거리 적용
 
     // 5. 원본 색상 샘플링 및 최종 출력 변수
-    float4 SceneColor = SceneColorTexture.Sample(PointSampler, Input.UV); // SceneColorTexture에서 샘플링한 원래 화면 색상
+    float4 SceneColor = SceneColorTexture.Sample(LinearSampler, Input.UV); // SceneColorTexture에서 샘플링한 원래 화면 색상
     float4 FinalColor = lerp(SceneColor, FogInscatteringColor, FogFactor); // 안개 색상과 SceneColor를 lerp한 최종 색상
 
     return FinalColor;

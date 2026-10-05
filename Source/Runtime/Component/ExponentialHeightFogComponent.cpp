@@ -1,6 +1,5 @@
 #include "EnginePCH.h"
 #include "ExponentialHeightFogComponent.h"
-#include "Render/RenderCommand.h"
 
 UExponentialHeightFogComponent::UExponentialHeightFogComponent()
 {

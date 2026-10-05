@@ -1,0 +1,311 @@
+{
+    "Actors": [
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UPrimitiveComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [
+                            {
+                                "Base": "DefaultMaterial",
+                                "BaseColor": [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "PSOType": 0,
+                                "SamplerState": "LinearClamp",
+                                "Textures": [
+                                    "Assets/Checker.png"
+                                ],
+                                "UVScrollSpeed": [
+                                    0.0,
+                                    0.0
+                                ]
+                            }
+                        ],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                -0.00072479248046875,
+                                63.53929901123047,
+                                0.003570556640625
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                147.38356018066406,
+                                1.0450377464294434,
+                                58.08540725708008
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UPrimitiveComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [
+                            {
+                                "Base": "DefaultMaterial",
+                                "BaseColor": [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "PSOType": 0,
+                                "SamplerState": "LinearClamp",
+                                "Textures": [
+                                    "Assets/Checker.png"
+                                ],
+                                "UVScrollSpeed": [
+                                    0.0,
+                                    0.0
+                                ]
+                            }
+                        ],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                -65.42549133300781,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                138.48829650878906,
+                                1.0,
+                                65.84782409667969
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UPrimitiveComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [
+                            {
+                                "Base": "DefaultMaterial",
+                                "BaseColor": [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "PSOType": 0,
+                                "SamplerState": "LinearClamp",
+                                "Textures": [
+                                    "Assets/Checker.png"
+                                ],
+                                "UVScrollSpeed": [
+                                    0.0,
+                                    0.0
+                                ]
+                            }
+                        ],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                -69.90613555908203,
+                                0.0,
+                                0.0
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                132.7509307861328,
+                                49.83753204345703
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UPrimitiveComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [
+                            {
+                                "Base": "DefaultMaterial",
+                                "BaseColor": [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "PSOType": 0,
+                                "SamplerState": "LinearClamp",
+                                "Textures": [
+                                    "Assets/Checker.png"
+                                ],
+                                "UVScrollSpeed": [
+                                    0.0,
+                                    0.0
+                                ]
+                            }
+                        ],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                70.68228912353516,
+                                -0.013248443603515625,
+                                0.9673309326171875
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                133.03355407714844,
+                                72.99867248535156
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UPrimitiveComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [
+                            {
+                                "Base": "DefaultMaterial",
+                                "BaseColor": [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "PSOType": 0,
+                                "SamplerState": "LinearClamp",
+                                "Textures": [
+                                    "Assets/Checker.png"
+                                ],
+                                "UVScrollSpeed": [
+                                    0.0,
+                                    0.0
+                                ]
+                            }
+                        ],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                0.0,
+                                -23.57961082458496
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                144.34996032714844,
+                                140.2672882080078,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        },
+        {
+            "Class": "AStaticMeshActor",
+            "Components": [
+                {
+                    "Class": "UStaticMeshComponent",
+                    "Name": "UPrimitiveComponent_0",
+                    "Properties": {
+                        "OverrideMaterials": [
+                            {
+                                "Base": "DefaultMaterial",
+                                "BaseColor": [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                    1.0
+                                ],
+                                "PSOType": 0,
+                                "SamplerState": "LinearClamp",
+                                "Textures": [
+                                    "Assets/Checker.png"
+                                ],
+                                "UVScrollSpeed": [
+                                    0.0,
+                                    0.0
+                                ]
+                            }
+                        ],
+                        "StaticMesh": "Cube",
+                        "Transform": {
+                            "Location": [
+                                0.0,
+                                -5.555441856384277,
+                                4.901941299438477
+                            ],
+                            "Rotation": [
+                                0.0,
+                                0.0,
+                                0.0
+                            ],
+                            "Scale": [
+                                1.0,
+                                1.0,
+                                1.0
+                            ]
+                        },
+                        "bVisible": true
+                    }
+                }
+            ],
+            "Properties": null
+        }
+    ],
+    "Version": 2
+}

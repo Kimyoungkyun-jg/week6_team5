@@ -13,6 +13,7 @@ class UExponentialHeightFogComponent : public USceneComponent
 		PROPERTY(FogStartDistance)
 		PROPERTY(FogCutoffDistance)
 		PROPERTY(FogMaxOpacity)
+		PROPERTY(bVisible)
 		REFLECT_END()
 public:
 	UExponentialHeightFogComponent();
@@ -20,6 +21,8 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime) override;
+
+	const bool IsVisible() const { return bVisible; }
 
 	float GetFogDensity() const { return FogDensity; }
 	float GetFogHeight() const { return GetWorldLocation().Z; }
@@ -30,9 +33,9 @@ public:
 	float GetFogMaxOpacity() const { return FogMaxOpacity; }
 private:
 	// 안개 밀도
-	float FogDensity = 0.05f;
+	float FogDensity = 0.02f;
 	// 높이에 따른 지수 감쇄 계수
-	float FogHeightFalloff = 0.2f;
+	float FogHeightFalloff = 0.01f;
 	// 안개 색상
 	FVector4 FogInscatteringColor = FVector4(0.5f, 0.5f, 0.5f, 1.0f);
 	// 카메라 앞 안개 시작 최소 거리
@@ -41,4 +44,6 @@ private:
 	float FogCutoffDistance = 0.0f;
 	// 불투명도 클램프
 	float FogMaxOpacity = 1.0f;
+
+	bool bVisible = true;
 };

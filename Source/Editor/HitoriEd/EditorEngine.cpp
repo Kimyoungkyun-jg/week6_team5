@@ -610,15 +610,14 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				SceneView.ViewProjectionMatrix);
 	}
 	RenderCommand::EndRenderPass();
-	// FTexture2D* SecondColorTarget = nullptr;
-	FTexture2D* SecondDepthTarget = nullptr;
-	RenderCommand::BeginRenderPass(ColorTarget, SecondDepthTarget, Width, Height);
+	FTexture2D* FogColorTarget = ViewClient ? ViewClient->GetFogColorTarget() : nullptr;
+	RenderCommand::BeginRenderPass(FogColorTarget, nullptr, Width, Height);
 	Renderer->RenderSceneDepth(DepthTarget,SettingsPanel->GetSettings().DepthDisplayMin,SettingsPanel->GetSettings().DepthDisplayMax);
-	/*for (TObjectIterator<UHeightFogComponent> FogComponent; FogComponent; ++FogComponent)
+	for (TObjectIterator<UHeightFogComponent> FogComponent; FogComponent; ++FogComponent)
 	{
-		Renderer->RenderExponentialFog(ColorTarget, DepthTarget, *FogComponent);
+		Renderer->RenderExponentialFog(ColorTarget, DepthTarget, *FogComponent, SceneView);
 		break;
-	}*/
+	}
 
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE || ViewIndex != 0) {

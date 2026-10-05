@@ -259,6 +259,17 @@ void FEditorViewportClient::Resize(const uint32 InWidth,
   Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
   ColorTarget = RenderCommand::CreateTexture2D(Desc);
 
+  D3D11_TEXTURE2D_DESC FogDesc{};
+  FogDesc.Width = Width;
+  FogDesc.Height = Height;
+  FogDesc.MipLevels = 1;
+  FogDesc.ArraySize = 1;
+  FogDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  FogDesc.SampleDesc.Count = 1;
+  FogDesc.Usage = D3D11_USAGE_DEFAULT;
+  FogDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+  FogColorTarget = RenderCommand::CreateTexture2D(FogDesc);
+
   Desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
   Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
   DepthTarget = RenderCommand::CreateTexture2D(Desc);

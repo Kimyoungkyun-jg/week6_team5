@@ -104,6 +104,8 @@ public:
 
   FTexture2D *GetColorTarget() const { return ColorTarget.get(); }
   FTexture2D *GetDepthTarget() const { return DepthTarget.get(); }
+  FTexture2D* GetFogColorTarget() const { return FogColorTarget.get(); }
+  FTexture2D* GetFogDepthTarget() const { return FogDepthTarget.get(); }
 
   bool IsWireframe() const { return bWireframe; }
   void SetWireframe(const bool bInWireframe) { bWireframe = bInWireframe; }
@@ -125,6 +127,8 @@ protected:
   uint32 Height = 0;
   TUniquePtr<FTexture2D> ColorTarget;
   TUniquePtr<FTexture2D> DepthTarget;
+  TUniquePtr<FTexture2D> FogColorTarget;
+  TUniquePtr<FTexture2D> FogDepthTarget;
 
   FVector ViewLocation = FVector(0.0f, 0.0f, 0.0f);
   FRotator ViewRotation = FRotator(0.0f, 0.0f, 0.0f);

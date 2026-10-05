@@ -16,9 +16,11 @@ struct FExponentialFogConstants
 	float StartDistance;
 	float FogCutoffDistance;
 	float FogMaxOpacity;
-	float Pad[3]{};
-
+	FVector CameraLocation;
 	float FogInscatteringColor[4];
+	FMatrix ViewProjectionInv;
+	FVector ComponentLocation;
+	float pad;
 };
 
 struct FDepthDisplayConstants
@@ -76,7 +78,7 @@ public:
 	void RenderSceneDepth(FTexture2D* DepthTarget, float DepthDisplayMin = 0.0f, float DepthDisplayMax = 1.0f);
 
 	// Scene Depth 렌더링
-	void RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget, UHeightFogComponent* FogComp);
+	void RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget, UHeightFogComponent* FogComp, const FSceneView& View);
 
 	// 오클루전 객체 조회
 	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }

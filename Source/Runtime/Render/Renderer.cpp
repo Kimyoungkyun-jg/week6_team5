@@ -503,7 +503,7 @@ void FRenderer::RenderSceneDepth(FTexture2D* DepthTarget,float DepthDisplayMin, 
 	RenderCommand::BindShaderResource(0, nullDSV, EShaderBindFlagBits::Pixel);
 }
 
-void FRenderer::RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget, UHeightFogComponent* FogComp)
+void FRenderer::RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthTarget, UHeightFogComponent* FogComp, const FSceneView& View)
 {
 	FullScreenQuad = UAssetManager::GetAssetByPath<UStaticMesh>("FullScreenQuad");
 	FogShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/ExponentialFogShader.hlsl");
@@ -529,9 +529,13 @@ void FRenderer::RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthT
 	}
 	FogConstant.FogMaxOpacity= FogComp->FogMaxOpacity;
 	FogConstant.StartDistance = FogComp->StartDistance;
+	FogConstant.CameraLocation = View.ViewLocation;
+	FogConstant.ViewProjectionInv = View.ViewProjectionMatrix.Inverse();
+	FogConstant.ComponentLocation = FogComp->GetWorldLocation();
 	RenderCommand::UpdateBufferData(FogDisplayCB.get(), &FogConstant);
 	RenderCommand::BindConstantBuffer(0, FogDisplayCB.get(), EShaderBindFlagBits::Pixel);
 
 	RenderCommand::DrawIndexed(FullScreenQuad->GetIndexBuffer(0)->GetIndexCount(), 0, 0);
 	RenderCommand::BindShaderResource(0, nullDSV, EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(1, nullDSV, EShaderBindFlagBits::Pixel);
 }

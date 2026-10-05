@@ -15,6 +15,13 @@ class UWorld;
 class FGizmo;
 class AActor;
 
+enum class EviewMode : uint8
+{
+    Lit,
+	Wireframe,
+	SceneDepth,
+};
+
 // 에디터 뷰포트 클라이언트
 class FEditorViewportClient : public FViewportClient {
 public:
@@ -108,6 +115,13 @@ public:
   bool IsWireframe() const { return bWireframe; }
   void SetWireframe(const bool bInWireframe) { bWireframe = bInWireframe; }
 
+  EviewMode GetViewMode() const { return ViewMode; }
+  void SetViewMode(EviewMode InViewMode)
+  {
+	  ViewMode = InViewMode;
+	  bWireframe = (InViewMode == EviewMode::Wireframe);
+  }
+
   // 타깃 크기 변경
   void Resize(uint32 InWidth, uint32 InHeight);
 
@@ -119,6 +133,7 @@ protected:
   bool bIsRealtime = true;
   bool bActive = false;
   bool bWireframe = false;
+  EviewMode ViewMode = EviewMode::Lit;
 
   FRect Rect{};
   uint32 Width = 0;

@@ -259,8 +259,8 @@ void FEditorViewportClient::Resize(const uint32 InWidth,
   Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
   ColorTarget = RenderCommand::CreateTexture2D(Desc);
 
-  Desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-  Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+  Desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
+  Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
   DepthTarget = RenderCommand::CreateTexture2D(Desc);
 
   if (Height > 0) {

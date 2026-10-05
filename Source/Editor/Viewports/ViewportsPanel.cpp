@@ -258,11 +258,11 @@ void FViewportsPanel::OnRender() {
 		}
 		ImGui::SameLine();
 		// 장면 채우기 모드 설정
-		int Mode = Client->IsWireframe() ? 1 : 0;
-		const char *Labels[] = {"Solid", "Wireframe"};
+		int Mode = static_cast<int>(Client->GetViewMode());
+		const char *Labels[] = {"Solid", "Wireframe", "Scene Depth"};
 		ImGui::SetNextItemWidth(100.0f);
-		if (ImGui::Combo("##FillMode", &Mode, Labels, 2)) {
-			Client->SetWireframe(Mode == 1);
+		if (ImGui::Combo("##FillMode", &Mode, Labels, 3)) {
+			Client->SetViewMode(static_cast<EviewMode>(Mode));
 		}
 		ImGui::SameLine();
 		if (CurrentLayoutMode == ELayoutMode::QuadSplit) {

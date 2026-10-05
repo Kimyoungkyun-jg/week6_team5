@@ -4,6 +4,7 @@
 
 class UHeightFogComponent : public UPrimitiveComponent
 {
+    DECLARE_CLASS(UHeightFogComponent, UPrimitiveComponent)
 public: 
     float FogDensity;
     float FogHeightFalloff;

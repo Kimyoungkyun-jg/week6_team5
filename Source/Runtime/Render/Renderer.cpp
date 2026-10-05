@@ -52,6 +52,7 @@ bool FRenderer::Init()
 	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
 	DepthDisplayCB = RenderCommand::CreateConstantBuffer(sizeof(FDepthDisplayConstants));
+	FogDisplayCB = RenderCommand::CreateConstantBuffer(sizeof(FExponentialFogConstants));
 
 	GPUOcclusion.Init();   // 실패해도 오클루전만 못 쓸 뿐 렌더링은 된다
 
@@ -529,6 +530,7 @@ void FRenderer::RenderExponentialFog(FTexture2D* ColorTarget, FTexture2D* DepthT
 	FogConstant.FogMaxOpacity= FogComp->FogMaxOpacity;
 	FogConstant.StartDistance = FogComp->StartDistance;
 	RenderCommand::UpdateBufferData(FogDisplayCB.get(), &FogConstant);
+	RenderCommand::BindConstantBuffer(0, FogDisplayCB.get(), EShaderBindFlagBits::Pixel);
 
 	RenderCommand::DrawIndexed(FullScreenQuad->GetIndexBuffer(0)->GetIndexCount(), 0, 0);
 	RenderCommand::BindShaderResource(0, nullDSV, EShaderBindFlagBits::Pixel);

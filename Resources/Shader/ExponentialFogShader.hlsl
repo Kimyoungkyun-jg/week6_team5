@@ -37,7 +37,11 @@ PSInput mainVS(VSInput Input)
 
 float4 mainPS(PSInput Input) : SV_TARGET
 {
+    float4 Color;
+    float Transmitrate;
+    float4 FogColor;
     int2 coords = int2(Input.Position.xy);
     float depth = DepthTarget.Load(int3(coords, 0)).r;
-    return float4(depth.x, depth.x, depth.x, 1.0f);
+    Color = ColorTarget.Load(int3(coords, 0)) * Transmitrate + FogColor * (1-Transmitrate);
+    return Color;
 }

@@ -1,15 +1,14 @@
 #pragma once
 
-#include "SceneComponent.h"
+#include "PrimitiveComponent.h"
 #include "Math/Vector4.h"
 
 // 한 층의 높이 안개 설정을 보관한다. 렌더러가 매 뷰에서 현재 값을 읽는다.
-class UExponentialHeightFogComponent : public USceneComponent
+class UExponentialHeightFogComponent : public UPrimitiveComponent
 {
-	DECLARE_CLASS(UExponentialHeightFogComponent, USceneComponent)
+	DECLARE_CLASS(UExponentialHeightFogComponent, UPrimitiveComponent)
 
 	REFLECT_START(ClassName)
-		PROPERTY(bVisible)
 		PROPERTY(FogDensity)
 		PROPERTY(FogHeightFalloff)
 		PROPERTY_TYPE(FogColor, Color)
@@ -21,9 +20,6 @@ class UExponentialHeightFogComponent : public USceneComponent
 public:
 	UExponentialHeightFogComponent() = default;
 	~UExponentialHeightFogComponent() override = default;
-
-	bool IsVisible() const { return bVisible; }
-	void SetVisible(bool bInVisible) { bVisible = bInVisible; }
 
 	float GetFogDensity() const { return FogDensity; }
 	void SetFogDensity(float InDensity) { FogDensity = InDensity; }
@@ -47,8 +43,6 @@ public:
 	float GetFogHeight() const { return GetWorldLocation().Z; }
 
 private:
-	bool bVisible = true;
-
 	// 단위는 월드 길이의 역수. 현재 씬에서 조절할 초기값이다.
 	float FogDensity = 0.02f;
 	float FogHeightFalloff = 0.2f;

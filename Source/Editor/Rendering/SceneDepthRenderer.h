@@ -5,7 +5,7 @@
 #include "Render/PipelineState.h"
 
 // 선형복원을 하기 위해 필요한 값을 넘긴다.
-struct FSceneDepthData
+struct alignas(16) FSceneDepthData
 {
 	float A;
 	float B;

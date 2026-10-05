@@ -237,7 +237,8 @@ FSceneView FEditorViewportClient::CalcSceneView() const {
 // 뷰포트 크기 변경 및 타깃 생성
 void FEditorViewportClient::Resize(const uint32 InWidth,
                                    const uint32 InHeight) {
-  if (Width == InWidth && Height == InHeight && ColorTarget && DepthTarget) {
+  if (Width == InWidth && Height == InHeight &&
+      ViewTargets.IsValidFor(InWidth, InHeight)) {
     return;
   }
 
@@ -247,20 +248,7 @@ void FEditorViewportClient::Resize(const uint32 InWidth,
   Width = InWidth;
   Height = InHeight;
 
-  D3D11_TEXTURE2D_DESC Desc{};
-  Desc.Width = Width;
-  Desc.Height = Height;
-  Desc.MipLevels = 1;
-  Desc.ArraySize = 1;
-  Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-  Desc.SampleDesc.Count = 1;
-  Desc.Usage = D3D11_USAGE_DEFAULT;
-  Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-  ColorTarget = RenderCommand::CreateTexture2D(Desc);
-
-  Desc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-  Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-  DepthTarget = RenderCommand::CreateTexture2D(Desc);
+  ViewTargets.Resize(Width, Height);
 
   if (Height > 0) {
     SetAspectRatio(static_cast<float>(Width) / static_cast<float>(Height));

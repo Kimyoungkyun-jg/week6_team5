@@ -23,6 +23,7 @@
 
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "Component/PointLightComponent.h"
 #include "GameFramework/Actor/LightActor.h"
 
 #include "Asset/AssetManager.h"
@@ -603,13 +604,21 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 	const uint32 Height = GameClient->GetHeight();
 	if (!ColorTarget || !DepthTarget || Width == 0 || Height == 0) return;
 
-	RenderCommand::BeginRenderPass(ColorTarget, DepthTarget, Width, Height);
+	const FDeferredViewTargets& Targets = GameClient->GetViewTargets();
+	if (!SceneRenderer.RenderGBuffer(Renderer, Targets, Width, Height)) // 여기서 기본 도형과 함께 defferedbuffer 값채우기
+		return;
 
-	// 스카이박스 렌더링
+	// 기본 조명을 쓰고 포인트 라이트를 HDR 색상에 더한다.
+	RenderCommand::BeginRenderPass(Targets.LightingHDR.get(), nullptr, Width, Height);
+	SceneRenderer.RenderDeferredLighting(Renderer, Targets);
+	RenderCommand::EndRenderPass();
+
+	RenderCommand::BeginRenderPass(ColorTarget, nullptr, Width, Height);
 	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix, SceneView.ViewLocation);
+	SceneRenderer.RenderToneMap(Renderer, Targets);
+	RenderCommand::EndRenderPass();
 
-	// 불투명 메시 렌더링
-	SceneRenderer.RenderOpaque(Renderer);
+	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
 
 	// 반투명 메시 렌더링
 	SceneRenderer.RenderTranslucent(Renderer);
@@ -743,8 +752,27 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 			? ViewClient->GetHeight()
 			: static_cast<uint32>(SceneView.ViewRect.Height);
 	const FViewportSettings ViewportSetting{0, 0, Width, Height, 0.0f, 1.0f};
+	const bool bDrawPrimitives =
+			bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
 
-	RenderCommand::BeginRenderPass(ColorTarget, DepthTarget, Width, Height);
+	const bool bGBufferRendered = bDrawPrimitives && ViewClient &&
+		SceneRenderer.RenderGBuffer(Renderer, ViewClient->GetViewTargets(), Width, Height);
+	if (!bGBufferRendered)
+		RenderCommand::ClearDepthStencil(DepthTarget);
+
+	if (bGBufferRendered)
+	{
+		RenderCommand::BeginRenderPass(ViewClient->GetViewTargets().LightingHDR.get(), nullptr, Width, Height);
+		SceneRenderer.RenderDeferredLighting(Renderer, ViewClient->GetViewTargets());
+		RenderCommand::EndRenderPass();
+	}
+
+	RenderCommand::BeginRenderPass(ColorTarget, nullptr, Width, Height);
+	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix, SceneView.ViewLocation);
+	if (bGBufferRendered)
+		SceneRenderer.RenderToneMap(Renderer, ViewClient->GetViewTargets());
+	RenderCommand::EndRenderPass();
+	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
 
 	// 라인 배처 렌더링
 	if (!bIsPIE &&
@@ -764,18 +792,6 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		}
 
 		LineBatcher->OnRender(SceneView.ViewProjectionMatrix);
-	}
-
-	const bool bDrawPrimitives =
-			bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
-
-	// 스카이박스 렌더링
-	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix,
-			SceneView.ViewLocation);
-
-	// 불투명 메시 렌더링
-	if (bDrawPrimitives) {
-		SceneRenderer.RenderOpaque(Renderer);
 	}
 
 	// 에디터 그리드 렌더링
@@ -1258,6 +1274,11 @@ UWorld* UEditorEngine::RecoverPIEWorldReferences(UWorld* InEditorWorld, UWorld* 
 				{
 					Scene->SetupAttachment(Cast<USceneComponent>(OriginNewAnnotataion[SceneOrigin->GetAttachParent()]));
 				}
+			}
+
+			if (UPointLightComponent* Light = Cast<UPointLightComponent>(NewActorComp))
+			{
+				InPIEWorld->GetScene().AddLight(Light);
 			}
 		}
 	}

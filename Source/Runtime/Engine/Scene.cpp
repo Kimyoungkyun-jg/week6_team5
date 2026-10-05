@@ -1,5 +1,38 @@
 ﻿#include "EnginePCH.h"
 #include "Scene.h"
+#include "Engine/LightSceneProxy.h"
+#include "Component/PointLightComponent.h"
+
+FScene::~FScene()
+{
+	RemoveAllLights();
+}
+
+void FScene::AddLight(UPointLightComponent* Component)
+{
+	if (!Component) return;
+	for (FLightSceneProxy* Proxy : Lights)
+		if (Proxy->GetComponent() == Component) return;
+	Lights.Add(new FLightSceneProxy(Component));
+}
+
+void FScene::RemoveLight(UPointLightComponent* Component)
+{
+	for (uint32 Index = 0; Index < Lights.Num(); ++Index)
+	{
+		if (Lights[Index]->GetComponent() != Component) continue;
+		delete Lights[Index];
+		Lights.RemoveAtSwap(Index);
+		return;
+	}
+}
+
+void FScene::RemoveAllLights()
+{
+	for (FLightSceneProxy* Proxy : Lights)
+		delete Proxy;
+	Lights.Reset();
+}
 
 void FScene::AddPrimitive(UPrimitiveComponent* Component)
 {
@@ -73,6 +106,9 @@ void FScene::RemoveAllPrimitives()
 
 void FScene::UpdateAllTransforms()
 {
+	for (FLightSceneProxy* Proxy : Lights)
+		Proxy->Update();
+
 	for (FPrimitiveSceneProxy* Proxy : RenderStateDirtyProxies)
 	{
 		Proxy->UpdateRenderState();

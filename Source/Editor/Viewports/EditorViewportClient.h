@@ -6,6 +6,7 @@
 #include "Math/Rotator.h"
 #include "Math/Vector.h"
 #include "Math/Vector2.h"
+#include "Render/DeferredViewTargets.h"
 #include "Render/SceneView.h"
 #include "Render/Texture2D.h"
 
@@ -101,8 +102,9 @@ public:
   uint32 GetWidth() const { return Width; }
   uint32 GetHeight() const { return Height; }
 
-  FTexture2D *GetColorTarget() const { return ColorTarget.get(); }
-  FTexture2D *GetDepthTarget() const { return DepthTarget.get(); }
+  FTexture2D *GetColorTarget() const { return ViewTargets.SceneColor.get(); }
+  FTexture2D *GetDepthTarget() const { return ViewTargets.Depth.get(); }
+  const FDeferredViewTargets &GetViewTargets() const { return ViewTargets; }
 
   bool IsWireframe() const { return bWireframe; }
   void SetWireframe(const bool bInWireframe) { bWireframe = bInWireframe; }
@@ -122,8 +124,7 @@ protected:
   FRect Rect{};
   uint32 Width = 0;
   uint32 Height = 0;
-  TUniquePtr<FTexture2D> ColorTarget;
-  TUniquePtr<FTexture2D> DepthTarget;
+  FDeferredViewTargets ViewTargets;
 
   FVector ViewLocation = FVector(0.0f, 0.0f, 0.0f);
   FRotator ViewRotation = FRotator(0.0f, 0.0f, 0.0f);

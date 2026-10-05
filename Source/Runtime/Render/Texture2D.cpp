@@ -60,7 +60,16 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 	HRESULT hr;
 	if (InDesc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
 	{
-		hr = Device->CreateShaderResourceView(Texture.Get(), nullptr, SRV.GetAddressOf());
+		D3D11_SHADER_RESOURCE_VIEW_DESC SrvDesc{};
+		D3D11_SHADER_RESOURCE_VIEW_DESC* SrvDescPtr = nullptr;
+		if (InDesc.Format == DXGI_FORMAT_R24G8_TYPELESS)
+		{
+			SrvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+			SrvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			SrvDesc.Texture2D.MipLevels = 1;
+			SrvDescPtr = &SrvDesc;
+		}
+		hr = Device->CreateShaderResourceView(Texture.Get(), SrvDescPtr, SRV.GetAddressOf());
 		if (FAILED(hr))
 			HTR_LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
 	}
@@ -75,7 +84,15 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 
 	if (InDesc.BindFlags & D3D11_BIND_DEPTH_STENCIL)
 	{
-		hr = Device->CreateDepthStencilView(Texture.Get(), nullptr, DSV.GetAddressOf());
+		D3D11_DEPTH_STENCIL_VIEW_DESC DsvDesc{};
+		D3D11_DEPTH_STENCIL_VIEW_DESC* DsvDescPtr = nullptr;
+		if (InDesc.Format == DXGI_FORMAT_R24G8_TYPELESS)
+		{
+			DsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+			DsvDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+			DsvDescPtr = &DsvDesc;
+		}
+		hr = Device->CreateDepthStencilView(Texture.Get(), DsvDescPtr, DSV.GetAddressOf());
 		if (FAILED(hr))
 			HTR_LOG(Error, "[Texture2D] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)hr);
 	}

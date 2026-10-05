@@ -6,6 +6,7 @@
 #include "GameFramework/Actor/ParticleActor.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
 #include "GameFramework/Actor/LightActor.h"
+#include "GameFramework/Actor/PointLightActor.h"
 #include "GameFramework/Actor/TextRenderActor.h"
 #include "GameFramework/Actor/SpinActor.h"
 class FViewportsPanel;
@@ -30,7 +31,7 @@ public:
 
 	int32 SelectedIndex = 0;
 
-	const char* Items[5] = {"StaticMesh", "Particle", "Text", "Light", "SpinActor"};
+	const char* Items[6] = {"StaticMesh", "Particle", "Text", "Light", "SpinActor", "PointLight"};
 
 	FGizmo* Gizmo = nullptr;
 	int32 GizmoSelectedIndex = 0;
@@ -46,6 +47,7 @@ public:
 		ATextRenderActor::StaticClass(),
 		ALightActor::StaticClass(),
 		ASpinActor::StaticClass(),
+		APointLightActor::StaticClass(),
 	};
 
 private:

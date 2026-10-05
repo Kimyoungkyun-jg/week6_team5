@@ -17,6 +17,7 @@
 #include "Component/ParticleSubUVComponent.h"
 
 #include "Component/StaticMeshComponent.h"
+#include "Component/PointLightComponent.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
 
 #include "Math/Frustum.h"
@@ -92,6 +93,8 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 	{
 		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
 			Scene.AddPrimitive(Primitive);
+		if (UPointLightComponent* Light = Cast<UPointLightComponent>(Component))
+			Scene.AddLight(Light);
 	}
 
 	// 4. Level->Actors에 등록
@@ -165,6 +168,7 @@ void UWorld::ClearWorld()
 	// 액터를 지우기 전에 렌더 프록시와 틱 등록부터 푼다. ClearActors는 액터를 delete만 하므로,
 	// 그대로 두면 지워진 컴포넌트를 가리키는 프록시가 FScene에 남아 다음 프레임에 터진다.
 	Scene.RemoveAllPrimitives();
+	Scene.RemoveAllLights();
 	for (ULevel* Level : Levels)
 	{
 		for (AActor* Actor : Level->Actors)
@@ -324,8 +328,14 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 					if (SlotDest)
 					{
 						// 칸 VisibleIndex는 이 반복만 쓴다 → 스레드끼리 겹치지 않음
-						std::memcpy(SlotDest + size_t(VisibleIndex) * ObjectSlotBytes,
-							&Proxy->GetLocalToWorld(), sizeof(FMatrix));
+						const FPerObjectConstants Constants =
+							MakePerObjectConstants(Proxy->GetLocalToWorld());
+
+						std::memcpy(
+							SlotDest + static_cast<size_t>(VisibleIndex) * ObjectSlotBytes,
+							&Constants,
+							sizeof(Constants));
+
 						Slot = VisibleIndex;
 					}
 
@@ -426,46 +436,6 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 	}
 }
 
-//void UWorld::GatherRenderPackets(TArray<FRenderPacket>& RenderArray, const FLODViewContext* LODView, const FFrustumPlanes* Frustum)
-//{
-//	for (TObjectIterator<UPrimitiveComponent> Itr; Itr; ++Itr)
-//	{
-//		if (!*Itr || !Itr->IsVisible())
-//			continue;
-//
-//		if (Frustum)
-//		{
-//			const FBox Box = Itr->CalcBounds();
-//			const FAABB Bounds{
-//				(Box.Min + Box.Max) * 0.5f,
-//				(Box.Max - Box.Min) * 0.5f
-//			};
-//			if (!IsAABBInFrustum(Bounds, *Frustum))
-//				continue;
-//		}
-//
-//		if (LODView)
-//		{
-//			if (auto* Component = Cast<UStaticMeshComponent>(*Itr))
-//			{
-//				if (UStaticMesh* Mesh =
-//					Component->GetStaticMesh())
-//				{
-//					const uint32 LOD = SelectStaticMeshLOD(
-//						*Mesh,
-//						Component->GetWorldMatrix(),
-//						*LODView);
-//
-//					Component->SubmitToRenderQueue(RenderQueue, LOD);
-//					continue;
-//				}
-//			}
-//		}
-//
-//		Itr->SubmitToRenderQueue(RenderQueue);
-//	}
-//}
-
 // 메인 카메라 생성
 void UWorld::CreateMainCamera()
 {
@@ -559,6 +529,8 @@ bool UWorld::DestroyActor(AActor* Actor)
 		{
 			Scene.RemovePrimitive(Primitive);
 		}
+		if (UPointLightComponent* Light = Cast<UPointLightComponent>(Component))
+			Scene.RemoveLight(Light);
 	}
 
 	Actor->RegisterAllActorTickFunctions(false);
@@ -799,6 +771,34 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 					newTRC->SetFont(srcTRC->GetFont());
 					newTRC->SetTextSize(srcTRC->GetTextSize());
 				}
+			}
+
+			for (UActorComponent* SrcComponent : SrcActor->GetComponents())
+			{
+				UPointLightComponent* SrcLight = Cast<UPointLightComponent>(SrcComponent);
+				if (!SrcLight) continue;
+
+				UPointLightComponent* DstLight = nullptr;
+				for (UActorComponent* DstComponent : NewActor->GetComponents())
+				{
+					if (DstComponent->GetFName() == SrcLight->GetFName())
+					{
+						DstLight = Cast<UPointLightComponent>(DstComponent);
+						break;
+					}
+				}
+				if (!DstLight)
+				{
+					DstLight = NewActor->CreateDefaultSubobject<UPointLightComponent>(SrcLight->GetFName());
+					if (NewActor->GetRootComponent())
+						DstLight->SetupAttachment(NewActor->GetRootComponent());
+					Scene.AddLight(DstLight);
+				}
+				DstLight->SetTransform(SrcLight->GetTransform());
+				DstLight->SetLightColor(SrcLight->GetLightColor());
+				DstLight->SetIntensity(SrcLight->GetIntensity());
+				DstLight->SetAttenuationRadius(SrcLight->GetAttenuationRadius());
+				DstLight->SetEnabled(SrcLight->IsEnabled());
 			}
 
 		}

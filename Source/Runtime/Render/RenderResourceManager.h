@@ -14,7 +14,11 @@ enum class EPSOType : uint8
 	Skybox,                  
 	Grid,                    
 	Outline_Mask,            
-	Outline_Draw,            
+	Outline_Draw,
+	StaticMesh_GBuffer,
+	DeferredLighting,
+	DeferredPointLighting,
+	ToneMap,
 	Count
 };
 
@@ -48,4 +52,4 @@ private:
 	TMap<FString, TUniquePtr<FShaderProgram>> ShaderProgramMap;
 
 	TMap<EPSOType, TUniquePtr<FPipelineState>> PipelineStateMap;
-}; 
+};

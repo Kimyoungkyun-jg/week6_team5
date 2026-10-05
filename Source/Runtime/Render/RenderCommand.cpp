@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Render/DeferredViewTargets.h"
 #include "RenderCommand.h"
 
 #include "PipelineState.h"
@@ -196,6 +197,26 @@ void RenderCommand::BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShad
 }
 
 
+bool RenderCommand::BeginGBufferPass(const FDeferredViewTargets& Targets, uint32 Width, uint32 Height)
+{
+	if (Width == 0 || Height == 0 || !Targets.IsValidFor(Width, Height))
+		return false;
+
+	ID3D11DeviceContext* Context = RenderDevice->GetContext();
+	ID3D11RenderTargetView* RTVs[2] = {
+		Targets.BaseColorMetallic->GetRTV(),
+		Targets.NormalRoughness->GetRTV()
+	};
+	ID3D11DepthStencilView* DSV = Targets.Depth->GetDSV();
+	constexpr float ClearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+	Context->ClearRenderTargetView(RTVs[0], ClearColor);
+	Context->ClearRenderTargetView(RTVs[1], ClearColor);
+	Context->ClearDepthStencilView(DSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	Context->OMSetRenderTargets(2, RTVs, DSV);
+	SetViewport(0, 0, Width, Height);
+	return true;
+}
 
 // 텍스처 기반 렌더 패스 시작
 void RenderCommand::BeginRenderPass(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height)
@@ -213,6 +234,14 @@ void RenderCommand::BeginRenderPass(FTexture2D* ColorTarget, FTexture2D* DepthTa
 		RenderDevice->GetContext()->ClearDepthStencilView(DSV, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	}
 
+	RenderDevice->GetContext()->OMSetRenderTargets(RTV ? 1 : 0, RTV ? &RTV : nullptr, DSV);
+	SetViewport(0, 0, Width, Height);
+}
+
+void RenderCommand::BindRenderPassNoClear(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height)
+{
+	ID3D11RenderTargetView* RTV = ColorTarget ? ColorTarget->GetRTV() : nullptr;
+	ID3D11DepthStencilView* DSV = DepthTarget ? DepthTarget->GetDSV() : nullptr;
 	RenderDevice->GetContext()->OMSetRenderTargets(RTV ? 1 : 0, RTV ? &RTV : nullptr, DSV);
 	SetViewport(0, 0, Width, Height);
 }

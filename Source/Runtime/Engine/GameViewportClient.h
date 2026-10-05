@@ -5,6 +5,7 @@
 #include "Math/Rotator.h"
 #include "Math/Matrix.h"
 #include "Render/SceneView.h"
+#include "Render/DeferredViewTargets.h"
 
 class UWorld;
 class UGameInstance;
@@ -39,8 +40,9 @@ public:
 	void Resize(uint32 InWidth, uint32 InHeight);
 	uint32 GetWidth() const { return Width; }
 	uint32 GetHeight() const { return Height; }
-	class FTexture2D* GetColorTarget() const { return ColorTarget.get(); }
-	class FTexture2D* GetDepthTarget() const { return DepthTarget.get(); }
+	class FTexture2D* GetColorTarget() const { return ViewTargets.SceneColor.get(); }
+	class FTexture2D* GetDepthTarget() const { return ViewTargets.Depth.get(); }
+	const FDeferredViewTargets& GetViewTargets() const { return ViewTargets; }
 
 	void SetGameInstance(UGameInstance* InGameInstance) { GameInstance = InGameInstance; }
 	UGameInstance* GetGameInstance() const { return GameInstance; }
@@ -67,6 +69,5 @@ private:
 	// 렌더 타깃 버퍼
 	uint32 Width = 0;
 	uint32 Height = 0;
-	TUniquePtr<class FTexture2D> ColorTarget;
-	TUniquePtr<class FTexture2D> DepthTarget;
+	FDeferredViewTargets ViewTargets;
 };

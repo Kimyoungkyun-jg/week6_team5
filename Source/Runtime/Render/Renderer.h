@@ -5,13 +5,26 @@
 #include "Text/Font.h"
 #include "SceneView.h"
 #include "Occlusion/GPUOcclusion.h"
+#include "Engine/LightSceneProxy.h"
 
 constexpr uint32 ObjectSlotBytes = 256;
 
 struct FPerObjectConstants
 {
 	FMatrix World;
+	FMatrix NormalMatrix;
 };
+
+inline FPerObjectConstants MakePerObjectConstants(const FMatrix& World)
+{
+	FPerObjectConstants Result{};
+	Result.World = World;
+	Result.NormalMatrix = World.Inverse().GetTransposed();
+	return Result;
+}
+
+static_assert(sizeof(FPerObjectConstants) == sizeof(FMatrix) * 2);
+static_assert(sizeof(FPerObjectConstants) <= ObjectSlotBytes);
 
 struct FSortEntry
 {
@@ -39,6 +52,9 @@ class FRenderer
 {
 public:
 	bool Init();
+	void DrawDeferredLighting(const FSceneView& View, const struct FDeferredViewTargets& Targets,
+		const TArray<FPointLightRenderData>& PointLights);
+	void DrawToneMap(const struct FDeferredViewTargets& Targets);
 
 	// 시점 상수 버퍼 및 렌더링 상태 설정
 	void SetupView(const FSceneView& View);
@@ -47,7 +63,7 @@ public:
 	void RenderAll(const FSceneView& View, const FRenderQueue& InQueue);
 
 	// 불투명 요소 렌더링
-	void RenderOpaque(const FSceneView& View, const FRenderQueue& InQueue);
+	void RenderOpaque(const FSceneView& View, const FRenderQueue& InQueue, bool bGBufferPass = false);
 
 	// 반투명 요소 렌더링
 	void RenderTranslucent(const FSceneView& View, const FRenderQueue& InQueue);
@@ -68,6 +84,7 @@ public:
 private:
 	TUniquePtr<FConstantBuffer> PerObjectCB;
 	TUniquePtr<FConstantBuffer> ViewCB;
+	TUniquePtr<FConstantBuffer> DeferredLightCB;
 
 	// 오브젝트 상수 버퍼
 	TUniquePtr<FConstantBuffer> PerObjectSlotCB;
@@ -84,16 +101,20 @@ private:
 
 	FGPUOcclusion GPUOcclusion;
 
-	void DrawPackets(const FRenderQueue& InQueue, uint32 Begin, uint32 End, const FMatrix& ViewProjection);
-	void DrawStaticGroups();
+	void DrawPackets(const FRenderQueue& InQueue, uint32 Begin, uint32 End, const FMatrix& ViewProjection, bool bGBufferPass = false);
+
+	void DrawStaticGroups(bool bGBufferPass = false);
+
 	void UpdatePerObjectConstants(const FMatrix& World);
 
 	// 스태틱 메시 묶음
 	std::vector<const FStaticDrawGroup*> StaticGroups;
 	// 머티리얼 바인딩
-	void BindMaterial(UMaterial* material, bool bInWireframe = false);
+	void BindMaterial(UMaterial* material, bool bInWireframe = false, bool bGBufferPass = false);
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
 	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
 	void UploadPerObjectConstants(const FRenderQueue& InQueue);
+
+
 };

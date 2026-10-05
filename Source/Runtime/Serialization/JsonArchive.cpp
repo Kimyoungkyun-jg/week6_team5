@@ -4,6 +4,7 @@
 #include "Engine/World.h"
 #include "Engine/Level.h"
 #include "Component/PrimitiveComponent.h"
+#include "Component/PointLightComponent.h"
 #include "GameFramework/Actor.h"
 #include "UObject/UObjectHash.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
@@ -211,6 +212,18 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 				{
 					Component = C;
 					break;
+				}
+			}
+
+			if (!Component)
+			{
+				if (ComponentJson.contains("Class") && ComponentJson["Class"] == "UPointLightComponent")
+				{
+					UPointLightComponent* Light = Actor->CreateDefaultSubobject<UPointLightComponent>(Name);
+					if (Actor->GetRootComponent())
+						Light->SetupAttachment(Actor->GetRootComponent());
+					World->GetScene().AddLight(Light);
+					Component = Light;
 				}
 			}
 

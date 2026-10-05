@@ -7,6 +7,7 @@
 #include "Component/StaticMeshComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Component/SpotLightComponent.h"
+#include "Component/PointLightComponent.h"
 #include "Component/ParticleSubUVComponent.h"
 #include "Component/BillboardComponent.h"
 #include "Component/TextRenderComponent.h"
@@ -979,6 +980,14 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 			auto* NewComp = Owner->CreateDefaultSubobject<USpotLightComponent>("SpotLight");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
+		}
+		if (ImGui::Selectable("PointLight Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UPointLightComponent>("PointLight");
+			if (Owner->GetRootComponent())
+				NewComp->SetupAttachment(Owner->GetRootComponent());
+			if (World)
+				World->GetScene().AddLight(NewComp);
 		}
 		if (ImGui::Selectable("ParticleSubUV Component"))
 		{

@@ -9,6 +9,8 @@
 #include "Engine/PrimitiveSceneProxy.h"
 
 #include "RenderCommand.h"
+#include "RenderResourceManager.h"
+#include "DeferredViewTargets.h"
 
 #include "Camera/CameraComponent.h"
 
@@ -22,6 +24,14 @@ DECLARE_CYCLE_STAT("Upload Per-Object CB", STAT_UploadPerObjectCB);
 
 namespace
 {
+	struct FDeferredLightConstants
+	{
+		FMatrix InverseViewProjection;
+		FVector4 ViewportLightCount;
+		FPointLightRenderData PointLights[MaxDeferredPointLights];
+	};
+	static_assert(sizeof(FPointLightRenderData) == 32);
+	static_assert(sizeof(FDeferredLightConstants) % 16 == 0);
 	// VSSetConstantBuffers1의 오프셋은 16개 상수(256바이트) 단위여야 하므로 오브젝트마다 256바이트 칸을 쓴다.
 	constexpr uint32 PerObjectSlotConstants = 16;
 	static_assert(sizeof(FPerObjectConstants) <= ObjectSlotBytes);
@@ -48,6 +58,7 @@ bool FRenderer::Init()
 	bUsePerObjectSlots = RenderCommand::SupportsConstantBufferOffsets();
 	PerObjectCB = RenderCommand::CreateConstantBuffer(sizeof(FPerObjectConstants));
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
+	DeferredLightCB = RenderCommand::CreateConstantBuffer(sizeof(FDeferredLightConstants));
 
 	GPUOcclusion.Init();   // 실패해도 오클루전만 못 쓸 뿐 렌더링은 된다
 
@@ -101,9 +112,13 @@ void FRenderer::UploadPerObjectConstants(const FRenderQueue& InQueue)
 	// 매핑된 메모리는 write-combined라 순차 쓰기만 하고 읽지 않는다.
 	for (uint32 Index = 0; Index < Count; ++Index)
 	{
-		const FRenderPacket& P = InQueue[Index];
-		const FMatrix& Model = GetPacketWorld(P);
-		std::memcpy(Dest + static_cast<size_t>(Index) * ObjectSlotBytes, &Model, sizeof(FMatrix));
+		const FRenderPacket& Packet = InQueue[Index];
+		const FPerObjectConstants Constants = MakePerObjectConstants(GetPacketWorld(Packet));
+
+		std::memcpy(
+			Dest + static_cast<size_t>(Index) * ObjectSlotBytes,
+			&Constants,
+			sizeof(Constants));
 	}
 
 	RenderCommand::Unmap(PerObjectSlotCB.get());
@@ -124,11 +139,67 @@ void FRenderer::RenderAll(const FSceneView& View, const FRenderQueue& InQueue)
 }
 
 // 불투명 요소 렌더링
-void FRenderer::RenderOpaque(const FSceneView& View, const FRenderQueue& InQueue)
+void FRenderer::RenderOpaque(const FSceneView& View, const FRenderQueue& InQueue, bool bGBufferPass)
 {
 	SetupView(View);
-	DrawStaticGroups();
-	DrawPackets(InQueue, 0, InQueue.GetFirstTranslucentIndex(), View.ViewProjectionMatrix);
+	DrawStaticGroups(bGBufferPass);
+	DrawPackets(InQueue, 0, InQueue.GetFirstTranslucentIndex(), View.ViewProjectionMatrix, bGBufferPass);
+}
+
+void FRenderer::DrawDeferredLighting(const FSceneView& View, const FDeferredViewTargets& Targets,
+	const TArray<FPointLightRenderData>& PointLights)
+{
+	FPipelineState* PSO = FRenderResourceManager::GetPSO(EPSOType::DeferredLighting);
+	if (!PSO || !PSO->Shader || !PSO->Shader->VertexShader || !PSO->Shader->PixelShader || !DeferredLightCB)
+		return;
+	FDeferredLightConstants Constants{};
+	Constants.InverseViewProjection = View.ViewProjectionMatrix.Inverse();
+	const uint32 LightCount = std::min<uint32>(static_cast<uint32>(PointLights.Num()), MaxDeferredPointLights);
+	Constants.ViewportLightCount = FVector4(
+		static_cast<float>(Targets.SceneColor->GetWidth()),
+		static_cast<float>(Targets.SceneColor->GetHeight()),
+		static_cast<float>(LightCount), 0.0f);
+	for (uint32 Index = 0; Index < LightCount; ++Index)
+		Constants.PointLights[Index] = PointLights[Index];
+	RenderCommand::UpdateBufferData(DeferredLightCB.get(), &Constants, sizeof(Constants));
+
+	RenderCommand::BindPipelineState(*PSO);
+	RenderCommand::BindConstantBuffer(0, DeferredLightCB.get(), EShaderBindFlagBits::Pixel);
+	RenderCommand::BindVertexBuffer(nullptr);
+	RenderCommand::BindShaderResource(0, Targets.BaseColorMetallic.get(), EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(1, Targets.NormalRoughness.get(), EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(2, Targets.Depth.get(), EShaderBindFlagBits::Pixel);
+	RenderCommand::Draw(3);
+	if (LightCount > 0)
+	{
+		FPipelineState* AdditivePSO = FRenderResourceManager::GetPSO(EPSOType::DeferredPointLighting);
+		if (AdditivePSO && AdditivePSO->Shader && AdditivePSO->Shader->VertexShader && AdditivePSO->Shader->PixelShader)
+		{
+			Constants.ViewportLightCount.W = 1.0f;
+			RenderCommand::UpdateBufferData(DeferredLightCB.get(), &Constants, sizeof(Constants));
+			RenderCommand::BindPipelineState(*AdditivePSO);
+			RenderCommand::Draw(3);
+		}
+	}
+
+	ID3D11ShaderResourceView* NullSRVs[3] = { nullptr, nullptr, nullptr };
+	RenderCommand::GetContext()->PSSetShaderResources(0, 3, NullSRVs);
+}
+
+void FRenderer::DrawToneMap(const FDeferredViewTargets& Targets)
+{
+	FPipelineState* PSO = FRenderResourceManager::GetPSO(EPSOType::ToneMap);
+	if (!PSO || !PSO->Shader || !PSO->Shader->VertexShader || !PSO->Shader->PixelShader)
+		return;
+
+	RenderCommand::BindPipelineState(*PSO);
+	RenderCommand::BindVertexBuffer(nullptr);
+	RenderCommand::BindShaderResource(0, Targets.LightingHDR.get(), EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(1, Targets.Depth.get(), EShaderBindFlagBits::Pixel);
+	RenderCommand::Draw(3);
+
+	ID3D11ShaderResourceView* NullSRVs[2] = { nullptr, nullptr };
+	RenderCommand::GetContext()->PSSetShaderResources(0, 2, NullSRVs);
 }
 
 // 반투명 요소 렌더링
@@ -140,7 +211,7 @@ void FRenderer::RenderTranslucent(const FSceneView& View, const FRenderQueue& In
 }
 
 // 스태틱 메시 묶음을 그린다
-void FRenderer::DrawStaticGroups()
+void FRenderer::DrawStaticGroups(bool bGBufferPass)
 {
 	if (StaticGroups.empty())
 		return;
@@ -160,7 +231,7 @@ void FRenderer::DrawStaticGroups()
 		if (Group->Material != BoundMaterial)
 		{
 			BoundMaterial = Group->Material;
-			BindMaterial(BoundMaterial, bCurrentWireframe);
+			BindMaterial(BoundMaterial, bCurrentWireframe, bGBufferPass);
 			FRenderPacket MaterialOnly;
 			MaterialOnly.Material = BoundMaterial;
 			UpdateMaterialParams(MaterialOnly);
@@ -186,7 +257,7 @@ void FRenderer::DrawStaticGroups()
 }
 
 // 정렬된 패킷 중 [Begin, End) 범위를 그린다
-void FRenderer::DrawPackets(const FRenderQueue& InQueue, uint32 Begin, uint32 End, const FMatrix& ViewProjection)
+void FRenderer::DrawPackets(const FRenderQueue& InQueue, uint32 Begin, uint32 End, const FMatrix& ViewProjection, bool bGBufferPass)
 {
 	SCOPE_CYCLE_COUNTER(STAT_DrawRenderPackets);
 
@@ -203,7 +274,7 @@ void FRenderer::DrawPackets(const FRenderQueue& InQueue, uint32 Begin, uint32 En
 			RenderCommand::BindMesh(RenderPacket.Mesh, RenderPacket.LODIndex);
 		}
 		if (RenderPacket.Material != LastMaterial) {
-			BindMaterial(RenderPacket.Material, bCurrentWireframe);
+			BindMaterial(RenderPacket.Material, bCurrentWireframe, bGBufferPass);
 		}
 		if (RenderPacket.Material != LastMaterial || RenderPacket.MaterialParamData)
 			UpdateMaterialParams(RenderPacket);
@@ -399,10 +470,14 @@ void FRenderer::EndObjectConstants()
 }
 
 // 머티리얼 파이프라인 상태 및 텍스처 바인딩
-void FRenderer::BindMaterial(UMaterial* material, bool bInWireframe)
+void FRenderer::BindMaterial(UMaterial* material, bool bInWireframe, bool bGBufferPass)
 {
 	EPSOType PSOType = material->PSOType;
-	if (bInWireframe && PSOType == EPSOType::StaticMesh_Opaque)
+	if (bGBufferPass && PSOType == EPSOType::StaticMesh_Opaque)
+	{
+		PSOType = EPSOType::StaticMesh_GBuffer;
+	}
+	else if (bInWireframe && PSOType == EPSOType::StaticMesh_Opaque)
 	{
 		PSOType = EPSOType::StaticMesh_Wireframe;
 	}
@@ -410,6 +485,9 @@ void FRenderer::BindMaterial(UMaterial* material, bool bInWireframe)
 	if (FPipelineState* PSO = FRenderResourceManager::GetPSO(PSOType))
 	{
 		RenderCommand::BindPipelineState(*PSO);
+
+		if (bGBufferPass && bInWireframe)
+			RenderCommand::SetRasterizerState(ERasterizerState::Wireframe);
 	}
 	// 텍스처와 샘플러 바인딩
 	for (size_t i = 0; i < material->Textures.size(); i++)
@@ -468,9 +546,11 @@ void FRenderer::UpdatePerObjectConstants(const FRenderPacket& RenderPacket, cons
 
 void FRenderer::UpdatePerObjectConstants(const FMatrix& World)
 {
-	FPerObjectConstants Constants;
+	const FPerObjectConstants Constants =
+		MakePerObjectConstants(World);
 
-	Constants.World = World;
-
-	RenderCommand::UpdateBufferData(PerObjectCB.get(), &Constants);
+	RenderCommand::UpdateBufferData(
+		PerObjectCB.get(),
+		&Constants,
+		sizeof(Constants));
 }

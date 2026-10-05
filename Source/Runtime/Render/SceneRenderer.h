@@ -3,9 +3,11 @@
 #include "Core/Types.h"
 #include "Render/SceneView.h"
 #include "Render/RenderPacket.h"
+#include "Engine/LightSceneProxy.h"
 
 class UWorld;
 class FRenderer;
+struct FDeferredViewTargets;
 
 // 씬 렌더링 조율자
 class FSceneRenderer
@@ -19,6 +21,9 @@ public:
 
 	// 불투명 렌더링
 	void RenderOpaque(FRenderer* Renderer);
+	bool RenderGBuffer(FRenderer* Renderer, const FDeferredViewTargets& Targets, uint32 Width, uint32 Height);
+	void RenderDeferredLighting(FRenderer* Renderer, const FDeferredViewTargets& Targets);
+	void RenderToneMap(FRenderer* Renderer, const FDeferredViewTargets& Targets);
 
 	// 반투명 렌더링
 	void RenderTranslucent(FRenderer* Renderer);
@@ -34,5 +39,6 @@ private:
 	UWorld* World = nullptr;
 	FSceneView View;
 	FRenderQueue RenderQueue;
+	TArray<FPointLightRenderData> VisiblePointLights;
 	FViewContext CachedViewContext;
 };

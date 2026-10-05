@@ -61,7 +61,13 @@ float4 mainPS(VS_OUTPUT Input) : SV_TARGET
     float Transmittance = exp(-OpticalDepth); // 빛의 투과율
     float FogFactor = saturate(1.0f - Transmittance); // 최종 안개 블렌딩 비율 (0.0 ~ 1.0)
     FogFactor *= FogMaxOpacity; // 안개 최대 불투명도 적용
-    FogFactor = FogCutoffDistance > 0.0f && FogCutoffDistance < RayLength ? 0.0f : FogFactor; // 안개 컷오프 거리 적용
+    if (FogCutoffDistance > 0.0f)
+    {
+        float FadeStartDistance = FogCutoffDistance * 0.85f;
+        float FadeRange = FogCutoffDistance - FadeStartDistance;
+        float FadeFactor = saturate(((FogCutoffDistance - RayLength)) / FadeRange);
+        FogFactor *= FadeFactor;
+    }
 
     // 5. 원본 색상 샘플링 및 최종 출력 변수
     float4 SceneColor = SceneColorTexture.Sample(LinearSampler, Input.UV); // SceneColorTexture에서 샘플링한 원래 화면 색상

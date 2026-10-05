@@ -33,17 +33,17 @@ public:
 	float GetFogMaxOpacity() const { return FogMaxOpacity; }
 private:
 	// 안개 밀도
-	float FogDensity = 0.02f;
+	float FogDensity = 0.05f;
 	// 높이에 따른 지수 감쇄 계수
 	float FogHeightFalloff = 0.01f;
 	// 안개 색상
 	FVector4 FogInscatteringColor = FVector4(0.5f, 0.5f, 0.5f, 1.0f);
 	// 카메라 앞 안개 시작 최소 거리
-	float FogStartDistance = 0.0f;
+	float FogStartDistance = 10.0f;
 	// 안개 최대 차단 거리(0이면 무제한)
 	float FogCutoffDistance = 0.0f;
 	// 불투명도 클램프
-	float FogMaxOpacity = 1.0f;
+	float FogMaxOpacity = 0.99f;
 
 	bool bVisible = true;
 };

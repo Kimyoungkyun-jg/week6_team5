@@ -43,6 +43,14 @@ void FSettingsPanel::OnRender()
 	ImGui::Checkbox("Draw Bounding Box", &Settings.bDrawBoundingBox);
 	ImGui::Checkbox("Show Object UUID", &Settings.bShowUUID);
 
+	ImGui::Dummy(ImVec2(0.0f, SectionGap));
+	ImGui::SeparatorText("Scene Depth");
+	ImGui::SetNextItemWidth(200.0f);
+	if (ImGui::DragFloat("Max Distance", &Settings.SceneDepthMaxRange, 0.5f,
+		0.1f, 10000.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp))
+		ApplySceneDepthRange();
+	ImGui::TextDisabled("White represents this distance from the camera.");
+
 	//////////////////////////////////////////////////////////
 
 	ImGui::Dummy(ImVec2(0.0f, SectionGap));
@@ -116,6 +124,7 @@ bool FSettingsPanel::SaveSettings() const
 	File << "ShowUUID=" << Settings.bShowUUID << "\n";
 	File << "DrawBatchLine=" << Settings.bDrawBatchLine << "\n";
 	File << "DrawPSGrid=" << Settings.bDrawPSGrid << "\n";
+	File << "SceneDepthMaxRange=" << Settings.SceneDepthMaxRange << "\n";
 	File << "\n";
 
 	File << "[Editor]\n";
@@ -236,6 +245,7 @@ bool FSettingsPanel::LoadSettings()
 				else if (Key == "ShowUUID") Settings.bShowUUID = std::stoi(ValueStr);
 				else if (Key == "DrawBatchLine") Settings.bDrawBatchLine = std::stoi(ValueStr);
 				else if (Key == "DrawPSGrid") Settings.bDrawPSGrid = std::stoi(ValueStr);
+				else if (Key == "SceneDepthMaxRange") Settings.SceneDepthMaxRange = std::stof(ValueStr);
 
 				else if (Key == "CameraMoveSpeed") Settings.CameraSpeed = std::stof(ValueStr);
 				else if (Key == "CameraRotateSensitivity") Settings.MouseSensitivity = std::stof(ValueStr);
@@ -253,6 +263,9 @@ bool FSettingsPanel::LoadSettings()
 	}
 
 	File.close();
+	if (!std::isfinite(Settings.SceneDepthMaxRange))
+		Settings.SceneDepthMaxRange = 50.0f;
+	Settings.SceneDepthMaxRange = FMath::Clamp(Settings.SceneDepthMaxRange, 0.1f, 10000.0f);
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
 		Settings.bViewLocationSaved[Index] = LocationComponentMasks[Index] == 0x7;
@@ -300,6 +313,7 @@ void FSettingsPanel::ApplyViewportSettings()
 {
 	if (!ViewportsPanel)
 		return;
+	ApplySceneDepthRange();
 
 	for (int32 Index = 0; Index < 4; ++Index)
 	{
@@ -311,6 +325,18 @@ void FSettingsPanel::ApplyViewportSettings()
 			Client->SetViewFOV(Settings.ViewFov[Index]);
 		if (Settings.ViewWireframe[Index] >= 0)
 			Client->SetViewportMode(Settings.ViewWireframe[Index] == 1 ? EViewportMode::Wireframe : EViewportMode::Solid);
+	}
+}
+
+void FSettingsPanel::ApplySceneDepthRange()
+{
+	if (!ViewportsPanel)
+		return;
+
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		if (FEditorViewportClient* Client = ViewportsPanel->GetViewportClient(Index))
+			Client->SetMaxRange(Settings.SceneDepthMaxRange);
 	}
 }
 

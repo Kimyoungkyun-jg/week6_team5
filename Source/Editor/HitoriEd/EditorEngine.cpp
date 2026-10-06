@@ -893,10 +893,10 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		ViewClient->GetViewportMode() == EViewportMode::Solid)
 		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 
-	//// 씬 뎁스 렌더링, 깊이를 시각적으로 확인하기 위한 코드
-	//if (ViewClient && ViewClient->IsSceneDepth()) {
-	//	SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
-	//}
+	// 씬 뎁스 렌더링, 깊이를 시각적으로 확인하기 위한 코드
+	if (ViewClient && ViewClient->IsSceneDepth()) {
+		SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
+	}
 
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE) {

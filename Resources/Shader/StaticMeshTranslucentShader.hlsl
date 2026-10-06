@@ -16,6 +16,15 @@ cbuffer MaterialParams : register(b1)
     float2 Padding;
 };
 
+cbuffer TranslucentFogConstants : register(b3)
+{
+    float4x4 FogInverseViewProjection;
+    float4 FogCameraPosition;
+    float4 FogColor;
+    float4 FogDensityHeight;
+    float4 FogDistanceViewport;
+};
+
 struct VS_INPUT
 {
     float3 p : POSITION;
@@ -30,35 +39,62 @@ struct PS_INPUT
     float3 normal : NORMAL;
     float4 color : COLOR;
     float2 uv : TEXCOORD0;
+    float3 worldPosition : TEXCOORD1;
 };
 
 Texture2D g_txColor : register(t0);
 SamplerState g_Sample : register(s0);
 
-static const float3 LightDir = normalize(float3(0.5f, 0.5f, -1.0f));
-static const float3 LightColor = float3(0.5f, 0.5f, 0.5f);
-static const float3 AmbientColor = float3(0.5f, 0.5f, 0.5f);
+float FogTransmittance(float3 Position)
+{
+    if (FogDensityHeight.x <= 0.0f || FogDistanceViewport.x <= 0.0f)
+        return 1.0f;
+
+    float3 Ray = Position - FogCameraPosition.xyz;
+    float Distance = length(Ray);
+    float Start = FogDensityHeight.w;
+    if (Distance <= Start ||
+        (FogDistanceViewport.y > 0.0f && Distance > FogDistanceViewport.y))
+        return 1.0f;
+
+    float Length = Distance - Start;
+    float StartHeight = FogCameraPosition.z + Ray.z * (Start / Distance);
+    float Falloff = FogDensityHeight.y;
+    float A = abs(Falloff * (Position.z - StartHeight));
+    float HeightExponent = -Falloff *
+        (min(StartHeight, Position.z) - FogDensityHeight.z);
+    float G;
+    if (A < 0.01f)
+        G = 1.0f - A * 0.5f + A * A / 6.0f;
+    else
+        G = (1.0f - exp(-A)) / A;
+    float LogTau = log(FogDensityHeight.x) + log(Length) +
+        HeightExponent + log(G);
+    if (!isfinite(LogTau))
+        return 1.0f;
+
+    float T = LogTau >= 4.382026635f ? 0.0f
+            : LogTau <= -80.0f ? 1.0f
+            : exp(-exp(LogTau));
+    return max(saturate(T), 1.0f - FogDistanceViewport.x);
+}
 
 PS_INPUT mainVS(VS_INPUT input)
 {
     PS_INPUT output;
 
-    output.position = mul(mul(float4(input.p, 1.0f), World), VP);
+    float4 WorldPosition = mul(float4(input.p, 1.0f), World);
+    output.position = mul(WorldPosition, VP);
     output.color = input.c;
     output.uv = input.t;
     output.normal = input.n;
+    output.worldPosition = WorldPosition.xyz;
     return output;
 }
 
 float4 mainPS(PS_INPUT input) : SV_TARGET
 {
-    return g_txColor.Sample(g_Sample, input.uv + UVOffset); // 라이팅 적용 시 제거
     float4 texColor = g_txColor.Sample(g_Sample, input.uv + UVOffset);
-    float4 albedo = texColor * BaseColor;
-
-    float3 N = normalize(input.normal);
-    float NdotL = saturate(dot(N, -LightDir));
-    float3 lighting = AmbientColor + LightColor * NdotL;
-
-    return float4(albedo.rgb * lighting, albedo.a);
+    texColor.a *= FogTransmittance(input.worldPosition);
+    return texColor;
 }

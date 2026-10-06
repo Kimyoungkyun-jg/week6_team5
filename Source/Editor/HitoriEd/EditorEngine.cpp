@@ -626,29 +626,29 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 	RenderCommand::EndRenderPass();
 
 	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
-
-	// 반투명 메시 렌더링
-	SceneRenderer.RenderTranslucent(Renderer);
+	UWorld* TargetWorld = GameClient->GetWorld();
+	const bool bHasFog = RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
+	FConstantBuffer* FogConstants = HeightFogRenderer
+		? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
+	SceneRenderer.RenderTranslucent(Renderer, FogConstants);
 
 	// 텍스트 컴포넌트 렌더링
-	UWorld* TargetWorld = GameClient->GetWorld();
 	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent) {
 		if (!TextComponent || !TextComponent->GetFont() || !TextComponent->IsVisible()) continue;
 		if (TextComponent->GetOwner() && TextComponent->GetOwner()->GetWorld() != TargetWorld) continue;
 		TextRenderer->OnRender(TextComponent->GetText(), TextComponent->GetWorldMatrix(), TextComponent->GetTextSize(), *TextComponent->GetFont(), SceneView.ViewProjectionMatrix);
 	}
 
-	RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 	RenderCommand::EndRenderPass();
 }
 
-// 합성된 장면 색에 현재 월드의 첫 활성 높이 안개를 적용한다.
-void UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& SceneView,
+// 불투명 장면과 하늘에 현재 월드의 첫 활성 높이 안개를 적용한다.
+bool UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& SceneView,
 	FTexture2D* DepthTarget, FTexture2D* ColorTarget)
 {
 	if (!TargetWorld || !HeightFogRenderer || !DepthTarget || !ColorTarget ||
 		!SceneView.bIsPerspective)
-		return;
+		return false;
 
 	for (TObjectIterator<UExponentialHeightFogComponent> Fog; Fog; ++Fog)
 	{
@@ -665,8 +665,9 @@ void UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& Scene
 		Setting.FogMaxOpacity = Fog->GetFogMaxOpacity();
 		Setting.FogCutoffDistance = Fog->GetFogCutoffDistance();
 		if (HeightFogRenderer->OnRender(SceneView, DepthTarget, ColorTarget, Setting))
-			break;
+			return true;
 	}
+	return false;
 }
 
 // 새 창 모드의 피아이이 윈도우 UI를 그린다
@@ -808,7 +809,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	if (bGBufferRendered)
 		SceneRenderer.RenderToneMap(Renderer, ViewClient->GetViewTargets());
 	RenderCommand::EndRenderPass();
+	
 	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
+	const bool bHasFog = bDrawPrimitives && ViewClient &&
+		ViewClient->GetViewportMode() == EViewportMode::Solid &&
+		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 
 	// 라인 배처 렌더링
 	if (!bIsPIE &&
@@ -864,9 +869,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		}
 	}
 
-	// 반투명 메시 렌더링
-	if (bDrawPrimitives) {
-		SceneRenderer.RenderTranslucent(Renderer);
+	if (bDrawPrimitives)
+	{
+		FConstantBuffer* FogConstants = HeightFogRenderer
+			? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
+		SceneRenderer.RenderTranslucent(Renderer, FogConstants);
 	}
 
 	// 텍스트 컴포넌트 렌더링
@@ -887,11 +894,6 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				TextComponent->GetTextSize(), *TextComponent->GetFont(),
 				SceneView.ViewProjectionMatrix);
 	}
-
-	// 장면을 모두 합성한 뒤 안개를 적용한다. 깊이는 불투명 GBuffer의 값을 사용한다.
-	if (bDrawPrimitives && ViewClient &&
-		ViewClient->GetViewportMode() == EViewportMode::Solid)
-		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 
 	//// 씬 뎁스 렌더링, 깊이를 시각적으로 확인하기 위한 코드
 	//if (ViewClient && ViewClient->IsSceneDepth()) {

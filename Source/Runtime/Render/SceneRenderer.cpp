@@ -2,6 +2,7 @@
 #include "Render/SceneRenderer.h"
 #include "Render/Renderer.h"
 #include "Render/RenderCommand.h"
+#include "Render/Buffer.h"
 #include "Render/DeferredViewTargets.h"
 #include "Engine/World.h"
 
@@ -90,12 +91,16 @@ void FSceneRenderer::RenderToneMap(FRenderer* Renderer, const FDeferredViewTarge
 }
 
 // 반투명 렌더링
-void FSceneRenderer::RenderTranslucent(FRenderer* Renderer)
+void FSceneRenderer::RenderTranslucent(FRenderer* Renderer, FConstantBuffer* FogConstants)
 {
 	if (!Renderer)
 	{
 		return;
 	}
 
+	ID3D11Buffer* FogBuffer = FogConstants ? FogConstants->GetBuffer() : nullptr;
+	RenderCommand::GetContext()->PSSetConstantBuffers(3, 1, &FogBuffer);
 	Renderer->RenderTranslucent(View, RenderQueue);
+	FogBuffer = nullptr;
+	RenderCommand::GetContext()->PSSetConstantBuffers(3, 1, &FogBuffer);
 }

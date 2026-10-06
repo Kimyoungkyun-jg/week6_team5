@@ -54,3 +54,15 @@ bool FHeightFogRenderer::OnRender(const FSceneView& View, FTexture2D* DepthTarge
 	RenderCommand::SetRenderTargets(ColorTarget, DepthTarget);
 	return true;
 }
+
+FConstantBuffer* FHeightFogRenderer::GetTranslucentFogConstants(bool bFogRendered)
+{
+	if (!ConstantBuffer)
+		return nullptr;
+	if (!bFogRendered)
+	{
+		const FHeightFogData Disabled{};
+		RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Disabled, sizeof(Disabled));
+	}
+	return ConstantBuffer.get();
+}

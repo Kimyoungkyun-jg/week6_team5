@@ -37,6 +37,8 @@ public:
 	// 지원하는 뷰에서 깊이를 읽어 한 층 안개를 합성한다.
 	bool OnRender(const FSceneView& View, FTexture2D* DepthTarget,
 		FTexture2D* ColorTarget, const FHeightFogSetting& InHeightFogSetting);
+	// 반투명 셰이더가 사용할 안개 데이터. 이 뷰에 안개가 없으면 0으로 초기화한다.
+	FConstantBuffer* GetTranslucentFogConstants(bool bFogRendered);
 
 private:
 	FRenderer* Renderer = nullptr;

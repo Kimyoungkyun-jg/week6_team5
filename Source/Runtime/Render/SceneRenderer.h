@@ -7,6 +7,7 @@
 
 class UWorld;
 class FRenderer;
+class FConstantBuffer;
 struct FDeferredViewTargets;
 
 // 씬 렌더링 조율자
@@ -26,7 +27,7 @@ public:
 	void RenderToneMap(FRenderer* Renderer, const FDeferredViewTargets& Targets);
 
 	// 반투명 렌더링
-	void RenderTranslucent(FRenderer* Renderer);
+	void RenderTranslucent(FRenderer* Renderer, FConstantBuffer* FogConstants = nullptr);
 
 	// 전체 렌더 큐 조회
 	FRenderQueue& GetRenderQueue() { return RenderQueue; }

@@ -242,6 +242,7 @@ void UParticleSubUVComponent::BeginViewSubmission()
         Value.AtlasColSize = static_cast<float>(ColSize);
         Value.AtlasRowSize = static_cast<float>(RowSize);
         Value.Alpha = Particle.Alpha;
+		Value.FogAdditive = Material && Material->PSOType == EPSOType::Particle_Additive ? 1.0f : 0.0f;
         Constants.Add(Value);
     }
 }

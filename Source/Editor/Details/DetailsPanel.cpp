@@ -903,6 +903,22 @@ void FDetailsPanel::OnRender()
 			{
 				DrawComponentTree(Root);
 			}
+			ImGui::Separator();
+			ImGui::TextDisabled("Actor Components");
+			for(UActorComponent* Comp : Owner->GetComponents())
+			{
+				if(!Comp->IsA<USceneComponent>())
+				{
+					ImGui::PushID(Comp);
+					FString Label = std::format("{} ({})", Comp->GetName(), Comp->GetClass()->Name);
+					bool bSelected = (SelectedComponent == Comp);
+					if (ImGui::Selectable(Label.c_str(), bSelected))
+					{
+						SelectedComponent = Comp;
+					}
+					ImGui::PopID();
+				}
+			}
 			ImGui::EndChild();
 			ImGui::Separator();
 

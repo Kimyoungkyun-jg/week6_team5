@@ -46,6 +46,18 @@ bool FGameViewportClient::InputKey(FViewport* Viewport, int32 Key, bool bDown)
 {
 	if (HandleUIKey(Key, bDown))
 		return true;
+	if (bDown && Key == static_cast<int32>(EKeyCode::Escape))
+	{
+		bExitRequested = true;
+		return true;
+	}
+
+	if (bDown && Key == static_cast<int32>(EKeyCode::F8))
+	{
+		bSIEModeRequested = true;
+		return true;
+	}
+
 
 	if (World)
 	{
@@ -76,6 +88,8 @@ bool FGameViewportClient::InputAxis(FViewport* Viewport, int32 ControllerId, EGa
 
 void FGameViewportClient::LostFocus()
 {
+	std::fill(std::begin(bSIEKeyDown), std::end(bSIEKeyDown), false);
+	SIEMouseDeltaX = SIEMouseDeltaY = SIEWheelDelta = 0.0f;
 	if (World)
 	{
 		if (APlayerController* PC = World->GetPlayerController())
@@ -104,9 +118,12 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 	OutView.ViewIndex = 0;
 	OutView.ViewRect = InViewRect;
 
-	const float Width = InViewRect.Width > 0.0f ? InViewRect.Width : 1.0f;
-	const float Height = InViewRect.Height > 0.0f ? InViewRect.Height : 1.0f;
-	const float Aspect = Width / Height;
+	Resize(
+		static_cast<uint32>(std::max(InViewRect.Width, 1.0f)),
+		static_cast<uint32>(std::max(InViewRect.Height, 1.0f))
+	); //여기서 바로 texture들 생성
+
+	const float Aspect = static_cast<float>(Width) / static_cast<float>(Height);
 
 
 	// 카메라 컴포넌트 획득
@@ -179,6 +196,154 @@ void FGameViewportClient::SetCameraComponent(UCameraComponent* InCameraComponent
 	CameraComponent = InCameraComponent;
 }
 
+bool FGameViewportClient::BeginSIEMode()
+{
+	if (bSIEMode)
+		return true;
+	if (!World || !World->GetMainCamera())
+		return false;
+
+	// 첫 렌더 이전에도 Pawn 카메라를 찾을 수 있도록 한다.
+	if (!CameraComponent)
+	{
+		if (APawn* Pawn = World->GetPlayerPawn())
+		{
+			if (ADefaultPawn* DefaultPawn = Cast<ADefaultPawn>(Pawn))
+				CameraComponent = DefaultPawn->GetCameraComponent();
+			else
+				for (UActorComponent* Component : Pawn->GetComponents())
+					if (UCameraComponent* Camera = Cast<UCameraComponent>(Component))
+					{
+						CameraComponent = Camera;
+						break;
+					}
+		}
+	}
+	if (!CameraComponent)
+		return false;
+
+	UCameraComponent* MainCamera = World->GetMainCamera()->GetCameraComponent();
+	if (!MainCamera || MainCamera == CameraComponent)
+		return false;
+
+	MainCamera->SetRelativeLocation(CameraComponent->GetWorldLocation());
+	MainCamera->SetRelativeRotation(CameraComponent->GetWorldRotation());
+	MainCamera->SetFieldOfView(CameraComponent->GetFieldOfView());
+	MainCamera->SetNearZ(CameraComponent->GetNearZ());
+	MainCamera->SetFarZ(CameraComponent->GetFarZ());
+	MainCamera->SetIsOrthogonal(CameraComponent->GetIsOrthogonal());
+	MainCamera->SetOrthoWidth(CameraComponent->GetOrthoWidth());
+	bPreviousMainCameraExternalInputManaged = MainCamera->IsExternalInputManaged();
+	MainCamera->SetExternalInputManaged(true);
+	CameraComponent = MainCamera;
+	bSIEMode = true;
+	std::fill(std::begin(bSIEKeyDown), std::end(bSIEKeyDown), false);
+	SIEMouseDeltaX = SIEMouseDeltaY = SIEWheelDelta = 0.0f;
+	LostFocus();
+	return true;
+}
+
+void FGameViewportClient::EndSIEMode()
+{
+	if (!bSIEMode)
+		return;
+	if (World && World->GetMainCamera())
+		if (UCameraComponent* MainCamera = World->GetMainCamera()->GetCameraComponent())
+			MainCamera->SetExternalInputManaged(bPreviousMainCameraExternalInputManaged);
+	CameraComponent = nullptr;
+	if (World)
+	{
+		if (APawn* Pawn = World->GetPlayerPawn())
+		{
+			if (ADefaultPawn* DefaultPawn = Cast<ADefaultPawn>(Pawn))
+				CameraComponent = DefaultPawn->GetCameraComponent();
+			else
+				for (UActorComponent* Component : Pawn->GetComponents())
+					if (UCameraComponent* Camera = Cast<UCameraComponent>(Component))
+					{
+						CameraComponent = Camera;
+						break;
+					}
+		}
+	}
+	bSIEMode = false;
+	std::fill(std::begin(bSIEKeyDown), std::end(bSIEKeyDown), false);
+	SIEMouseDeltaX = SIEMouseDeltaY = SIEWheelDelta = 0.0f;
+}
+
+void FGameViewportClient::GetKeyInputBySIEMode(int32 Key, bool bDown)
+{
+	if (bSIEMode && Key >= 0 && Key < 256)
+		bSIEKeyDown[Key] = bDown;
+}
+
+void FGameViewportClient::GetAxisInputBySIEMode(EGameInputAxis Key, float Delta)
+{
+	if (!bSIEMode)
+		return;
+	switch (Key)
+	{
+	case EGameInputAxis::MouseX: SIEMouseDeltaX += Delta; break;
+	case EGameInputAxis::MouseY: SIEMouseDeltaY += Delta; break;
+	case EGameInputAxis::MouseWheel: SIEWheelDelta += Delta; break;
+	}
+}
+
+void FGameViewportClient::TickSIEInput(float DeltaTime, float MoveSpeed, float MouseSensitivity)
+{
+	if (!bSIEMode || !CameraComponent)
+		return;
+	const bool bCaptured = bSIEKeyDown[static_cast<int32>(EKeyCode::RButton)];
+	const bool bPerspective = !CameraComponent->GetIsOrthogonal();
+	FRotator Rotation = CameraComponent->GetRelativeRotation();
+	FVector Location = CameraComponent->GetRelativeLocation();
+
+	if (bCaptured)
+	{
+		if (bPerspective)
+		{
+			Rotation.Yaw += SIEMouseDeltaX * MouseSensitivity;
+			Rotation.Pitch = FMath::Clamp(Rotation.Pitch + SIEMouseDeltaY * MouseSensitivity, -89.0f, 89.0f);
+			CameraComponent->SetRelativeRotation(Rotation);
+		}
+		else
+		{
+			const float ViewWidth = Width > 0 ? static_cast<float>(Width) : 800.0f;
+			const float WorldUnitsPerPixel = CameraComponent->GetOrthoWidth() / ViewWidth;
+			const FQuat RotationQuat = Rotation.Quaternion();
+			Location += RotationQuat.GetRightVector() * (-SIEMouseDeltaX * WorldUnitsPerPixel);
+			Location += RotationQuat.GetUpVector() * (SIEMouseDeltaY * WorldUnitsPerPixel);
+		}
+
+		const FQuat RotationQuat = Rotation.Quaternion();
+		const FVector Forward = RotationQuat.GetForwardVector();
+		const FVector Right = RotationQuat.GetRightVector();
+		const FVector Up = RotationQuat.GetUpVector();
+		FVector MoveDir = FVector::ZeroVector;
+		if (bSIEKeyDown[static_cast<int32>(EKeyCode::W)]) MoveDir += bPerspective ? Forward : Up;
+		if (bSIEKeyDown[static_cast<int32>(EKeyCode::S)]) MoveDir -= bPerspective ? Forward : Up;
+		if (bSIEKeyDown[static_cast<int32>(EKeyCode::D)]) MoveDir += Right;
+		if (bSIEKeyDown[static_cast<int32>(EKeyCode::A)]) MoveDir -= Right;
+		if (bPerspective && bSIEKeyDown[static_cast<int32>(EKeyCode::E)]) MoveDir += Up;
+		if (bPerspective && bSIEKeyDown[static_cast<int32>(EKeyCode::Q)]) MoveDir -= Up;
+		if (MoveDir.Size() > 0.0001f)
+			Location += MoveDir.Normalized() * (MoveSpeed * DeltaTime);
+	}
+
+	if (SIEWheelDelta != 0.0f)
+	{
+		if (bPerspective)
+			Location += Rotation.Quaternion().GetForwardVector() * (SIEWheelDelta * 0.01f * MoveSpeed);
+		else
+		{
+			const float ZoomFactor = SIEWheelDelta > 0.0f ? 0.9f : 1.1f;
+			CameraComponent->SetOrthoWidth(FMath::Clamp(CameraComponent->GetOrthoWidth() * ZoomFactor, 0.1f, 100000.0f));
+		}
+	}
+	CameraComponent->SetRelativeLocation(Location);
+	SIEMouseDeltaX = SIEMouseDeltaY = SIEWheelDelta = 0.0f;
+}
+
 // 뷰포트 크기 변경 및 타깃 생성
 void FGameViewportClient::Resize(uint32 InWidth, uint32 InHeight)
 {
@@ -201,6 +366,9 @@ void FGameViewportClient::Resize(uint32 InWidth, uint32 InHeight)
 
 void FGameViewportClient::Reset()
 {
+	EndSIEMode();
+	bExitRequested = false;
+	bSIEModeRequested = false;
 	World = nullptr;
 	GameInstance = nullptr;
 	Engine = nullptr;

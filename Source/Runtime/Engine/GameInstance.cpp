@@ -80,10 +80,12 @@ bool UGameInstance::StartPlayInEditorGameInstance()
 		return false;
 	}
 	
-	// 엔진의 활성 플레이 월드 설정
-	if (UEngine* Engine = GetEngine())
+	// 에디터의 기본 PlayWorld는 PIE 인스턴스 0의 월드를 가리킨다.
+	// 다른 인스턴스는 각자의 WorldContext에서 월드를 조회한다.
+	if (WorldContext && WorldContext->PIEInstance == 0)
 	{
-		Engine->SetPlayWorld(*PlayWorld);
+		if (UEngine* Engine = GetEngine())
+			Engine->SetPlayWorld(*PlayWorld);
 	}
 
 	// 게임 뷰포트 클라이언트 생성 및 초기화

@@ -31,6 +31,17 @@ public:
 	virtual void MouseMove(FViewport* Viewport, int32 X, int32 Y) override;
 	virtual bool InputKey(FViewport* Viewport, int32 Key, bool bDown) override;
 	virtual bool InputAxis(FViewport* Viewport, int32 ControllerId, EGameInputAxis AxisKey, float Delta, float DeltaTime) override;
+	bool ConsumeExitRequest() {
+		const bool bRequested = bExitRequested;
+		bExitRequested = false;
+		return bRequested;
+	}
+
+	bool ConsumeSIERequest() {
+		const bool bRequested = bSIEModeRequested;
+		bSIEModeRequested = false;
+		return bRequested;
+	}
 
 	// 게임 카메라 시점 계산
 	FSceneView CalcSceneView(const FRect& InViewRect);
@@ -53,6 +64,13 @@ public:
 
 	void Reset();
 
+	bool BeginSIEMode();
+	void EndSIEMode();
+	void GetKeyInputBySIEMode(int32 Key, bool bDown);
+	void GetAxisInputBySIEMode(EGameInputAxis Key, float Delta);
+	void TickSIEInput(float DeltaTime, float MoveSpeed, float MouseSensitivity);
+	bool IsSIEMode() const { return bSIEMode; }
+
 	virtual void LostFocus() override;
 
 private:
@@ -65,6 +83,15 @@ private:
 	UGameInstance* GameInstance = nullptr;
 	UEngine* Engine = nullptr;
 	UCameraComponent* CameraComponent = nullptr;
+	bool bSIEMode = false;
+	bool bPreviousMainCameraExternalInputManaged = false;
+	bool bSIEKeyDown[256]{};
+	float SIEMouseDeltaX = 0.0f;
+	float SIEMouseDeltaY = 0.0f;
+	float SIEWheelDelta = 0.0f;
+	bool bExitRequested = false;
+	bool bSIEModeRequested = false;
+
 
 	// 렌더 타깃 버퍼
 	uint32 Width = 0;

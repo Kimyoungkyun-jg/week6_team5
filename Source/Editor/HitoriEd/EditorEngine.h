@@ -54,7 +54,7 @@ public:
 	// 뷰포트 하나의 씬과 에디터 요소를 렌더링한다.
 	void RenderFrame(FEditorViewportClient* ViewClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer, UWorld* TargetWorld, const bool bIsPIE);
 	// 게임 뷰포트 화면을 렌더링한다.
-	void RenderGameFrame(FGameViewportClient* GameClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer);
+	void RenderGameFrame(FGameViewportClient* GameClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer, bool bIsSIEMode = false);
 
 
 	// 네 View 결과와 ImGui를 메인 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
@@ -139,6 +139,7 @@ private:
 	void StopPIESession();
 	void DrawPIEWindows();
 	//UWorld* CreatePIEWorld();
+
 	
 	virtual UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld) override;
 	void SerializeWorldForPIE(UWorld* editorWorld, UWorld* PIEWorld);
@@ -155,4 +156,7 @@ private:
 	void UpdateInputOwner();
 	void DispatchGameInput(float DeltaTime);
 	FGameViewportClient* FindPIEGameClient(int32 PIEInstance) const;
+	
+	bool bIsSIEMode = false;
+
 };

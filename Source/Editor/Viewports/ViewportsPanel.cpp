@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/Viewports/ViewportsPanel.h"
+#include "Engine/GameViewportClient.h"
 
 #include "Core/StatOverlay.h"
 #include "Core/Stats/LightweightStats.h"
@@ -146,7 +147,8 @@ void FViewportsPanel::OnRender() {
 		const ImVec2 ViewMax{ViewMin.x + Rect.Width,
 			ViewMin.y + Rect.Height};
 
-		if (ViewIndex == 0 && bShowNoCamera)
+		const bool bGameViewport = GameViewportClient && ViewIndex == GameViewportIndex;
+		if (ViewIndex == 0 && bShowNoCamera && !bGameViewport)
 		{
 			// 메인 원근 뷰포트 영역을 어두운 회색으로 채움
 			DrawList->AddRectFilled(ViewMin, ViewMax, IM_COL32(45, 45, 48, 255));
@@ -160,10 +162,13 @@ void FViewportsPanel::OnRender() {
 			continue;
 		}
 
-		if (!Client->GetColorTarget())
+		FTexture2D* DisplayTarget = bGameViewport
+			? GameViewportClient->GetColorTarget()
+			: Client->GetColorTarget();
+		if (!DisplayTarget || !DisplayTarget->GetSRV())
 			continue;
 
-		DrawList->AddImage(Client->GetColorTarget()->GetSRV(), ViewMin, ViewMax);
+		DrawList->AddImage(DisplayTarget->GetSRV(), ViewMin, ViewMax);
 
 		// 마우스 클릭 시 활성 뷰포트 설정
 		const bool bViewHovered = bHovered && ImGui::IsMouseHoveringRect(ViewMin, ViewMax);

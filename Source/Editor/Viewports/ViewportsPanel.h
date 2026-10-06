@@ -6,6 +6,8 @@
 #include "Editor/Viewports/ViewportLayout.h"
 #include <functional>
 
+class FGameViewportClient;
+
 class FViewportsPanel : public IEditorPanel {
 public:
 	// 활성 뷰포트 인덱스 설정
@@ -57,6 +59,16 @@ public:
 			}
 			return nullptr;
 	}
+	void SetGameViewportClient(int32 ViewIndex, FGameViewportClient* InGameClient) {
+		if (ViewIndex < 0 || ViewIndex >= 4)
+			return;
+		GameViewportIndex = ViewIndex;
+		GameViewportClient = InGameClient;
+	}
+	void ClearGameViewportClient() {
+		GameViewportClient = nullptr;
+		GameViewportIndex = -1;
+	}
 
 	void SetShowNoCamera(bool bValue) { bShowNoCamera = bValue; }
 
@@ -68,6 +80,9 @@ private:
 	void DrawStatOverlay(ImDrawList *DrawList, const ImVec2 &ViewMin) const;
 
 	TUniquePtr<FEditorViewportClient> ViewportClients[4]{};
+	// PIE 월드 컨텍스트가 소유하며, 세션 종료 전에 비운다.
+	FGameViewportClient* GameViewportClient = nullptr;
+	int32 GameViewportIndex = -1;
 	ImVec2 ContentOrigin{};
 	ImVec2 ContentSize{1.0f, 1.0f};
 	bool bHovered = false;

@@ -3,7 +3,7 @@
 #include "MovementComponent.h"
 
 UProjectileMovementComponent::UProjectileMovementComponent()
-	: InitialSpeed(1000.0f)
+	: InitialSpeed(20.0f)
 	, bShouldBounce(true)
 	, bRotationFollowsVelocity(true)
 	, Bounciness(0.6f)
@@ -41,7 +41,7 @@ void UProjectileMovementComponent::TickComponent(float DeltaTime)
 	float RemainingTime = DeltaTime;
 	int32 Iterations = 0;
 
-	while (RemainingTime > 0.0001f && Iterations < 4)
+	while (RemainingTime > 0.0001f && Iterations < MaxSimulationIterations)
 	{
 		Iterations++;
 		float TimeTick = RemainingTime;
@@ -71,7 +71,7 @@ void UProjectileMovementComponent::TickComponent(float DeltaTime)
 			RemainingTime -= TimeTick * HitResult.Time;
 			// 충돌 발생 시 연결
 			HandleImpact(HitResult, RemainingTime, MoveDelta);
-			if (Velocity.Size() < 2.5f)
+			if (Velocity.Size() < BounceVelocityStopSimulatingThreshold)
 			{
 				//FRotator FlatRotation(0.0f, UpdatedComponent->GetRelativeRotation().Yaw, 0.0f);
 				//UpdatedComponent->SetRelativeRotation(FlatRotation);

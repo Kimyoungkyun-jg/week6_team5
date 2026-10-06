@@ -34,21 +34,24 @@ public:
 
 	float GetInitialSpeed() const { return InitialSpeed; }
 	void SetInitialSpeed(float InInitialSpeed) { InitialSpeed = InInitialSpeed; }
-
 	float GetMaxSpeed() const { return MaxSpeed; }
 	void SetMaxSpeed(float InMaxSpeed) { MaxSpeed = InMaxSpeed; }
-
 	bool GetShouldBounce() const { return bShouldBounce; }
 	void SetShouldBounce(bool bInShouldBounce) { bShouldBounce = bInShouldBounce; }
-
 	bool GetRotationFollowsVelocity() const { return bRotationFollowsVelocity; }
 	void SetRotationFollowsVelocity(bool bInRotationFollowsVelocity) { bRotationFollowsVelocity = bInRotationFollowsVelocity; }
-
 	float GetBounciness() const { return Bounciness; }
 	void SetBounciness(float InBounciness) { Bounciness = InBounciness; }
-
 	float GetGravityScale() const { return GravityScale; }
 	void SetGravityScale(float InGravityScale) { GravityScale = InGravityScale; }
+	bool GetIsGravityEnabled() const { return bISGravityEnabled; }
+	void SetIsGravityEnabled(bool bInIsGravityEnabled) { bISGravityEnabled = bInIsGravityEnabled; }
+	bool GetSweep() const { return bSweep; }
+	void SetSweep(bool bInSweep) { bSweep = bInSweep; }
+	bool GetIsFrictionEnabled() const { return bIsFrictionEnabled; }
+	void SetIsFrictionEnabled(bool bInIsFrictionEnabled) { bIsFrictionEnabled = bInIsFrictionEnabled; }
+	float GetFriction() const { return Friction; }
+	void SetFriction(float InFriction) { Friction = InFriction; }
 
 private:
 	float InitialSpeed = 20.0f;
@@ -60,4 +63,8 @@ private:
 	bool bSweep = true;
 	bool bIsFrictionEnabled = false;
 	float Friction = 0.2f;
+	// 정지 속ㄷ도 임계값. 이 값보다 속도가 작으면 시뮬레이션을 중지한다.
+	float BounceVelocityStopSimulatingThreshold = 5.0f;
+	// 시뮬레이션 반복 횟수 제한. 이 값보다 반복 횟수가 많으면 시뮬레이션을 중지한다.
+	int32 MaxSimulationIterations = 4;
 };

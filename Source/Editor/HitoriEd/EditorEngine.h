@@ -52,7 +52,7 @@ public:
 	// Active View의 입력과 Picking 결과만 Gizmo 및 선택 상태에 반영한다.
 	void UpdateGizmoAndPicking();
 	// 뷰포트 하나의 씬과 에디터 요소를 렌더링한다.
-	void RenderFrame(FEditorViewportClient* ViewClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer, const bool bIsPIE);
+	void RenderFrame(FEditorViewportClient* ViewClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer, UWorld* TargetWorld, const bool bIsPIE);
 	// 게임 뷰포트 화면을 렌더링한다.
 	void RenderGameFrame(FGameViewportClient* GameClient, const FSceneView& SceneView, FSceneRenderer& SceneRenderer);
 
@@ -72,6 +72,7 @@ private:
 	void TickWorld(float DeltaTime);
 	// 한 번 캡처한 월드 결과를 재사용해 현재 레이아웃의 각 View를 렌더한다.
 	void RenderViewports();
+	void RenderHeightFog(UWorld* TargetWorld, const FSceneView& SceneView, FTexture2D* DepthTarget, FTexture2D* ColorTarget);
 	// 화면 합성과 View 설정 보관으로 프레임을 마무리한다.
 	void EndFrame();
 

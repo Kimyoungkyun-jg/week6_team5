@@ -573,7 +573,7 @@ void UEditorEngine::RenderViewports() {
 		SceneRenderer.InitViews(Renderer);
 
 		// 프레임 렌더링
-		RenderFrame(ViewClient, SceneView, SceneRenderer, bIsGameView);
+		RenderFrame(ViewClient, SceneView, SceneRenderer, CurrentWorld, bIsGameView);
 	}
 
 	// 새 창 모드일 때 게임 뷰포트 렌더링
@@ -638,7 +638,35 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 		TextRenderer->OnRender(TextComponent->GetText(), TextComponent->GetWorldMatrix(), TextComponent->GetTextSize(), *TextComponent->GetFont(), SceneView.ViewProjectionMatrix);
 	}
 
+	RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 	RenderCommand::EndRenderPass();
+}
+
+// 합성된 장면 색에 현재 월드의 첫 활성 높이 안개를 적용한다.
+void UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& SceneView,
+	FTexture2D* DepthTarget, FTexture2D* ColorTarget)
+{
+	if (!TargetWorld || !HeightFogRenderer || !DepthTarget || !ColorTarget ||
+		!SceneView.bIsPerspective)
+		return;
+
+	for (TObjectIterator<UExponentialHeightFogComponent> Fog; Fog; ++Fog)
+	{
+		if (!Fog || !Fog->IsVisible() || !Fog->GetOwner() ||
+			Fog->GetOwner()->GetWorld() != TargetWorld)
+			continue;
+
+		FHeightFogSetting Setting;
+		Setting.FogDensity = Fog->GetFogDensity();
+		Setting.FogHeightFalloff = Fog->GetFogHeightFalloff();
+		Setting.FogHeight = Fog->GetFogHeight();
+		Setting.FogColor = Fog->GetFogColor();
+		Setting.StartDistance = Fog->GetStartDistance();
+		Setting.FogMaxOpacity = Fog->GetFogMaxOpacity();
+		Setting.FogCutoffDistance = Fog->GetFogCutoffDistance();
+		if (HeightFogRenderer->OnRender(SceneView, DepthTarget, ColorTarget, Setting))
+			break;
+	}
 }
 
 // 새 창 모드의 피아이이 윈도우 UI를 그린다
@@ -747,6 +775,7 @@ void UEditorEngine::UpdateGizmoAndPicking() {
 void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 			const FSceneView &SceneView,
 			FSceneRenderer &SceneRenderer,
+			UWorld *TargetWorld,
 			const bool bIsPIE) {
   
 	const int32 ViewIndex = SceneView.ViewIndex;
@@ -799,43 +828,6 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 		}
 
 		LineBatcher->OnRender(SceneView.ViewProjectionMatrix);
-	}
-
-	const bool bDrawPrimitives =
-			bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
-
-	// 스카이박스 렌더링
-	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix,
-			SceneView.ViewLocation);
-
-	// 불투명 메시 렌더링
-	if (bDrawPrimitives) {
-		SceneRenderer.RenderOpaque(Renderer);
-	}
-
-	UWorld* TargetWorld = bIsPIE ? PlayWorld : EditorWorld;
-	// 현재 월드의 첫 활성 안개만 사용한다. 디버그/직교 뷰에는 적용하지 않는다.
-	if (TargetWorld && HeightFogRenderer && ColorTarget && DepthTarget && bDrawPrimitives && SceneView.bIsPerspective && 
-		ViewClient && ViewClient->GetViewportMode() == EViewportMode::Solid) {
-		for (TObjectIterator<UExponentialHeightFogComponent> Fog; Fog; ++Fog) {
-			if (!Fog || !Fog->IsVisible() || !Fog->GetOwner() ||
-					Fog->GetOwner()->GetWorld() != TargetWorld) {
-				continue;
-			}
-
-			FHeightFogSetting FogSetting;
-			FogSetting.FogDensity = Fog->GetFogDensity();
-			FogSetting.FogHeightFalloff = Fog->GetFogHeightFalloff();
-			FogSetting.FogHeight = Fog->GetFogHeight();
-			FogSetting.FogColor = Fog->GetFogColor();
-			FogSetting.StartDistance = Fog->GetStartDistance();
-			FogSetting.FogMaxOpacity = Fog->GetFogMaxOpacity();
-			FogSetting.FogCutoffDistance = Fog->GetFogCutoffDistance();
-			HeightFogRenderer->OnRender(SceneView, DepthTarget, ColorTarget, FogSetting);
-
-			// 가장 첫번째 fog component에 대하여만 렌더링한다.
-			break;
-		}
 	}
 
 	// 에디터 그리드 렌더링
@@ -895,6 +887,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				TextComponent->GetTextSize(), *TextComponent->GetFont(),
 				SceneView.ViewProjectionMatrix);
 	}
+
+	// 장면을 모두 합성한 뒤 안개를 적용한다. 깊이는 불투명 GBuffer의 값을 사용한다.
+	if (bDrawPrimitives && ViewClient &&
+		ViewClient->GetViewportMode() == EViewportMode::Solid)
+		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 
 	// 씬 뎁스 렌더링
 	if (ViewClient && ViewClient->IsSceneDepth()) {

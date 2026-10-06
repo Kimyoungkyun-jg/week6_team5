@@ -45,7 +45,7 @@ public:
 private:
 	// 단위는 월드 길이의 역수. 현재 씬에서 조절할 초기값이다.
 	float FogDensity = 0.02f;
-	float FogHeightFalloff = 0.2f;
+	float FogHeightFalloff = 0.02f;
 
 	// RGB만 사용한다. 합성 알파는 렌더러가 투과율로 계산한다.
 	FVector4 FogColor = FVector4(0.5f, 0.6f, 0.7f, 1.0f);

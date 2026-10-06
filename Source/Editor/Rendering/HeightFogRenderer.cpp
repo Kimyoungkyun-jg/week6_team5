@@ -19,9 +19,14 @@ void FHeightFogRenderer::Init(FRenderer* InRenderer)
 
 bool FHeightFogRenderer::OnRender(const FSceneView& View, FTexture2D* DepthTarget, FTexture2D* ColorTarget, const FHeightFogSetting& Settings)
 {
+	if (!DepthTarget || !ColorTarget || !Shader || !Shader->VertexShader ||
+		!Shader->PixelShader || !ConstantBuffer)
+		return false;
+
 	const uint32 Width = ColorTarget->GetWidth();
 	const uint32 Height = ColorTarget->GetHeight();
-	if (DepthTarget->GetWidth() != Width || DepthTarget->GetHeight() != Height)
+	if (Width == 0 || Height == 0 || DepthTarget->GetWidth() != Width ||
+		DepthTarget->GetHeight() != Height)
 		return false;
 
 	if (Settings.FogDensity <= 0.0f || Settings.FogMaxOpacity <= 0.0f) 
@@ -39,6 +44,8 @@ bool FHeightFogRenderer::OnRender(const FSceneView& View, FTexture2D* DepthTarge
 
 	RenderCommand::BindPipelineState(PipelineState);
 	RenderCommand::SetRenderTargets(ColorTarget, nullptr);
+	RenderCommand::SetViewport(0, 0, Width, Height);
+	RenderCommand::BindVertexBuffer(nullptr);
 	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Data, sizeof(Data));
 	RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Pixel);
 	RenderCommand::BindShaderResource(0, DepthTarget, EShaderBindFlagBits::Pixel);

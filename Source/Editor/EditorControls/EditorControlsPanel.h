@@ -32,7 +32,7 @@ public:
 
 	int32 SelectedIndex = 0;
 
-	const char* Items[6] = {"StaticMesh", "Particle", "Text", "Light", "SpinActor", "PointLight", "HeightFog" };
+	const char* Items[7] = {"StaticMesh", "Particle", "Text", "Light", "SpinActor", "PointLight", "HeightFog" };
 
 	FGizmo* Gizmo = nullptr;
 	int32 GizmoSelectedIndex = 0;

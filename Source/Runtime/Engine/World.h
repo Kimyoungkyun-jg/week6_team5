@@ -80,7 +80,7 @@ public:
 
 	void ClearWorld();
 
-	void GatherRenderPackets(FRenderQueue& RenderArray, const FViewContext* View = nullptr, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
+	void GatherRenderPackets(FRenderQueue& RenderArray, const FViewContext& View, const FFrustumPlanes* Frustum = nullptr, FRenderer* Renderer = nullptr);
 
 	void CreateMainCamera();
 

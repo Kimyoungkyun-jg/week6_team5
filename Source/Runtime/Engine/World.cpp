@@ -181,7 +181,7 @@ void UWorld::ClearWorld()
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
-void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* View, const FFrustumPlanes* Frustum, FRenderer* Renderer)
+void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext& View, const FFrustumPlanes* Frustum, FRenderer* Renderer)
 {
 
 	// 멤버로 두어 매 프레임 용량을 재사용한다.
@@ -214,10 +214,10 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 	// Cull이 켜져 있으면 가려진 물체를 목록에서 빼서 이후 Gather·정렬·드로우를 모두 건너뛴다.
 	// 꺼져 있으면(검증 모드) 목록은 그대로 두고 패킷에 판정만 표시한다.
 	const uint8* OccludedMask = nullptr;
-	if (Renderer && View && Renderer->GetGPUOcclusion().GetSettings().bEnabled)
+	if (Renderer && Renderer->GetGPUOcclusion().GetSettings().bEnabled)
 	{
 		FGPUOcclusion& Occlusion = Renderer->GetGPUOcclusion();
-		if (Occlusion.Run(VisibleProxies.GetData(), VisibleProxies.Num(), *View))
+		if (Occlusion.Run(VisibleProxies.GetData(), VisibleProxies.Num(), View))
 		{
 			const std::vector<uint8>& Occluded = Occlusion.GetOccluded();
 			if (Occlusion.GetSettings().bCull)
@@ -271,14 +271,11 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
 
-        LODInputs.Reset();
-        if (View)
-        {
-            LODInputs.Reserve(VisibleProxies.Num());
-            for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
-                LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
-            SelectLODs(LODInputs, *View, SelectedLODs);
-        }
+		LODInputs.Reset();
+		LODInputs.Reserve(VisibleProxies.Num());
+		for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
+			LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
+		SelectLODs(LODInputs, View, SelectedLODs);
 		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
 			{
 				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
@@ -320,7 +317,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 						continue;
 					}
 
-					const uint32 LOD = View ? SelectedLODs[VisibleIndex] : 0;
+					const uint32 LOD = SelectedLODs[VisibleIndex];
 					const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
 					++Out.LODCounts[LOD];                          // RenderStats 대신 조각 전용 통계
 
@@ -400,7 +397,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 				const uint32 FirstNew = RenderQueue.Num();
 
 				// 프록시 캐시가 없는 스태틱 메시는 기존처럼 LOD를 골라 제출하고, 그 외는 컴포넌트에 맡긴다.
-				UStaticMeshComponent* StaticMeshComponent = View ? Cast<UStaticMeshComponent>(Primitive) : nullptr;
+				UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(Primitive);
 				if (StaticMeshComponent && StaticMeshComponent->GetStaticMesh())
 				{
 					const uint32 LOD = SelectedLODs[VisibleIndex];
@@ -408,7 +405,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 				}
 				else
 				{
-					Primitive->SubmitToRenderQueue(RenderQueue, *View);
+					Primitive->SubmitToRenderQueue(RenderQueue, View);
 				}
 
 				// continue 없이 항상 여기까지 와서 새 패킷에 여유 칸을 배정한다.
@@ -728,9 +725,11 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 	if (!SrcWorld)
 	{
 		HTR_LOG(Error, "Fail to Duplicate EditorWorld...");
+		return;
 	}
 	
-	Init();
+	if (!Init())
+		return;
 
 
 	if (ULevel* SrcLevel = SrcWorld->GetPersistentLevel())

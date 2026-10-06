@@ -5,15 +5,20 @@
 #include "Core/Windows/WindowsPlatformTime.h"
 #include "Core/EngineLog.h"
 #include "ObjectSystem/ObjectFactory.h"
+#include "Engine/GameInstance.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/Level.h"
+#include "Camera/CameraActor.h"
 
 UEngine* GEngine = nullptr;
 
 bool UEngine::Init()
 {
 	EditorWorld = FObjectFactory::ConstructObject<UWorld>();
+	if (!EditorWorld)
+		return false;
 	EditorWorld->GetWorldType() = EWorldType::Editor;
-
-	if (!EditorWorld || !EditorWorld->Init())
+	if (!EditorWorld->Init())
 	{
 		return false;
 	}
@@ -27,11 +32,11 @@ bool UEngine::Init()
 
 FWorldContext* UEngine::GetWorldContextFromPIEInstance(int32 PIEInstanceIndex)
 {
-	for (FWorldContext& WorldContext : WorldContextlist)
+	for (const TUniquePtr<FWorldContext>& Context : WorldContextlist)
 	{
-		if (WorldContext.WorldType == EWorldType::PIE && WorldContext.PIEInstance == PIEInstanceIndex)
+		if (Context->WorldType == EWorldType::PIE && Context->PIEInstance == PIEInstanceIndex)
 		{
-			return &WorldContext;
+			return Context.get();
 		}
 	}
 	return nullptr;
@@ -39,11 +44,11 @@ FWorldContext* UEngine::GetWorldContextFromPIEInstance(int32 PIEInstanceIndex)
 
 FWorldContext* UEngine::GetWorldContextFromType(EWorldType WorldType)
 {
-	for (FWorldContext& Context : WorldContextlist)
+	for (const TUniquePtr<FWorldContext>& Context : WorldContextlist)
 	{
-		if (Context.WorldType == WorldType)
+		if (Context->WorldType == WorldType)
 		{
-			return &Context;
+			return Context.get();
 		}
 	}
 	return nullptr;
@@ -53,18 +58,65 @@ void UEngine::DestroyWorldContext(EWorldType WorldType)
 {
 	for (int32 i = 0; i < WorldContextlist.Num(); ++i)
 	{
-		if (WorldContextlist[i].WorldType == WorldType)
+		if (WorldContextlist[i]->WorldType == WorldType)
 		{
-			if (WorldContextlist[i].World())
-			{
-				WorldContextlist[i].World()->ClearWorld();
-				delete WorldContextlist[i].World();
-				WorldContextlist[i].SetCurrentWorld(nullptr);
-			}
-			WorldContextlist.RemoveAtSwap(i);
+			DestroyWorldContext(*WorldContextlist[i]);
 			return;
 		}
 	}
+}
+
+void UEngine::DestroyWorldContext(FWorldContext& Context)
+{
+	int32 Index = -1;
+	for (int32 i = 0; i < WorldContextlist.Num(); ++i)
+	{
+		if (WorldContextlist[i].get() == &Context)
+		{
+			Index = i;
+			break;
+		}
+	}
+	if (Index < 0)
+		return;
+
+	UWorld* World = Context.World();
+	if (Context.GameViewport)
+	{
+		Context.GameViewport->LostFocus();
+		Context.GameViewport->Reset();
+		Context.GameViewport.reset();
+	}
+	if (World && Context.WorldType == EWorldType::PIE)
+		World->EndPlay();
+
+	if (UGameInstance* GameInstance = Context.OwningGameInstance)
+	{
+		GameInstance->Shutdown();
+		Context.OwningGameInstance = nullptr;
+		delete GameInstance;
+	}
+
+	if (World)
+	{
+		ACameraActor* Camera = World->GetMainCamera();
+		const bool bOwnsCamera = Camera && !Camera->GetLevel();
+		if (Camera)
+			World->SetMainCamera(nullptr);
+		if (World->GetPersistentLevel())
+			World->ClearWorld();
+		for (ULevel* Level : World->GetLevel())
+			delete Level;
+		if (bOwnsCamera)
+			delete Camera;
+		if (PlayWorld == World)
+			PlayWorld = nullptr;
+		if (EditorWorld == World)
+			EditorWorld = nullptr;
+		Context.SetCurrentWorld(nullptr);
+		delete World;
+	}
+	WorldContextlist.RemoveAt(Index, 1);
 }
 
 UWorld* UEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld)
@@ -79,7 +131,13 @@ UWorld* UEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld
 
 	// 월드 생성 및 복제
 	UWorld* NewPIEWorld = FObjectFactory::ConstructObject<UWorld>();
+	if (!NewPIEWorld)
+		return nullptr;
+	// 부분 초기화에 실패해도 공통 컨텍스트 종료 경로에서 회수한다.
+	WorldContext.SetCurrentWorld(NewPIEWorld);
 	NewPIEWorld->DuplicateWorld(InWorld);
+	if (!NewPIEWorld->GetPersistentLevel())
+		return nullptr;
 	NewPIEWorld->GetWorldType() = EWorldType::PIE;
 
 	// 월드 컨텍스트 갱신
@@ -94,8 +152,7 @@ UWorld* UEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld
 FWorldContext& UEngine::CreateNewWorldContext(EWorldType InWorldType)
 {
 	// 신규 컨텍스트 등록
-	WorldContextlist.Add(FWorldContext(InWorldType));
-	FWorldContext& Context = WorldContextlist.Last();
-	return Context;
+	WorldContextlist.Add(MakeUnique<FWorldContext>(InWorldType));
+	return *WorldContextlist.Last();
 }
 

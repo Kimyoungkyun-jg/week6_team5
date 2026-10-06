@@ -26,11 +26,12 @@ public:
 	FWorldContext* GetWorldContext() const { return WorldContext; }
 	void SetWorldContext(FWorldContext* InWorldContext);
 
-	virtual void InitializeForPlayInEditor(int32 PIEInstanceIndex);
+	virtual bool InitializeForPlayInEditor(int32 PIEInstanceIndex);
 	virtual bool StartPlayInEditorGameInstance();
 	// 소유 엔진 참조
 	UEngine* GetEngine() const;
 
 protected:
+	// 엔진이 소유한다. 컨텍스트를 삭제하기 전에 Shutdown으로 참조를 끊는다.
 	FWorldContext* WorldContext = nullptr;
 };

@@ -13,9 +13,10 @@ FQuat::FQuat(float InX, float InY, float InZ, float InW)
 	X = InX; Y = InY; Z = InZ; W = InW;
 }
 
-FQuat::FQuat(FRotator InRoatator)
+FQuat::FQuat(FRotator InRotator)
+	: FQuat()
 {
-	// TODO
+	*this = InRotator.Quaternion();
 }
 
 /* Functions */

@@ -315,7 +315,7 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		// 프러스텀 컬링 + GPU 오클루전 + Gather 전체
 		SCOPE_CYCLE_COUNTER(STAT_GatherTotal);
 		RenderQueue.Reset();
-		EditorWorld->GatherRenderPackets(RenderQueue, &LODView, &Frustum, Renderer);
+		EditorWorld->GatherRenderPackets(RenderQueue, LODView, &Frustum, Renderer);
 		RenderQueue.Sort();
 	}
 

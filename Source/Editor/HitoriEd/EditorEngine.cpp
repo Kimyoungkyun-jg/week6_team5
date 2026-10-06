@@ -95,27 +95,32 @@ bool UEditorEngine::Init() {
 			break;
 		case EPIEAction::Pause:
 			if (PIEState == EPIEState::Playing) {
-				for (auto Worldctx : WorldContextlist)
+				for (const TUniquePtr<FWorldContext>& Worldctx : WorldContextlist)
 				{
-					Worldctx.World()->GetbIsPause() = true;
+					if (Worldctx->WorldType == EWorldType::PIE && Worldctx->World())
+						Worldctx->World()->GetbIsPause() = true;
 				}
 
 				PIEState = EPIEState::Paused;
 			}
 			break;
 		case EPIEAction::Resume:
-			for (auto Worldctx : WorldContextlist)
+			for (const TUniquePtr<FWorldContext>& Worldctx : WorldContextlist)
 			{
-				Worldctx.World()->GetbIsPause() = false;
+				if (Worldctx->WorldType == EWorldType::PIE && Worldctx->World())
+					Worldctx->World()->GetbIsPause() = false;
 			}
 
 			PIEState = EPIEState::Playing;
 			break;
 		case EPIEAction::Step:
-			for (auto Worldctx : WorldContextlist)
+			for (const TUniquePtr<FWorldContext>& Worldctx : WorldContextlist)
 			{
-				bIsStep = true;
-				Worldctx.World()->GetbIsPause() = false;
+				if (Worldctx->WorldType == EWorldType::PIE && Worldctx->World())
+				{
+					bIsStep = true;
+					Worldctx->World()->GetbIsPause() = false;
+				}
 			}
 
 			break;
@@ -489,7 +494,7 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			// PIE 모드 월드 틱 순회
 			bool bTicked = false;
 			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
-				FWorldContext &Context = WorldContextlist[WorldIdx];
+				FWorldContext &Context = *WorldContextlist[WorldIdx];
 				if (Context.WorldType == EWorldType::PIE && Context.World()) {
 					Context.World()->Tick(EWorldTick::All, DeltaTime);
 					bTicked = true;
@@ -502,7 +507,7 @@ void UEditorEngine::TickWorld(const float DeltaTime) {
 			// 단일 프레임 진행 후 일시정지 복구
 			if (bIsStep) {
 				for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx) {
-					FWorldContext &Context = WorldContextlist[WorldIdx];
+					FWorldContext &Context = *WorldContextlist[WorldIdx];
 					if (Context.WorldType == EWorldType::PIE && Context.World()) {
 						Context.World()->GetbIsPause() = true;
 					}
@@ -582,14 +587,14 @@ void UEditorEngine::RenderViewports() {
 			FGameViewportClient* GameClient = nullptr;
 			for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx)
 			{
-				if (WorldContextlist[WorldIdx].WorldType == EWorldType::PIE &&
-					WorldContextlist[WorldIdx].PIEInstance == TargetPlayerIndex &&
-					WorldContextlist[WorldIdx].GameViewport)
+				if (WorldContextlist[WorldIdx]->WorldType == EWorldType::PIE &&
+					WorldContextlist[WorldIdx]->PIEInstance == TargetPlayerIndex &&
+					WorldContextlist[WorldIdx]->GameViewport)
 				{
-					GameClient = WorldContextlist[WorldIdx].GameViewport.get();
-					if (WorldContextlist[WorldIdx].World())
+					GameClient = WorldContextlist[WorldIdx]->GameViewport.get();
+					if (WorldContextlist[WorldIdx]->World())
 					{
-						CurrentWorld = WorldContextlist[WorldIdx].World();
+						CurrentWorld = WorldContextlist[WorldIdx]->World();
 					}
 
 					SceneView = GameClient->CalcSceneView(ViewRect);
@@ -620,7 +625,7 @@ void UEditorEngine::RenderViewports() {
 	{
 		for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx)
 		{
-			FWorldContext& Context = WorldContextlist[WorldIdx];
+			FWorldContext& Context = *WorldContextlist[WorldIdx];
 			
 			if (Context.WorldType == EWorldType::PIE && Context.GameViewport && Context.World())
 			{
@@ -751,7 +756,7 @@ void UEditorEngine::DrawPIEWindows()
 	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
 	for (int32 WorldIdx = 0; WorldIdx < WorldContextlist.Num(); ++WorldIdx)
 	{
-		FWorldContext& Context = WorldContextlist[WorldIdx];
+		FWorldContext& Context = *WorldContextlist[WorldIdx];
 		if (Context.WorldType == EWorldType::PIE && Context.GameViewport)
 		{
 			if (Mode == EPIEMode::SelectedViewport && Context.PIEInstance == 0)
@@ -1021,6 +1026,8 @@ void UEditorEngine::PresentFrame() {
 
 // 종료 전 정리
 void UEditorEngine::PreExit() {
+	if (GetWorldContextFromType(EWorldType::PIE))
+		StopPIESession();
 	if (SettingsPanel) {
 		SettingsPanel->CaptureViewportSettings();
 		SettingsPanel->SaveSettings();
@@ -1124,22 +1131,20 @@ void UEditorEngine::RenderActorUUIDs(const FSceneView &SceneView) {
 
 void UEditorEngine::CreatePIESession()
 {
+	if (GetWorldContextFromType(EWorldType::PIE))
+		return;
 	bIsSIEMode = false;
 	if (ViewportsPanel)
 		ViewportsPanel->ClearGameViewportClient();
 
 	// 선택 해제
 	ResetSceneSelection();
-	PIEState = EPIEState::Playing;
 
 	// PIE 시작 뷰포트 지정
 	PIEStartViewportIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : 0;
 
 	const int32 NumPlayers = EditorUI ? std::clamp(EditorUI->GetPIEPlayerCount(), 1, 16) : 1;
 	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
-
-	// 컨텍스트 배열 재할당 방지
-	WorldContextlist.Reserve(WorldContextlist.Num() + NumPlayers + 4);
 
 	// 게임 세션 생성
 	for (int32 i = 0; i < NumPlayers; ++i)
@@ -1149,10 +1154,14 @@ void UEditorEngine::CreatePIESession()
 		Context.PIEInstance = i;
 
 		UGameInstance* GI = FObjectFactory::ConstructObject<UGameInstance>();
-		GI->InitializeForPlayInEditor(i);
-		GI->StartPlayInEditorGameInstance();
-
 		Context.OwningGameInstance = GI;
+		if (!GI || !GI->InitializeForPlayInEditor(i) ||
+			!GI->StartPlayInEditorGameInstance())
+		{
+			HTR_LOG(Error, "PIE: Failed to start player {}", i);
+			StopPIESession();
+			return;
+		}
 		if (Mode == EPIEMode::SelectedViewport && i == 0 &&
 			Context.GameViewport && ViewportsPanel)
 		{
@@ -1173,6 +1182,7 @@ void UEditorEngine::CreatePIESession()
 			}
 		}
 	}
+	PIEState = EPIEState::Playing;
 
 	
 
@@ -1209,6 +1219,7 @@ void UEditorEngine::StopPIESession()
 		ImageRect = {};
 
 	PIEState = EPIEState::Stopped;
+	bIsStep = false;
 
 	// 선택 해제
 	ResetSceneSelection();
@@ -1219,21 +1230,8 @@ void UEditorEngine::StopPIESession()
 	// 피아이이 월드 및 컨텍스트 정리
 	for (int32 Index = WorldContextlist.Num() - 1; Index >= 0; --Index)
 	{
-		if (WorldContextlist[Index].WorldType == EWorldType::PIE)
-		{
-			if (UWorld* World = WorldContextlist[Index].World())
-			{
-				World->EndPlay();
-				World->ClearWorld();
-				for (ULevel* Level : World->GetLevel())
-				{
-					delete Level;
-				}
-				delete World;
-			}
-			WorldContextlist[Index].OwningGameInstance->Shutdown();
-			WorldContextlist.RemoveAt(Index, 1);
-		}
+		if (WorldContextlist[Index]->WorldType == EWorldType::PIE)
+			DestroyWorldContext(*WorldContextlist[Index]);
 	}
 
 	// 에디터 카메라 갱신 재연결
@@ -1281,7 +1279,12 @@ UWorld* UEditorEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, 
 
 	// 복제 월드 생성
 	UWorld* NewPIEWorld = FObjectFactory::ConstructObject<UWorld>();
-	NewPIEWorld->Init();
+	if (!NewPIEWorld)
+		return nullptr;
+	// 초기화 실패 시에도 StopPIESession에서 부분 생성된 월드를 정리한다.
+	WorldContext.SetCurrentWorld(NewPIEWorld);
+	if (!NewPIEWorld->Init())
+		return nullptr;
 
 	// 직렬화 복사 및 참조 복원
 	SerializeWorldForPIE(InWorld, NewPIEWorld);
@@ -1471,7 +1474,7 @@ FGameViewportClient* UEditorEngine::FindPIEGameClient(int32 PIEInstance) const
 {
 	for (int32 i = 0; i < WorldContextlist.Num(); ++i)
 	{
-		const FWorldContext& Context = WorldContextlist[i];
+		const FWorldContext& Context = *WorldContextlist[i];
 		if (Context.WorldType == EWorldType::PIE &&
 			Context.PIEInstance == PIEInstance &&
 			Context.World() &&

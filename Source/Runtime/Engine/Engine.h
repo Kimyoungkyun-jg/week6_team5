@@ -102,9 +102,10 @@ public:
 	FWorldContext* GetWorldContextFromPIEInstance(int32 PIEInstanceIndex);
 	virtual UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld);
 	FWorldContext& CreateNewWorldContext(EWorldType InWorldType);
+	void DestroyWorldContext(FWorldContext& Context);
 
-	// 관리 중인 월드 컨텍스트 목록
-	TArray<FWorldContext> WorldContextlist;
+	// 개별 할당하므로 배열 증감에도 GameInstance가 참조하는 컨텍스트 주소는 유지된다.
+	TArray<TUniquePtr<FWorldContext>> WorldContextlist;
 
 	void SetPlayWorld(UWorld& playWorld)
 	{

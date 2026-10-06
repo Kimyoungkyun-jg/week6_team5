@@ -27,7 +27,7 @@ void FSceneRenderer::InitViews(FRenderer* Renderer)
 	}
 
 	// 월드 프리미티브 수집 및 절두체 컬링
-	World->GatherRenderPackets(RenderQueue, &CachedViewContext, &View.Frustum, Renderer);
+	World->GatherRenderPackets(RenderQueue, CachedViewContext, &View.Frustum, Renderer);
 
 	// 렌더 큐 자체 정렬
 	RenderQueue.Sort();

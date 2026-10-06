@@ -40,19 +40,19 @@ void UGameInstance::SetWorldContext(FWorldContext* InWorldContext)
 	}
 }
 
-void UGameInstance::InitializeForPlayInEditor(int32 PIEInstanceIndex)
+bool UGameInstance::InitializeForPlayInEditor(int32 PIEInstanceIndex)
 {
 	UEngine* Engine = GetEngine();
 	if (!Engine)
 	{
-		return;
+		return false;
 	}
 
 	// 기존 컨텍스트 검색 또는 신규 생성
 	WorldContext = Engine->GetWorldContextFromPIEInstance(PIEInstanceIndex); 
 	if (!WorldContext)
 	{
-		return;
+		return false;
 	}
 	WorldContext->OwningGameInstance = this;
 
@@ -60,14 +60,16 @@ void UGameInstance::InitializeForPlayInEditor(int32 PIEInstanceIndex)
 	UWorld* EditorWorld = Engine->GetEditorWorld();
 	if (!EditorWorld)
 	{
-		return;
+		return false;
 	}
 
 	// 에디터 월드 복제
-	Engine->CreatePIEWorldByDuplication(*WorldContext, EditorWorld);
+	if (!Engine->CreatePIEWorldByDuplication(*WorldContext, EditorWorld))
+		return false;
 	
 	// 세션 초기화
 	Init();
+	return true;
 }
 
 bool UGameInstance::StartPlayInEditorGameInstance()

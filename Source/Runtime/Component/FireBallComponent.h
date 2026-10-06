@@ -7,9 +7,10 @@ struct FFireBallMaterialParams
 	FVector Center;
 	float Radius = 1.0f;
 	FVector4 Color;
+	FVector CameraPosition;
 	float RadiusFalloff = 0.5f;
 	float Intensity = 1.0f;
-	float Padding[2];
+	float Padding[3];
 };
 
 class UFireBallComponent : public UPrimitiveComponent

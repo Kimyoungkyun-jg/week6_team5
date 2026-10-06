@@ -26,12 +26,13 @@ void UFireBallComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FV
 {
 	FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
 	Packet.Mesh = UAssetManager::GetAssetByPath<UStaticMesh>("Sphere");
-	//Packet.Material = UAssetManager::GetAssetByPath<UMaterial>("FireBallMaterial");
+	Packet.Material = UAssetManager::GetAssetByPath<UMaterial>("FireBallMaterial");
 	MaterialParams.Center = GetWorldLocation();
 	MaterialParams.Color = Color;
 	MaterialParams.Radius = Radius;
 	MaterialParams.RadiusFalloff = RadiusFalloff;
 	MaterialParams.Intensity = Intensity;
+	MaterialParams.CameraPosition = ViewContext.CameraPosition;
 	Packet.MaterialParamData = &MaterialParams;
 	Packet.MaterialParamDataSize = sizeof(FFireBallMaterialParams);
 	FTransform Transform = FTransform(GetWorldLocation(), GetRelativeScale3D() * Radius, GetRelativeRotation());

@@ -16,6 +16,7 @@ cbuffer PerObjectConstants : register(b1)
     float3 Center;
     float Radius;
     float4 Color;
+    float3 CameraPosition;
     float RadiusFallOff;
     float Intensity;
 };
@@ -45,9 +46,12 @@ PS_INPUT mainVS(VS_INPUT input)
 
 float4 mainPS(PS_INPUT input) : SV_TARGET
 {
+    float3 ViewDir = normalize(CameraPosition - input.WorldPos);
+    float3 Normal = normalize(input.WorldPos - Center);
+    float NdotV = saturate(dot(Normal, ViewDir));
     float Distance = length(input.WorldPos - Center);
     float x = Radius > 0.0f ? Distance / Radius : 1.0f;
-    float Attenuation = pow(saturate(1.0 - x), RadiusFallOff);
+    float Attenuation = pow(NdotV, RadiusFallOff);
     
     return Color * Attenuation * Intensity;
 }

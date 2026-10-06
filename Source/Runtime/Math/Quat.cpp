@@ -246,3 +246,9 @@ FQuat FQuat::MakeFromEuler(float RollRadian, float PitchRadian, float YawRadian)
 		CR * CP * CY + SR * SP * SY
 	);
 }
+
+bool FQuat::Equals(const FQuat& Q, float Tolerance) const
+{
+	return ((fabsf(X - Q.X) <= Tolerance && fabsf(Y - Q.Y) <= Tolerance && fabsf(Z - Q.Z) <= Tolerance && fabsf(W - Q.W) <= Tolerance) ||
+		(fabsf(X + Q.X) <= Tolerance && fabsf(Y + Q.Y) <= Tolerance && fabsf(Z + Q.Z) <= Tolerance && fabsf(W + Q.W) <= Tolerance));
+}

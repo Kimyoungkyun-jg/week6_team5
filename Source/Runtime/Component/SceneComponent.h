@@ -3,6 +3,7 @@
 #include "../Math/Transform.h"
 #include "ActorComponent.h"
 #include "Math/Box.h"
+#include "Collision/HitResult.h"
 
 class USceneComponent : public UActorComponent
 {
@@ -65,6 +66,9 @@ public:
 	void MarkTransformDirty();
 	virtual void OnTransformDirty() {};
 
+	bool MoveComponent(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
+	bool MoveComponent(const FVector& Delta, const FRotator& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
+	virtual bool MoveComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
 
 protected:
 	bool bTransformDirty;

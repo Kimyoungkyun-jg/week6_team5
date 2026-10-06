@@ -2,6 +2,7 @@
 #include "Component/SceneComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "Engine/World.h"
 
 USceneComponent::~USceneComponent()
 {
@@ -111,3 +112,59 @@ void USceneComponent::MarkTransformDirty()
 }
 
 
+bool USceneComponent::MoveComponent(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+	return MoveComponentImpl(Delta, NewRotation, bSweep, OutHit);
+}
+
+bool USceneComponent::MoveComponent(const FVector& Delta, const FRotator& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+	return MoveComponentImpl(Delta, NewRotation.Quaternion(), bSweep, OutHit);
+}
+
+bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+	FHitResult Temphit;
+	FHitResult& HitResult = OutHit ? *OutHit : Temphit;
+	if (OutHit)
+	{
+		*OutHit = FHitResult(1.f); // 초기화
+	}
+	// 이동 거리가 0인 경우
+	if(Delta.IsZero())
+	{
+		// 회전이 바뀌지 않은 경우
+		if(NewRotation.Equals(GetRelativeRotation().Quaternion()))
+		{
+			return false;
+		}
+	}
+	// bSweep = true일 때 충돌 체크
+	if(bSweep)
+	{
+		// 충돌 체크 로직
+		AActor* OwnerActor = GetOwner();
+		UWorld* World = OwnerActor->GetWorld();
+		if (!World) return false;
+
+		FRay Ray = FRay(GetWorldLocation(), Delta.Normalized());
+		if(World->LineTraceSingle(Ray, HitResult))
+		{
+			if(HitResult.Distance < Delta.Size() && HitResult.HitComponent->GetOwner() != OwnerActor)
+			{
+				// 충돌 발생 시 Hit에 충돌 정보 저장 및 종료
+				HitResult.bBlockingHit = true;
+				HitResult.Normal = -Delta.Normalized();
+				HitResult.ImpactNormal = HitResult.Normal;
+				return false;
+			}
+		}
+	}
+
+
+	// 충돌 발생하지 않으면 위치 및 회전 업데이트
+	SetRelativeLocation(GetRelativeLocation() + Delta);
+	SetRelativeRotation(NewRotation.ToFRotator());
+
+	return true;
+}

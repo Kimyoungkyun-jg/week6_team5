@@ -17,6 +17,7 @@ struct FEditorSettings
 	bool bShowUUID = false;
 	bool bDrawBatchLine = true;
 	bool bDrawPSGrid = false;
+	bool bEnableFXAA = false;
 
 	// Values
 	float SceneDepthMaxRange = 50.0f;

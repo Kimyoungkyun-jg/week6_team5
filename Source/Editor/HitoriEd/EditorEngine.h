@@ -11,6 +11,7 @@
 #include "Editor/Rendering/GridRenderer.h"
 #include "Editor/Rendering/SceneDepthRenderer.h"
 #include "Editor/Rendering/HeightFogRenderer.h"
+#include "Editor/Rendering/FXAARenderer.h"
 #include "Editor/Gizmo/GizmoRenderer.h"
 #include "Render/LineBatcher.h"
 
@@ -102,6 +103,7 @@ private:
 	TUniquePtr<FSceneDepthRenderer> SceneDepthRenderer;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
 	TUniquePtr<FHeightFogRenderer> HeightFogRenderer;
+	TUniquePtr<FFXAARenderer> FXAARenderer;
 
 	UFont* SystemFont;
 

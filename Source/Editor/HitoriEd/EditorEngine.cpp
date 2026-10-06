@@ -164,6 +164,9 @@ bool UEditorEngine::Init() {
 	HeightFogRenderer = MakeUnique<FHeightFogRenderer>();
 	HeightFogRenderer->Init(Renderer);
 
+	FXAARenderer = MakeUnique<FFXAARenderer>();
+	FXAARenderer->Init(Renderer);
+
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
 	Outline = MakeUnique<FOutline>();
@@ -686,6 +689,11 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 		TextRenderer->OnRender(TextComponent->GetText(), TextComponent->GetWorldMatrix(), TextComponent->GetTextSize(), *TextComponent->GetFont(), SceneView.ViewProjectionMatrix);
 	}
 
+	// FXAA 렌더링
+	if (SettingsPanel->GetSettings().bEnableFXAA) {
+		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget);
+	}
+
 	if (bIsSIEMode)
 	{
 		const FViewportSettings ViewportSetting{ 0, 0, Width, Height, 0.0f, 1.0f };
@@ -953,6 +961,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	// Scene Depth 뷰 모드에서만 선형 거리를 회색으로 표시한다.
 	if (!bIsPIE && ViewClient && ViewClient->IsSceneDepth())
 		SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
+
+	// FXAA 렌더링
+	if (SettingsPanel->GetSettings().bEnableFXAA) {
+		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget);
+	}
 
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE) {

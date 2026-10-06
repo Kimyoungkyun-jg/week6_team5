@@ -8,6 +8,7 @@
 #include "Component/TextRenderComponent.h"
 #include "Component/SpotLightComponent.h"
 #include "Component/HeightFogComponent.h"
+#include "Component/RotationMovementComponent.h"
 #include "Component/ParticleSubUVComponent.h"
 #include "Component/BillboardComponent.h"
 #include "Component/TextRenderComponent.h"
@@ -892,6 +893,21 @@ void FDetailsPanel::OnRender()
 			{
 				DrawComponentTree(Root);
 			}
+			// ActorComponents have no attachment tree, so list them separately.
+			for (UActorComponent* Component : Owner->GetComponents())
+			{
+				if (!Component || Cast<USceneComponent>(Component))
+					continue;
+
+				ImGui::PushID(Component);
+				ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+				if (SelectedComponent == Component)
+					Flags |= ImGuiTreeNodeFlags_Selected;
+				ImGui::TreeNodeEx(Component->GetName().c_str(), Flags);
+				if (ImGui::IsItemClicked())
+					SelectedComponent = Component;
+				ImGui::PopID();
+			}
 			ImGui::EndChild();
 			ImGui::Separator();
 
@@ -986,6 +1002,13 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 			auto* NewComp = Owner->CreateDefaultSubobject<UHeightFogComponent>("HeightFog");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
+		}
+		if (ImGui::Selectable("RotatingMovement Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<RotatingMovementComponent>("RotatingMovement");
+			SelectedComponent = NewComp;
+			if (UWorld* OwnerWorld = Owner->GetWorld(); OwnerWorld && OwnerWorld->GetWorldType() == EWorldType::PIE)
+				NewComp->PrimaryComponentTick.RegisterTickFunction(OwnerWorld->GetTickTaskManager());
 		}
 		if (ImGui::Selectable("ParticleSubUV Component"))
 		{

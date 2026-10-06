@@ -54,6 +54,7 @@ public:
 	class FTexture2D* GetColorTarget() const { return ViewTargets.SceneColor.get(); }
 	FTexture2D* SwapSceneColorAndBind(TUniquePtr<FTexture2D>& Output) { return ViewTargets.SwapSceneColorAndBind(Output); }
 	class FTexture2D* GetDepthTarget() const { return ViewTargets.Depth.get(); }
+	FDeferredViewTargets& GetViewTargets() { return ViewTargets; }
 	const FDeferredViewTargets& GetViewTargets() const { return ViewTargets; }
 
 	void SetGameInstance(UGameInstance* InGameInstance) { GameInstance = InGameInstance; }

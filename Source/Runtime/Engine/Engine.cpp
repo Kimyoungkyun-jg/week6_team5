@@ -135,8 +135,7 @@ UWorld* UEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld
 		return nullptr;
 	// 부분 초기화에 실패해도 공통 컨텍스트 종료 경로에서 회수한다.
 	WorldContext.SetCurrentWorld(NewPIEWorld);
-	NewPIEWorld->DuplicateWorld(InWorld);
-	if (!NewPIEWorld->GetPersistentLevel())
+	if (!NewPIEWorld->DuplicateWorld(InWorld))
 		return nullptr;
 	NewPIEWorld->GetWorldType() = EWorldType::PIE;
 

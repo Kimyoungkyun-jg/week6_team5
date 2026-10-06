@@ -660,44 +660,14 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 {
 	if (!GameClient) return;
 
-	FTexture2D* ColorTarget = GameClient->GetColorTarget();
-	FTexture2D* DepthTarget = GameClient->GetDepthTarget();
-	const uint32 Width = GameClient->GetWidth();
-	const uint32 Height = GameClient->GetHeight();
-	if (!ColorTarget || !DepthTarget || Width == 0 || Height == 0) return;
-
-	const FDeferredViewTargets& Targets = GameClient->GetViewTargets();
-	if (!SceneRenderer.RenderGBuffer(Renderer, Targets, Width, Height)) // 여기서 기본 도형과 함께 defferedbuffer 값채우기
+	FSceneRenderOptions Options;
+	Options.bEnableFXAA = SettingsPanel && SettingsPanel->GetSettings().bEnableFXAA;
+	FDeferredViewTargets& Targets = GameClient->GetViewTargets();
+	if (!RenderSceneFrame(Targets, SceneView, SceneRenderer, GameClient->GetWorld(), Options))
 		return;
-
-	// 기본 조명을 쓰고 포인트 라이트를 HDR 색상에 더한다.
-	RenderCommand::BeginRenderPass(Targets.LightingHDR.get(), nullptr, Width, Height);
-	SceneRenderer.RenderDeferredLighting(Renderer, Targets);
-	RenderCommand::EndRenderPass();
-
-	RenderCommand::BeginRenderPass(ColorTarget, nullptr, Width, Height);
-	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix, SceneView.ViewLocation);
-	SceneRenderer.RenderToneMap(Renderer, Targets);
-	RenderCommand::EndRenderPass();
-
-	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
-	UWorld* TargetWorld = GameClient->GetWorld();
-	const bool bHasFog = RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
-	FConstantBuffer* FogConstants = HeightFogRenderer
-		? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
-	SceneRenderer.RenderTranslucent(Renderer, FogConstants);
-
-	// 텍스트 컴포넌트 렌더링
-	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent; ++TextComponent) {
-		if (!TextComponent || !TextComponent->GetFont() || !TextComponent->IsVisible()) continue;
-		if (TextComponent->GetOwner() && TextComponent->GetOwner()->GetWorld() != TargetWorld) continue;
-		TextRenderer->OnRender(TextComponent->GetText(), TextComponent->GetWorldMatrix(), TextComponent->GetTextSize(), *TextComponent->GetFont(), SceneView.ViewProjectionMatrix);
-	}
-
-	// FXAA 렌더링
-	if (SettingsPanel->GetSettings().bEnableFXAA && FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget)) {
-		GameClient->SwapSceneColorAndBind(FXAARenderer->GetOutputTarget());
-	}
+	FTexture2D* DepthTarget = Targets.Depth.get();
+	const uint32 Width = Targets.SceneColor->GetWidth();
+	const uint32 Height = Targets.SceneColor->GetHeight();
 
 	if (bIsSIEMode)
 	{
@@ -716,6 +686,74 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 		}
 	}
 	RenderCommand::EndRenderPass();
+}
+
+bool UEditorEngine::RenderSceneFrame(FDeferredViewTargets& Targets, const FSceneView& SceneView,
+	FSceneRenderer& SceneRenderer, UWorld* TargetWorld, const FSceneRenderOptions& Options)
+{
+	FTexture2D* ColorTarget = Targets.SceneColor.get();
+	FTexture2D* DepthTarget = Targets.Depth.get();
+	if (!TargetWorld || !Renderer || !ColorTarget || !DepthTarget)
+		return false;
+	const uint32 Width = ColorTarget->GetWidth();
+	const uint32 Height = ColorTarget->GetHeight();
+	if (!Width || !Height || !Targets.IsValidFor(Width, Height))
+		return false;
+
+	// GBuffer -> HDR lighting -> skybox and tone mapping.
+	if (Options.bDrawPrimitives)
+	{
+		if (!SceneRenderer.RenderGBuffer(Renderer, Targets, Width, Height))
+			return false;
+		RenderCommand::BeginRenderPass(Targets.LightingHDR.get(), nullptr, Width, Height);
+		SceneRenderer.RenderDeferredLighting(Renderer, Targets);
+		RenderCommand::EndRenderPass();
+	}
+	else
+		RenderCommand::ClearDepthStencil(DepthTarget);
+
+	RenderCommand::BeginRenderPass(ColorTarget, nullptr, Width, Height);
+	if (SkyboxRenderer)
+		SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix, SceneView.ViewLocation);
+	if (Options.bDrawPrimitives)
+		SceneRenderer.RenderToneMap(Renderer, Targets);
+	RenderCommand::EndRenderPass();
+
+	// Opaque/sky fog, then translucent objects using their own distance to the camera.
+	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
+	const bool bHasFog = Options.bDrawPrimitives && Options.bEnableFog &&
+		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
+	if (Options.bDrawPrimitives)
+	{
+		FConstantBuffer* FogConstants = HeightFogRenderer
+			? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
+		SceneRenderer.RenderTranslucent(Renderer, FogConstants);
+	}
+	RenderSceneText(TargetWorld, SceneView);
+
+	if (Options.bShowSceneDepth && SceneDepthRenderer)
+		SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, Options.SceneDepthRange);
+	if (Options.bEnableFXAA && !Options.bShowSceneDepth && FXAARenderer &&
+		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget))
+	{
+		// Both viewport types now exchange and bind the same final output target.
+		if (!Targets.SwapSceneColorAndBind(FXAARenderer->GetOutputTarget()))
+			RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
+	}
+	return true;
+}
+
+void UEditorEngine::RenderSceneText(UWorld* TargetWorld, const FSceneView& SceneView)
+{
+	if (!TextRenderer) return;
+	for (TObjectIterator<UTextRenderComponent> Text; Text; ++Text)
+	{
+		if (!Text || !Text->GetFont() || !Text->IsVisible() || !Text->GetOwner() ||
+			Text->GetOwner()->GetWorld() != TargetWorld)
+			continue;
+		TextRenderer->OnRender(Text->GetText(), Text->GetWorldMatrix(), Text->GetTextSize(),
+			*Text->GetFont(), SceneView.ViewProjectionMatrix);
+	}
 }
 
 // 불투명 장면과 하늘에 현재 월드의 첫 활성 높이 안개를 적용한다.
@@ -846,42 +884,22 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 			FSceneRenderer &SceneRenderer,
 			UWorld *TargetWorld,
 			const bool bIsPIE) {
-  
+
+	if (!ViewClient || !SettingsPanel) return;
+	FSceneRenderOptions Options;
+	Options.bDrawPrimitives = bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
+	Options.bEnableFog = ViewClient->GetViewportMode() == EViewportMode::Solid;
+	Options.bEnableFXAA = SettingsPanel->GetSettings().bEnableFXAA;
+	Options.bShowSceneDepth = !bIsPIE && ViewClient->IsSceneDepth();
+	Options.SceneDepthRange = ViewClient->GetMaxRange();
+	FDeferredViewTargets& Targets = ViewClient->GetViewTargets();
+	if (!RenderSceneFrame(Targets, SceneView, SceneRenderer, TargetWorld, Options))
+		return;
+	FTexture2D* DepthTarget = Targets.Depth.get();
+	const uint32 Width = Targets.SceneColor->GetWidth();
+	const uint32 Height = Targets.SceneColor->GetHeight();
 	const int32 ViewIndex = SceneView.ViewIndex;
-	FTexture2D *ColorTarget = ViewClient ? ViewClient->GetColorTarget() : nullptr;
-	FTexture2D *DepthTarget = ViewClient ? ViewClient->GetDepthTarget() : nullptr;
-	const uint32 Width = ViewClient
-			? ViewClient->GetWidth()
-			: static_cast<uint32>(SceneView.ViewRect.Width);
-	const uint32 Height = ViewClient
-			? ViewClient->GetHeight()
-			: static_cast<uint32>(SceneView.ViewRect.Height);
 	const FViewportSettings ViewportSetting{0, 0, Width, Height, 0.0f, 1.0f};
-	const bool bDrawPrimitives =
-			bIsPIE || SettingsPanel->GetSettings().bDrawPrimitives;
-
-	const bool bGBufferRendered = bDrawPrimitives && ViewClient &&
-		SceneRenderer.RenderGBuffer(Renderer, ViewClient->GetViewTargets(), Width, Height);
-	if (!bGBufferRendered)
-		RenderCommand::ClearDepthStencil(DepthTarget);
-
-	if (bGBufferRendered)
-	{
-		RenderCommand::BeginRenderPass(ViewClient->GetViewTargets().LightingHDR.get(), nullptr, Width, Height);
-		SceneRenderer.RenderDeferredLighting(Renderer, ViewClient->GetViewTargets());
-		RenderCommand::EndRenderPass();
-	}
-
-	RenderCommand::BeginRenderPass(ColorTarget, nullptr, Width, Height);
-	SkyboxRenderer->OnRender(SceneView.ViewProjectionMatrix, SceneView.ViewLocation);
-	if (bGBufferRendered)
-		SceneRenderer.RenderToneMap(Renderer, ViewClient->GetViewTargets());
-	RenderCommand::EndRenderPass();
-	
-	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
-	const bool bHasFog = bDrawPrimitives && ViewClient &&
-		ViewClient->GetViewportMode() == EViewportMode::Solid &&
-		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 
 	// 라인 배처 렌더링
 	if (!bIsPIE &&
@@ -935,45 +953,6 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 					static_cast<float>(SettingsPanel->GetSettings().GridSpacing),
 					SceneView.bIsPerspective, ViewportSetting);
 		}
-	}
-
-	if (bDrawPrimitives)
-	{
-		FConstantBuffer* FogConstants = HeightFogRenderer
-			? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
-		SceneRenderer.RenderTranslucent(Renderer, FogConstants);
-	}
-
-	// 텍스트 컴포넌트 렌더링
-	for (TObjectIterator<UTextRenderComponent> TextComponent; TextComponent;
-			 ++TextComponent) {
-		if (!TextComponent || !TextComponent->GetFont() ||
-				!TextComponent->IsVisible()) {
-			continue;
-		}
-
-		if (TextComponent->GetOwner() &&
-				TextComponent->GetOwner()->GetWorld() != TargetWorld) {
-			continue;
-		}
-
-		TextRenderer->OnRender(
-				TextComponent->GetText(), TextComponent->GetWorldMatrix(),
-				TextComponent->GetTextSize(), *TextComponent->GetFont(),
-				SceneView.ViewProjectionMatrix);
-	}
-
-	// Scene Depth 뷰 모드에서만 선형 거리를 회색으로 표시한다.
-	if (!bIsPIE && ViewClient && ViewClient->IsSceneDepth())
-		SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
-
-	// FXAA 렌더링
-	if (SettingsPanel->GetSettings().bEnableFXAA && FXAARenderer && !ViewClient->IsSceneDepth() &&
-		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget)) {
-		if (FTexture2D* NewColorTarget = ViewClient->SwapSceneColorAndBind(FXAARenderer->GetOutputTarget()))
-			ColorTarget = NewColorTarget;
-		else
-			RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
 	}
 
 	// 에디터 오버레이 렌더링
@@ -1249,188 +1228,6 @@ void UEditorEngine::StopPIESession()
 	DetailsPanel->SetWorld(EditorWorld);
 	SettingsPanel->SetWorld(EditorWorld);
 
-	// 참조 맵 초기화
-	OriginNewAnnotataion.Reset();
-}
-
-//UWorld* UEditorEngine::CreatePIEWorld()
-//{
-//	FWorldContext* Context = GetWorldContextFromPIEInstance(0);
-//	if (!Context)
-//	{
-//		Context = &CreateNewWorldContext(EWorldType::PIE);
-//		Context->PIEInstance = 0;
-//	}
-//	return CreatePIEWorldByDuplication(*Context, EditorWorld);
-//}
-
-UWorld* UEditorEngine::CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld)
-{
-	if (!InWorld)
-	{
-		HTR_LOG(Error, "InWorld is nullptr");
-		return nullptr;
-	}
-
-	// 참조 맵 초기화
-	OriginNewAnnotataion.Reset();
-
-	double StartTime = FPlatformTime::Seconds();
-
-	// 복제 월드 생성
-	UWorld* NewPIEWorld = FObjectFactory::ConstructObject<UWorld>();
-	if (!NewPIEWorld)
-		return nullptr;
-	// 초기화 실패 시에도 StopPIESession에서 부분 생성된 월드를 정리한다.
-	WorldContext.SetCurrentWorld(NewPIEWorld);
-	if (!NewPIEWorld->Init())
-		return nullptr;
-
-	// 직렬화 복사 및 참조 복원
-	SerializeWorldForPIE(InWorld, NewPIEWorld);
-	RecoverPIEWorldReferences(InWorld, NewPIEWorld);
-
-	// 컨텍스트 갱신
-	WorldContext.SetCurrentWorld(NewPIEWorld);
-	WorldContext.WorldType = EWorldType::PIE;
-
-	HTR_LOG(Info, "PIE: Created PIE world by copying editor world ({:.4f}s)", FPlatformTime::Seconds() - StartTime);
-	return NewPIEWorld;
-}
-
-void UEditorEngine::SerializeWorldForPIE(UWorld* InEditorWorld, UWorld* InPIEWorld)
-{
-	json WorldData;
-	InEditorWorld->Serialize(WorldData, false);
-	InPIEWorld->Serialize(WorldData, true);
-
-	// 에디터 월드와 플레이 월드 매핑
-	OriginNewAnnotataion.Add(InEditorWorld, InPIEWorld);
-
-	// 레벨 순회 및 복제
-	for (int32 i = 0; i < InEditorWorld->GetLevel().Num(); ++i)
-	{
-		json LevelData;
-		ULevel* OriginalLevel = InEditorWorld->GetLevel()[i];
-		OriginalLevel->Serialize(LevelData, false);
-		ULevel* NewLevel = Cast<ULevel>(FObjectFactory::ConstructObject(OriginalLevel->GetClass(), InPIEWorld));
-		NewLevel->Serialize(LevelData, true);
-		OriginNewAnnotataion.Add(OriginalLevel, NewLevel);
-
-		// 액터 순회 및 복제
-		for (int32 j = 0; j < OriginalLevel->GetActors().Num(); ++j)
-		{
-			json ActorData;
-			AActor* OriginalActor = OriginalLevel->GetActors()[j];
-			OriginalActor->Serialize(ActorData, false);
-			AActor* NewActor = Cast<AActor>(FObjectFactory::ConstructObject(OriginalActor->GetClass(), NewLevel));
-			NewActor->Serialize(ActorData, true);
-			OriginNewAnnotataion.Add(InEditorWorld->GetLevel()[i]->GetActors()[j], NewActor);
-
-			// 컴포넌트 순회 및 복제
-			for (int32 k = 0; k < OriginalActor->GetComponents().Num(); ++k)
-			{
-				json ActorCompData;
-				UActorComponent* OriginalComp = OriginalActor->GetComponents()[k];
-				OriginalComp->Serialize(ActorCompData, false);
-				UActorComponent* NewActorComp = nullptr;
-
-				// 기본 생성 컴포넌트 검사
-				for (UActorComponent* DupComponents : NewActor->GetComponents())
-				{
-					if (DupComponents && DupComponents->GetFName() == OriginalComp->GetFName() && DupComponents->GetClass() == OriginalComp->GetClass())
-					{
-						NewActorComp = DupComponents;
-						break;
-					}
-				}
-
-				if (NewActorComp == nullptr)
-				{
-					NewActorComp = Cast<UActorComponent>(FObjectFactory::ConstructObject(OriginalComp->GetClass(), NewActor));
-					NewActor->AddComponents(NewActorComp);
-				}
-
-				NewActorComp->Serialize(ActorCompData, true);
-				OriginNewAnnotataion.Add(OriginalComp, NewActorComp);
-			}
-		}
-	}
-}
-
-UWorld* UEditorEngine::RecoverPIEWorldReferences(UWorld* InEditorWorld, UWorld* InPIEWorld)
-{
-	// 참조 관계 복원
-	for (auto pair : OriginNewAnnotataion)
-	{
-		// 레벨 참조 복원
-		if (pair.second->IsA(ULevel::StaticClass()))
-		{
-			ULevel* OriginalLevel = Cast<ULevel>(pair.first);
-			ULevel* NewLevel = Cast<ULevel>(pair.second);
-			NewLevel->SetWorld(InPIEWorld);
-			InPIEWorld->AddLevel(NewLevel);
-		}
-
-		// 액터 참조 복원
-		if (pair.second->IsA(AActor::StaticClass()))
-		{
-			AActor* OriginalActor = Cast<AActor>(pair.first);
-			AActor* NewActor = Cast<AActor>(pair.second);
-			NewActor->SetWorld(InPIEWorld);
-			NewActor->SetLevel(Cast<ULevel>(OriginNewAnnotataion[OriginalActor->GetLevel()]));
-			NewActor->GetLevel()->AddActor(NewActor);
-
-			USceneComponent* OriginalRoot = OriginalActor->GetRootComponent();
-			if (OriginalRoot == nullptr)
-			{
-				NewActor->SetRootComponent(nullptr);
-			}
-			else
-			{
-				NewActor->SetRootComponent(Cast<USceneComponent>(OriginNewAnnotataion[OriginalRoot]));
-			}
-		}
-
-		// 컴포넌트 참조 복원
-		if (pair.second->IsA(UActorComponent::StaticClass()))
-		{
-			UActorComponent* OriginalActorComp = Cast<UActorComponent>(pair.first);
-			UActorComponent* NewActorComp = Cast<UActorComponent>(pair.second);
-			NewActorComp->SetOwner(Cast<AActor>(OriginNewAnnotataion[OriginalActorComp->GetOwner()]));
-
-			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(NewActorComp))
-			{
-				InPIEWorld->GetScene().AddPrimitive(Primitive);
-			}
-
-			USceneComponent* SceneOrigin = Cast<USceneComponent>(OriginalActorComp);
-			USceneComponent* Scene = Cast<USceneComponent>(NewActorComp);
-			if (SceneOrigin != nullptr && Scene != nullptr)
-			{
-				if (SceneOrigin->GetAttachParent() == nullptr)
-				{
-					Scene->SetupAttachment(nullptr);
-				}
-				else
-				{
-					Scene->SetupAttachment(Cast<USceneComponent>(OriginNewAnnotataion[SceneOrigin->GetAttachParent()]));
-				}
-			}
-
-			if (UPointLightComponent* Light = Cast<UPointLightComponent>(NewActorComp))
-			{
-				InPIEWorld->GetScene().AddLight(Light);
-			}
-		}
-	}
-
-	// 현재 레벨과 퍼시스턴트 레벨 복원
-	InPIEWorld->SetCurrentLevel(Cast<ULevel>(OriginNewAnnotataion[InEditorWorld->GetCurrentLevel()]));
-	InPIEWorld->SetPersistentLevel(Cast<ULevel>(OriginNewAnnotataion[InEditorWorld->GetPersistentLevel()]));
-	InPIEWorld->GetWorldType() = EWorldType::PIE;
-
-	return InPIEWorld;
 }
 
 void UEditorEngine::UpdateInputOwner()

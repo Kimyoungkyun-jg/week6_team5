@@ -127,7 +127,8 @@ public:
 
 	bool& GetbIsPause() { return bIsPaused; }
 
-	void DuplicateWorld(UWorld* SrcWorld);
+	// Duplicate into an uninitialized world; restore internal references before proxy registration.
+	bool DuplicateWorld(UWorld* SrcWorld);
 
 private:
 	struct alignas(64) FGatherChunk

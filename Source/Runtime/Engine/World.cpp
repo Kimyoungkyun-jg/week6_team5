@@ -720,87 +720,174 @@ void UWorld::EndPlay()
 	bBegunPlay = false;
 }
 
-void UWorld::DuplicateWorld(UWorld* SrcWorld)
+bool UWorld::DuplicateWorld(UWorld* Source)
 {
-	if (!SrcWorld)
-	{
-		HTR_LOG(Error, "Fail to Duplicate EditorWorld...");
-		return;
-	}
-	
-	if (!Init())
-		return;
+	// 복제 대상은 아직 초기화하지 않은 월드여야 한다.
+	if (!Source || Source == this || !Source->GetPersistentLevel() ||
+		!Levels.IsEmpty() || MainCamera)
+		return false;
 
+	TMap<UObject*, UObject*> OriginalToDuplicate;
+	OriginalToDuplicate.Add(Source, this);
 
-	if (ULevel* SrcLevel = SrcWorld->GetPersistentLevel())
+	auto Resolve = [&](UObject* Original) -> UObject*
 	{
-		for (AActor* SrcActor : SrcLevel->GetActors())
+		UObject** Duplicate = OriginalToDuplicate.Find(Original);
+		return Duplicate ? *Duplicate : nullptr;
+	};
+
+	// 생성된 객체는 즉시 레벨/액터의 소유 목록에 넣어 실패 시에도 회수한다.
+	auto CloneActor = [&](AActor* Original, ULevel* Level) -> bool
+	{
+		AActor* Duplicate = Cast<AActor>(FObjectFactory::ConstructObject(Original->GetClass(),
+			Level ? static_cast<UObject*>(Level) : this));
+		if (!Duplicate) return false;
+		Duplicate->SetName(Original->GetFName());
+		Duplicate->SetWorld(this);
+		Duplicate->SetLevel(Level);
+		if (Level) Level->AddActor(Duplicate);
+		else MainCamera = Cast<ACameraActor>(Duplicate);
+		OriginalToDuplicate.Add(Original, Duplicate);
+
+		for (UActorComponent* Component : Original->GetComponents())
 		{
-			if (!SrcActor || SrcActor->IsA<ACameraActor>())
-				continue; 
-
-			// 기존 액터의 위치/회전/스케일 가져오기
-			const FTransform ActorTransform = SrcActor->GetRootComponent()
-				? SrcActor->GetRootComponent()->GetTransform()
-				: FTransform::Identity;
-
-			// 새 액터 스폰
-			AActor* NewActor = SpawnActor(SrcActor->GetClass(), NAME_None, &ActorTransform);
-			
-			for (int i = 0; i < NewActor->Components.size(); i++)
+			if (!Component) continue;
+			UActorComponent* Copy = nullptr;
+			for (UActorComponent* Default : Duplicate->GetComponents())
 			{
-				if (UStaticMeshComponent* newSMC = Cast<UStaticMeshComponent>(NewActor->Components[i]))
+				if (Default && Default->GetFName() == Component->GetFName() &&
+					Default->GetClass() == Component->GetClass())
 				{
-					UStaticMeshComponent* srcSMC = Cast<UStaticMeshComponent>(SrcActor->Components[i]);
-					newSMC->SetStaticMesh(srcSMC->GetStaticMesh());
-					// 머티리얼 복제
-					const int32 NumMats = srcSMC->GetNumMaterials();
-					for (int32 MatIdx = 0; MatIdx < NumMats; ++MatIdx)
-					{
-						if (UMaterial* Mat = srcSMC->GetOverrideMaterial(MatIdx))
-						{
-							newSMC->SetMaterial(MatIdx, Mat);
-						}
-					}
-				}
-				else if (UTextRenderComponent* newTRC = Cast<UTextRenderComponent>(NewActor->Components[i]))
-				{
-					UTextRenderComponent* srcTRC = Cast<UTextRenderComponent>(SrcActor->Components[i]);
-					newTRC->SetText(srcTRC->GetText());
-					newTRC->SetFont(srcTRC->GetFont());
-					newTRC->SetTextSize(srcTRC->GetTextSize());
+					Copy = Default;
+					break;
 				}
 			}
-
-			for (UActorComponent* SrcComponent : SrcActor->GetComponents())
+			if (!Copy)
 			{
-				UPointLightComponent* SrcLight = Cast<UPointLightComponent>(SrcComponent);
-				if (!SrcLight) continue;
-
-				UPointLightComponent* DstLight = nullptr;
-				for (UActorComponent* DstComponent : NewActor->GetComponents())
-				{
-					if (DstComponent->GetFName() == SrcLight->GetFName())
-					{
-						DstLight = Cast<UPointLightComponent>(DstComponent);
-						break;
-					}
-				}
-				if (!DstLight)
-				{
-					DstLight = NewActor->CreateDefaultSubobject<UPointLightComponent>(SrcLight->GetFName());
-					if (NewActor->GetRootComponent())
-						DstLight->SetupAttachment(NewActor->GetRootComponent());
-					Scene.AddLight(DstLight);
-				}
-				DstLight->SetTransform(SrcLight->GetTransform());
-				DstLight->SetLightColor(SrcLight->GetLightColor());
-				DstLight->SetIntensity(SrcLight->GetIntensity());
-				DstLight->SetAttenuationRadius(SrcLight->GetAttenuationRadius());
-				DstLight->SetEnabled(SrcLight->IsEnabled());
+				Copy = Cast<UActorComponent>(FObjectFactory::ConstructObject(Component->GetClass(), Duplicate));
+				if (!Copy) return false;
+				Copy->SetName(Component->GetFName());
+				Duplicate->AddComponents(Copy);
 			}
-
+			Copy->SetOwner(Duplicate);
+			OriginalToDuplicate.Add(Component, Copy);
 		}
-	}
+		return true;
+	};
 
+	auto Rollback = [&]() -> bool
+	{
+		Scene.RemoveAllPrimitives();
+		Scene.RemoveAllLights();
+		ACameraActor* Camera = MainCamera;
+		const bool bStandaloneCamera = Camera && !Camera->GetLevel();
+		SetMainCamera(nullptr);
+		for (ULevel* Level : Levels)
+		{
+			Level->ClearActors();
+			delete Level;
+		}
+		if (bStandaloneCamera) delete Camera;
+		Levels.Reset();
+		PersistentLevel = CurrentLevel = nullptr;
+		return false;
+	};
+
+	try
+	{
+		// 1. 원본과 같은 객체 집합을 먼저 만든다. Init()의 빈 레벨은 만들지 않는다.
+		for (ULevel* Original : Source->GetLevel())
+		{
+			if (!Original) continue;
+			ULevel* Copy = Cast<ULevel>(FObjectFactory::ConstructObject(Original->GetClass(), this));
+			if (!Copy) return Rollback();
+			Copy->SetName(Original->GetFName());
+			Copy->SetWorld(this);
+			Levels.Add(Copy);
+			OriginalToDuplicate.Add(Original, Copy);
+			for (AActor* Actor : Original->GetActors())
+				if (Actor && !CloneActor(Actor, Copy)) return Rollback();
+		}
+		ACameraActor* OriginalCamera = Source->GetMainCamera();
+		if (OriginalCamera && !Resolve(OriginalCamera) && !CloneActor(OriginalCamera, nullptr))
+			return Rollback();
+
+		// 2. 직렬화 프로퍼티를 복사한다. 메모리상의 에셋은 다시 로드하지 않고 공유한다.
+		for (const auto& Pair : OriginalToDuplicate)
+		{
+			json Data = json::object();
+			Pair.first->Serialize(Data, false);
+			for (UClass* Class = Pair.first->GetClass(); Class; Class = Class->Super)
+				for (const FProperty& Property : Class->GetProperties())
+					if (Property.Type == EPropertyType::Object) Data.erase(Property.Name);
+			Data.erase("OverrideMaterials");
+			Pair.second->Serialize(Data, true);
+
+			for (UClass* Class = Pair.first->GetClass(); Class; Class = Class->Super)
+			{
+				for (const FProperty& Property : Class->GetProperties())
+				{
+					if (Property.Type != EPropertyType::Object) continue;
+					UObject* Reference = *reinterpret_cast<UObject**>(reinterpret_cast<uint8*>(Pair.first) + Property.Offset);
+					UObject* Remapped = Resolve(Reference);
+					*reinterpret_cast<UObject**>(reinterpret_cast<uint8*>(Pair.second) + Property.Offset) =
+						Remapped ? Remapped : Reference;
+				}
+			}
+			if (UMeshComponent* Mesh = Cast<UMeshComponent>(Pair.first))
+			{
+				UMeshComponent* Copy = Cast<UMeshComponent>(Pair.second);
+				for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
+					Copy->SetMaterial(Slot, Mesh->GetOverrideMaterial(Slot));
+			}
+			// Camera settings are not reflected; keep the source projection and controls.
+			if (UCameraComponent* Camera = Cast<UCameraComponent>(Pair.first))
+			{
+				UCameraComponent* Copy = Cast<UCameraComponent>(Pair.second);
+				Copy->SetFieldOfView(Camera->GetFieldOfView());
+				Copy->SetAspectRatio(Camera->GetAspectRatio());
+				Copy->SetNearZ(Camera->GetNearZ());
+				Copy->SetFarZ(Camera->GetFarZ());
+				Copy->SetIsOrthogonal(Camera->GetIsOrthogonal());
+				Copy->SetOrthoWidth(Camera->GetOrthoWidth());
+				Copy->SetMoveSpeed(Camera->GetMoveSpeed());
+				Copy->SetMouseSensitivity(Camera->GetMouseSensitivity());
+				Copy->SetWheelSpeed(Camera->GetWheelSpeed());
+			}
+		}
+
+		// 3. 모든 객체가 존재하는 상태에서 루트와 부모 연결을 복원한다.
+		for (const auto& Pair : OriginalToDuplicate)
+		{
+			if (AActor* Actor = Cast<AActor>(Pair.first))
+				Cast<AActor>(Pair.second)->SetRootComponent(Cast<USceneComponent>(Resolve(Actor->GetRootComponent())));
+			if (USceneComponent* Component = Cast<USceneComponent>(Pair.first))
+			{
+				USceneComponent* Copy = Cast<USceneComponent>(Pair.second);
+				Copy->SetupAttachment(Cast<USceneComponent>(Resolve(Component->GetAttachParent())));
+				Copy->SetTransform(Component->GetTransform());
+			}
+		}
+		PersistentLevel = Cast<ULevel>(Resolve(Source->GetPersistentLevel()));
+		CurrentLevel = Cast<ULevel>(Resolve(Source->GetCurrentLevel()));
+		if (!PersistentLevel || !CurrentLevel) return Rollback();
+		MainCamera = Cast<ACameraActor>(Resolve(OriginalCamera));
+		if (!MainCamera) CreateMainCamera();
+		if (!MainCamera) return Rollback();
+		MainCamera->RegisterAllActorTickFunctions(true);
+
+		// 4. 완성된 소유/부모 관계로 프록시를 생성한다.
+		for (const auto& Pair : OriginalToDuplicate)
+		{
+			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Pair.second)) Scene.AddPrimitive(Primitive);
+			if (UPointLightComponent* Light = Cast<UPointLightComponent>(Pair.second)) Scene.AddLight(Light);
+		}
+		WorldType = EWorldType::PIE;
+		return true;
+	}
+	catch (const std::exception& Error)
+	{
+		HTR_LOG(Error, "World duplication failed: {}", Error.what());
+		return Rollback();
+	}
 }

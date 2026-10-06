@@ -73,6 +73,18 @@ private:
 	void TickWorld(float DeltaTime);
 	// 한 번 캡처한 월드 결과를 재사용해 현재 레이아웃의 각 View를 렌더한다.
 	void RenderViewports();
+	struct FSceneRenderOptions
+	{
+		bool bDrawPrimitives = true;
+		bool bEnableFog = true;
+		bool bEnableFXAA = false;
+		bool bShowSceneDepth = false;
+		float SceneDepthRange = 1.0f;
+	};
+	// Common scene passes. Leaves SceneColor/Depth bound for caller overlays and EndRenderPass.
+	bool RenderSceneFrame(FDeferredViewTargets& Targets, const FSceneView& SceneView,
+		FSceneRenderer& SceneRenderer, UWorld* TargetWorld, const FSceneRenderOptions& Options);
+	void RenderSceneText(UWorld* TargetWorld, const FSceneView& SceneView);
 	bool RenderHeightFog(UWorld* TargetWorld, const FSceneView& SceneView, FTexture2D* DepthTarget, FTexture2D* ColorTarget);
 	// 화면 합성과 View 설정 보관으로 프레임을 마무리한다.
 	void EndFrame();
@@ -85,10 +97,6 @@ private:
 	FSwapchain* MainWindowSC = nullptr;
 	FRenderer* Renderer = nullptr;
 
-	TMap<UObject*, UObject*> OriginNewAnnotataion;
-	TMap<ULevel*,json> LeveljsonMap;
-	TMap<AActor*, json> ActorjsonMap;
-	TMap<UActorComponent*, json> ActorCompjsonMap;
 
 	TUniquePtr<FEditorUI> EditorUI;
 
@@ -140,13 +148,6 @@ private:
 	void CreatePIESession();
 	void StopPIESession();
 	void DrawPIEWindows();
-	//UWorld* CreatePIEWorld();
-
-	
-	virtual UWorld* CreatePIEWorldByDuplication(FWorldContext& WorldContext, UWorld* InWorld) override;
-	void SerializeWorldForPIE(UWorld* editorWorld, UWorld* PIEWorld);
-	UWorld* RecoverPIEWorldReferences(UWorld* editorWorlds, UWorld* PIEWorld);
-
 private:
 	int32 InputOwnerPIEInstance = -1;
 	int32 PendingFocusedPIEInstance = -1;

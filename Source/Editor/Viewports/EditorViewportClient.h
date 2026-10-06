@@ -106,6 +106,7 @@ public:
   FTexture2D *GetColorTarget() const { return ViewTargets.SceneColor.get(); }
   FTexture2D* SwapSceneColorAndBind(TUniquePtr<FTexture2D>& Output) { return ViewTargets.SwapSceneColorAndBind(Output); }
   FTexture2D *GetDepthTarget() const { return ViewTargets.Depth.get(); }
+	FDeferredViewTargets& GetViewTargets() { return ViewTargets; }
   const FDeferredViewTargets &GetViewTargets() const { return ViewTargets; }
 
   bool IsWireframe() const { return ViewportMode == EViewportMode::Wireframe; }

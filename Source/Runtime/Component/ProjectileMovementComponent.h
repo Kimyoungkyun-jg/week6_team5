@@ -10,8 +10,11 @@ class UProjectileMovementComponent : public UMovementComponent
 		PROPERTY(bShouldBounce)
 		PROPERTY(Bounciness)
 		PROPERTY(bRotationFollowsVelocity)
+		PROPERTY(bISGravityEnabled)
 		PROPERTY(GravityScale)
 		PROPERTY(bSweep)
+		PROPERTY(bIsFrictionEnabled)
+		PROPERTY(Friction)
 		REFLECT_END()
 public:
 	UProjectileMovementComponent();
@@ -52,6 +55,9 @@ private:
 	bool bShouldBounce = true;
 	float Bounciness = 0.6f;
 	bool bRotationFollowsVelocity = true;
+	bool bISGravityEnabled = true;
 	float GravityScale = 1.0f;
 	bool bSweep = true;
+	bool bIsFrictionEnabled = false;
+	float Friction = 0.2f;
 };

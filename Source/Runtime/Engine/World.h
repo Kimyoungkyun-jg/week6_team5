@@ -108,6 +108,7 @@ public:
 	// 현재 World의 Component에 Ray를 전달하고 가장 가까운 유효 교차를 반환한다.
 	bool LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 		FBillboardTraceTransform ResolveBillboard = nullptr, const void* ViewContext = nullptr);
+	bool SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, FHitResult& OutHit, AActor* IgnoreActor = nullptr);
 
 	void BeginPlay();
 	void EndPlay();

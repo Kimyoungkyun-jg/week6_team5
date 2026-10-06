@@ -130,7 +130,7 @@ void UWorld::Tick(EWorldTick TickType, float DeltaTime)
 			}
 		}
 	}
-	else if(WorldType == EWorldType::Editor)
+	else if (WorldType == EWorldType::Editor)
 	{
 
 		for (TObjectIterator<UParticleSubUVComponent> Comp; Comp; ++Comp)
@@ -184,7 +184,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 		// 컬링 단계에서는 프록시 포인터만 모으고, 컴포넌트 역참조(가시성 확인)는 어차피 컴포넌트를 읽는 Gather로 미룬다.
 		const auto Visit = [&](FPrimitiveSceneProxy* Proxy) { VisibleProxies.Add(Proxy); };
 
-		if (Frustum) 
+		if (Frustum)
 		{
 			Scene.BVH.QueryCull(
 				FrustumAllPlanesMask,
@@ -263,14 +263,14 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FViewContext* 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
 
-        LODInputs.Reset();
-        if (View)
-        {
-            LODInputs.Reserve(VisibleProxies.Num());
-            for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
-                LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
-            SelectLODs(LODInputs, *View, SelectedLODs);
-        }
+		LODInputs.Reset();
+		if (View)
+		{
+			LODInputs.Reserve(VisibleProxies.Num());
+			for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
+				LODInputs.Add({ Proxy->GetLODSphere(), Proxy->GetRenderState() });
+			SelectLODs(LODInputs, *View, SelectedLODs);
+		}
 		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
 			{
 				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
@@ -576,11 +576,66 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	float NearestT = std::numeric_limits<float>::max();
 
 	const auto TraceComponent = [&](FPrimitiveSceneProxy* Proxy, float& InOutNearestT)
-	{
-		if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
 		{
-			if (!Proxy->IsVisible())
+			if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
+			{
+				if (!Proxy->IsVisible())
+					return false;
+
+				const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
+				const FRay LocalRay{
+					.Origin = WorldToLocal.TransformPosition(WorldRay.Origin),
+					.Direction = WorldToLocal.TransformVector(WorldRay.Direction)
+				};
+
+				float T = InOutNearestT;
+				if (!RayIntersectsMesh(LocalRay, Mesh->GetMeshData(), T))
+					return false;
+
+				OutHit.HitComponent = Proxy->GetComponent();
+				OutHit.Distance = T;
+				OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+				InOutNearestT = T;
+				return true;
+			}
+
+			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
+
+			if (!Component || !Component->IsVisible())
 				return false;
+
+			if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))
+			{
+				if (!ResolveBillboard)
+				{
+					FHitResult Hit;
+					if (!Billboard->LineTraceComponent(WorldRay, Hit) ||
+						Hit.Distance >= InOutNearestT)
+					{
+						return false;
+					}
+
+					OutHit = Hit;
+					InOutNearestT = Hit.Distance;
+					return true;
+				}
+
+				const FMatrix BillboardToWorld = ResolveBillboard(*Billboard, ViewContext);
+
+				const FRay LocalRay = ToLocalRay(WorldRay, BillboardToWorld);
+
+				float T = InOutNearestT;
+				if (!Billboard->LineTraceComponentLocal(LocalRay, T))
+				{
+					return false;
+				}
+
+				OutHit.HitComponent = Billboard;
+				OutHit.Distance = T;
+				OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+				InOutNearestT = T;
+				return true;
+			}
 
 			const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
 			const FRay LocalRay{
@@ -589,72 +644,17 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 			};
 
 			float T = InOutNearestT;
-			if (!RayIntersectsMesh(LocalRay, Mesh->GetMeshData(), T))
-				return false;
-
-			OutHit.HitComponent = Proxy->GetComponent();
-			OutHit.Distance = T;
-			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
-			InOutNearestT = T;
-			return true;
-		}
-
-		UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
-
-		if (!Component || !Component->IsVisible())
-			return false;
-
-		if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))
-		{
-			if (!ResolveBillboard)
-			{
-				FHitResult Hit;
-				if (!Billboard->LineTraceComponent(WorldRay, Hit) ||
-					Hit.Distance >= InOutNearestT)
-				{
-					return false;
-				}
-
-				OutHit = Hit;
-				InOutNearestT = Hit.Distance;
-				return true;
-			}
-
-			const FMatrix BillboardToWorld = ResolveBillboard(*Billboard, ViewContext);
-
-			const FRay LocalRay = ToLocalRay(WorldRay, BillboardToWorld);
-
-			float T = InOutNearestT;
-			if (!Billboard->LineTraceComponentLocal(LocalRay, T))
+			if (!Component->LineTraceComponentLocal(LocalRay, T))
 			{
 				return false;
 			}
 
-			OutHit.HitComponent = Billboard;
+			OutHit.HitComponent = Component;
 			OutHit.Distance = T;
 			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
 			InOutNearestT = T;
 			return true;
-		}
-
-		const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
-		const FRay LocalRay{
-			.Origin = WorldToLocal.TransformPosition(WorldRay.Origin),
-			.Direction = WorldToLocal.TransformVector(WorldRay.Direction)
 		};
-
-		float T = InOutNearestT;
-		if (!Component->LineTraceComponentLocal(LocalRay, T))
-		{
-			return false;
-		}
-
-		OutHit.HitComponent = Component;
-		OutHit.Distance = T;
-		OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
-		InOutNearestT = T;
-		return true;
-	};
 
 	const FPreparedRay PreparedRay(WorldRay);
 
@@ -664,6 +664,106 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 		NearestT);
 
 	return OutHit.HitComponent != nullptr;
+}
+
+bool UWorld::SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, FHitResult& OutHit, AActor* IgnoreActor)
+{
+	OutHit = FHitResult(1.0f);
+	float NearestT = MaxDistance;
+
+	const auto TraceComponent = [&](FPrimitiveSceneProxy* Proxy, float& InOutNearestT)
+		{
+			if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
+			{
+				if (Proxy->GetComponent()->GetOwner() == IgnoreActor)
+				{
+					return false;
+				}
+				FAABB Bounds = Proxy->GetBounds();
+				Bounds.Extent += FVector(Radius, Radius, Radius);
+
+				float T = InOutNearestT;
+				if (!RayIntersectsAABB(WorldRay, Bounds.Center - Bounds.Extent, Bounds.Center + Bounds.Extent, T))
+				{
+					return false;
+				}
+
+				FVector ImpactNormal;
+				FVector ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+				FVector D = ImpactPoint - Bounds.Center;
+				float NormX = D.X / Bounds.Extent.X;
+				float NormY = D.Y / Bounds.Extent.Y;
+				float NormZ = D.Z / Bounds.Extent.Z;
+
+				float AbsX = fabsf(NormX);
+				float AbsY = fabsf(NormY);
+				float AbsZ = fabsf(NormZ);
+				float MaxAxis = std::max({ AbsX, AbsY, AbsZ });
+
+				if (MaxAxis == AbsX)
+				{
+					ImpactNormal = FVector(NormX > 0 ? 1.0f : -1.0f, 0.0f, 0.0f);
+				}
+				else if (MaxAxis == AbsY)
+				{
+					ImpactNormal = FVector(0.0f, NormY > 0 ? 1.0f : -1.0f, 0.0f);
+				}
+				else
+				{
+					ImpactNormal = FVector(0.0f, 0.0f, NormZ > 0 ? 1.0f : -1.0f);
+				}
+
+				if (ImpactNormal.Dot(WorldRay.Direction) > 0.0f)
+					return false;
+
+
+
+				OutHit.bBlockingHit = true;
+				OutHit.HitComponent = Proxy->GetComponent();
+				OutHit.Distance = T;
+				OutHit.Time = T / MaxDistance;
+				OutHit.ImpactPoint = ImpactPoint;
+				OutHit.ImpactNormal = ImpactNormal;
+				OutHit.Normal = OutHit.ImpactNormal;
+				InOutNearestT = T;
+				return true;
+			}
+
+			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
+
+			if (!Component || !Component->IsVisible())
+				return false;
+
+			const FMatrix& WorldToLocal = Proxy->GetWorldToLocal();
+			const FRay LocalRay{
+				.Origin = WorldToLocal.TransformPosition(WorldRay.Origin),
+				.Direction = WorldToLocal.TransformVector(WorldRay.Direction)
+			};
+
+			float T = InOutNearestT;
+			if (!Component->LineTraceComponentLocal(LocalRay, T))
+			{
+				return false;
+			}
+
+			OutHit.bBlockingHit = true;
+			OutHit.HitComponent = Component;
+			OutHit.Distance = T;
+			OutHit.Time = T / MaxDistance;
+			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+			OutHit.ImpactNormal = -WorldRay.Direction;
+			OutHit.Normal = OutHit.ImpactNormal;
+			InOutNearestT = T;
+			return true;
+		};
+	const FPreparedRay PreparedRay(WorldRay);
+	const FVector Extent(Radius, Radius, Radius);
+	Scene.BVH.TraceClosest(
+		[&](const FBox& Bounds, float& OutEnterT) { return RayIntersectsAABB(PreparedRay, Bounds.Min - Extent, Bounds.Max + Extent, OutEnterT); },
+		[&](FPrimitiveSceneProxy* Proxy, float& OutNearestT) { return TraceComponent(Proxy, OutNearestT); },
+		NearestT);
+
+	return OutHit.bBlockingHit;
 }
 
 void UWorld::BeginPlay()
@@ -702,7 +802,7 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 	{
 		HTR_LOG(Error, "Fail to Duplicate EditorWorld...");
 	}
-	
+
 	Init();
 
 
@@ -711,7 +811,7 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 		for (AActor* SrcActor : SrcLevel->GetActors())
 		{
 			if (!SrcActor || SrcActor->IsA<ACameraActor>())
-				continue; 
+				continue;
 
 			// 기존 액터의 위치/회전/스케일 가져오기
 			const FTransform ActorTransform = SrcActor->GetRootComponent()
@@ -720,7 +820,7 @@ void UWorld::DuplicateWorld(UWorld* SrcWorld)
 
 			// 새 액터 스폰
 			AActor* NewActor = SpawnActor(SrcActor->GetClass(), NAME_None, &ActorTransform);
-			
+
 			for (int i = 0; i < NewActor->Components.size(); i++)
 			{
 				if (UStaticMeshComponent* newSMC = Cast<UStaticMeshComponent>(NewActor->Components[i]))

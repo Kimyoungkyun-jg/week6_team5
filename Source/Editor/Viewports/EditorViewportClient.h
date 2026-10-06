@@ -16,6 +16,7 @@ class UWorld;
 class FGizmo;
 class AActor;
 
+
 // 에디터 뷰포트 클라이언트
 class FEditorViewportClient : public FViewportClient {
 public:
@@ -106,8 +107,11 @@ public:
   FTexture2D *GetDepthTarget() const { return ViewTargets.Depth.get(); }
   const FDeferredViewTargets &GetViewTargets() const { return ViewTargets; }
 
-  bool IsWireframe() const { return bWireframe; }
-  void SetWireframe(const bool bInWireframe) { bWireframe = bInWireframe; }
+  bool IsWireframe() const { return ViewportMode == EViewportMode::Wireframe; }
+  bool IsSceneDepth() const { return ViewportMode == EViewportMode::SceneDepth; }
+  EViewportMode GetViewportMode() const { return ViewportMode; }
+  void SetViewportMode(const EViewportMode InViewportMode) { ViewportMode = InViewportMode; }
+  float GetMaxRange() const { return MaxRange; }
 
   // 타깃 크기 변경
   void Resize(uint32 InWidth, uint32 InHeight);
@@ -119,7 +123,7 @@ protected:
   bool bIsPerspective = true;
   bool bIsRealtime = true;
   bool bActive = false;
-  bool bWireframe = false;
+  EViewportMode ViewportMode = EViewportMode::Solid;
 
   FRect Rect{};
   uint32 Width = 0;
@@ -133,4 +137,5 @@ protected:
   float NearClip = 0.1f;
   float FarClip = 10000.0f;
   float OrthoWidth = 10.0f;
+  float MaxRange = 50.0f;
 };

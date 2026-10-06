@@ -79,6 +79,7 @@ public:
 	static bool BeginGBufferPass(const FDeferredViewTargets& Targets, uint32 Width, uint32 Height);
 	static void EndRenderPass();
 	static void ClearDepthStencil(FTexture2D* DepthStencilTexture, float Depth = 1.0f, uint8 Stencil = 0);
+	static void SetRenderTargets(FTexture2D* ColorTarget, FTexture2D* DepthTarget);
 
 	static void SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 InHeight);
 

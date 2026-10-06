@@ -11,6 +11,7 @@
 #include "Component/BillboardComponent.h"
 #include "Component/TextRenderComponent.h"
 #include "Component/ExponentialHeightFogComponent.h"
+#include "Component/ProjectileMovementComponent.h"
 #include "Asset/AssetManager.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
@@ -1025,6 +1026,10 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 			auto* NewComp = Owner->CreateDefaultSubobject<UExponentialHeightFogComponent>("ExponentialHeightFog");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
+		}
+		if (ImGui::Selectable("Projectile Movement Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UProjectileMovementComponent>("ProjectileMovement");
 		}
 		ImGui::EndPopup();
 	}

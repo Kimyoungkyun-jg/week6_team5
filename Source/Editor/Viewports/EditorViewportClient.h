@@ -104,6 +104,7 @@ public:
   uint32 GetHeight() const { return Height; }
 
   FTexture2D *GetColorTarget() const { return ViewTargets.SceneColor.get(); }
+  FTexture2D* SwapSceneColorAndBind(TUniquePtr<FTexture2D>& Output) { return ViewTargets.SwapSceneColorAndBind(Output); }
   FTexture2D *GetDepthTarget() const { return ViewTargets.Depth.get(); }
   const FDeferredViewTargets &GetViewTargets() const { return ViewTargets; }
 

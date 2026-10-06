@@ -895,10 +895,9 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				SceneView.ViewProjectionMatrix);
 	}
 
-	//// 씬 뎁스 렌더링, 깊이를 시각적으로 확인하기 위한 코드
-	//if (ViewClient && ViewClient->IsSceneDepth()) {
-	//	SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
-	//}
+	// Scene Depth 뷰 모드에서만 선형 거리를 회색으로 표시한다.
+	if (!bIsPIE && ViewClient && ViewClient->IsSceneDepth())
+		SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
 
 	// 에디터 오버레이 렌더링
 	if (!bIsPIE) {

@@ -112,6 +112,7 @@ public:
   EViewportMode GetViewportMode() const { return ViewportMode; }
   void SetViewportMode(const EViewportMode InViewportMode) { ViewportMode = InViewportMode; }
   float GetMaxRange() const { return MaxRange; }
+  void SetMaxRange(float InMaxRange) { MaxRange = InMaxRange; }
 
   // 타깃 크기 변경
   void Resize(uint32 InWidth, uint32 InHeight);

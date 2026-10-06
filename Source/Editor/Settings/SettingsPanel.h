@@ -19,6 +19,7 @@ struct FEditorSettings
 	bool bDrawPSGrid = false;
 
 	// Values
+	float SceneDepthMaxRange = 50.0f;
 	float CameraSpeed = 1.0f;
 	float MouseSensitivity = 1.0f;
 	int32 GridSpacing = 1;
@@ -73,6 +74,7 @@ private:
 
     // View별 Transform·투영·표시 설정을 읽어 저장용 스냅샷에 반영한다.
     void ReadViewportSettings(FEditorSettings& Out) const;
+	void ApplySceneDepthRange();
 	UWorld* World = nullptr;
 	FViewportsPanel* ViewportsPanel = nullptr;
 	FEditorSettings Settings;

@@ -522,6 +522,7 @@ void FRenderer::UpdateMaterialParams(const FRenderPacket& RenderPacket)
 	}
 	case EPSOType::Particle_AlphaBlend:
 	case EPSOType::Particle_Additive:
+	case EPSOType::FireBall:
 	{
 		if (RenderPacket.MaterialParamData != nullptr)
 		{

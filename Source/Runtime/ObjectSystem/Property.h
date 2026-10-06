@@ -45,4 +45,7 @@ struct FProperty
     size_t Offset;
     size_t Size;
     UClass* Class = nullptr;
+	float MinValue = 0.0f;
+	float MaxValue = 0.0f;
+	bool bHasRange = false;
 };

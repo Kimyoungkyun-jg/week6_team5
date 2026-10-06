@@ -652,8 +652,25 @@ namespace
 		switch (Property.Type)
 		{
 		case EPropertyType::Float:
-			ImGui::DragFloat(Label.c_str(), static_cast<float*>(ValuePtr), 0.1f);
+		{
+			bool bChanged = false;
+			if (Property.bHasRange)
+			{
+				const float DragSpeed = (Property.MaxValue - Property.MinValue) * 0.001f;
+				bChanged = ImGui::DragFloat(Label.c_str(), static_cast<float*>(ValuePtr), DragSpeed,
+					Property.MinValue, Property.MaxValue, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+			}
+			else
+			{
+				bChanged = ImGui::DragFloat(Label.c_str(), static_cast<float*>(ValuePtr), 0.1f);
+			}
+			if (bChanged)
+			{
+				if (USceneComponent* SceneComponent = Cast<USceneComponent>(Object))
+					SceneComponent->MarkTransformDirty();
+			}
 			break;
+		}
 
 		case EPropertyType::Int:
 			ImGui::DragInt(Label.c_str(), static_cast<int*>(ValuePtr), 1.0f);

@@ -21,6 +21,9 @@ public: \
 #define PROPERTY_TYPE(PropertyName, PropertyType) \
     InClass->AddProperty<decltype(ThisClass::PropertyName)>(#PropertyName, offsetof(ThisClass, PropertyName), EPropertyType::##PropertyType);
 
+#define PROPERTY_RANGE(PropertyName, Min, Max) \
+    InClass->AddProperty<decltype(ThisClass::PropertyName)>(#PropertyName, offsetof(ThisClass, PropertyName), Min, Max);
+
 #define REFLECT_END()\
 	};\
 private:

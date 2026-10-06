@@ -9,12 +9,12 @@ class UExponentialHeightFogComponent : public UPrimitiveComponent
 	DECLARE_CLASS(UExponentialHeightFogComponent, UPrimitiveComponent)
 
 	REFLECT_START(ClassName)
-		PROPERTY(FogDensity)
-		PROPERTY(FogHeightFalloff)
+		PROPERTY_RANGE(FogDensity, 0.0f, 1.0f)
+		PROPERTY_RANGE(FogHeightFalloff, 0.0f, 1.0f)
 		PROPERTY_TYPE(FogColor, Color)
-		PROPERTY(StartDistance)
-		PROPERTY(FogMaxOpacity)
-		PROPERTY(FogCutoffDistance)
+		PROPERTY_RANGE(StartDistance, 0.0f, 1000.0f)
+		PROPERTY_RANGE(FogMaxOpacity, 0.0f, 1.0f)
+		PROPERTY_RANGE(FogCutoffDistance, 0.0f, 3000.0f)
 	REFLECT_END()
 
 public:

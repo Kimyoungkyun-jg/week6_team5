@@ -164,6 +164,9 @@ bool UEditorEngine::Init() {
 	HeightFogRenderer = MakeUnique<FHeightFogRenderer>();
 	HeightFogRenderer->Init(Renderer);
 
+	FXAARenderer = MakeUnique<FFXAARenderer>();
+	FXAARenderer->Init(Renderer);
+
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
 	Outline = MakeUnique<FOutline>();
@@ -639,6 +642,12 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 	}
 
 	RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
+
+	// FXAA 렌더링
+	if (SettingsPanel->GetSettings().bEnableFXAA) {
+		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget);
+	}
+
 	RenderCommand::EndRenderPass();
 }
 
@@ -896,6 +905,11 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	// 씬 뎁스 렌더링, 깊이를 시각적으로 확인하기 위한 코드
 	if (ViewClient && ViewClient->IsSceneDepth()) {
 		SceneDepthRenderer->OnRender(SceneView, DepthTarget, ColorTarget, ViewClient->GetMaxRange());
+	}
+
+	// FXAA 렌더링
+	if (SettingsPanel->GetSettings().bEnableFXAA) {
+		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget);
 	}
 
 	// 에디터 오버레이 렌더링

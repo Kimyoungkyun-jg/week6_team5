@@ -15,7 +15,9 @@ SamplerState LinearClampSampler : register(s0);
 static const float EdgeThreshold = 0.166;       // 상대 임계값 (rangeMax에 비례)
 static const float EdgeThresholdMin = 0.0833;   // 절대 임계값 (어두운 곳 제외)
 static const float SubpixelStrength = 0.75;
-static const int MaxSearchSteps = 32;           //  걸음 수 상한. UE는 프리셋(Quality)에 따라 비균일 간격을 사용함. 이 값은 연산량에 영향을 많이 준다.
+// UE Quality 4 = FXAA preset 29. 마지막 간격은 미발견 방향의 거리 확장에만 사용한다.
+static const int SearchSampleCount = 11;
+static const float SearchSteps[12] = { 1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 4.0, 8.0 };
 
 // luma = 0.299R + 0.587G + 0.114B (Rec.601). UE의 FxaaLuma와 같음
 float GetLuma(float3 Color)
@@ -100,35 +102,38 @@ float4 mainPS(VSOutput Input) : SV_Target
     float EndDeltaNegative = 0;
     float EndDeltaPositive = 0;
 
-    // 선을 따라 양쪽으로 걷기. UE는 간격이 1, 1.5, 2, ... 로 커지지만 여기는 1픽셀 균일
+    // 샘플 거리: 1, 2.5, 4.5, ..., 18.5, 22.5픽셀. 발견한 방향은 멈춘다.
     [loop]
-    for (int Step = 1; Step <= MaxSearchSteps; ++Step)
+    for (int Step = 0; Step < SearchSampleCount; ++Step)
     {
         if (!FoundNegative)
         {
-            EndDeltaNegative = SampleLuma(SearchOrigin - SearchStep * Step) - PairAverage;
+            DistanceNegative += SearchSteps[Step];
+            EndDeltaNegative = SampleLuma(SearchOrigin - SearchStep * DistanceNegative) - PairAverage;
             FoundNegative = abs(EndDeltaNegative) >= EndThreshold;
-            DistanceNegative = Step;    // 끝을 처음 감지한 탐색점까지의 거리 (최소 1)
         }
         if (!FoundPositive)
         {
-            EndDeltaPositive = SampleLuma(SearchOrigin + SearchStep * Step) - PairAverage;
+            DistancePositive += SearchSteps[Step];
+            EndDeltaPositive = SampleLuma(SearchOrigin + SearchStep * DistancePositive) - PairAverage;
             FoundPositive = abs(EndDeltaPositive) >= EndThreshold;
-            DistancePositive = Step;
         }
         if (FoundNegative && FoundPositive)
             break;
     }
 
-    // 한쪽이라도 끝을 못 찾으면 가장자리 항은 사용하지 않는다.
+    // UE처럼 미발견 방향은 30.5픽셀까지 거리만 확장한다.
+    // 부호 검사에는 마지막으로 실제 샘플링한 밝기 차이를 사용한다.
+    if (!FoundNegative)
+        DistanceNegative += SearchSteps[SearchSampleCount];
+    if (!FoundPositive)
+        DistancePositive += SearchSteps[SearchSampleCount];
+
     float EdgeOffset = 0;
-    if (FoundNegative && FoundPositive)
-    {
-        float NearestEndDelta = DistanceNegative < DistancePositive ? EndDeltaNegative : EndDeltaPositive;
-        if ((NearestEndDelta < 0) != (M - PairAverage < 0))
-            // t = 0.5 − min(a,b)/(a+b)   (UE의 pixelOffset)
-            EdgeOffset = 0.5 - min(DistanceNegative, DistancePositive) / (DistanceNegative + DistancePositive);
-    }
+    float NearestEndDelta = DistanceNegative < DistancePositive ? EndDeltaNegative : EndDeltaPositive;
+    if ((NearestEndDelta < 0) != (M - PairAverage < 0))
+        // 양쪽 미발견이면 거리가 같아 자연스럽게 0이 된다.
+        EdgeOffset = 0.5 - min(DistanceNegative, DistancePositive) / (DistanceNegative + DistancePositive);
 
     // 서브픽셀: 주변 8픽셀 가중평균 (상하좌우 2, 모서리 1, 합 12). M 제외
     float NeighborhoodAverage = (2 * (N + S + W + E) + NW + NE + SW + SE) / 12.0;

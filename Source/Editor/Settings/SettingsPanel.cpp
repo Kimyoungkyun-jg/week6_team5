@@ -46,6 +46,7 @@ void FSettingsPanel::OnRender()
 
 	ImGui::Dummy(ImVec2(0.0f, SectionGap));
 	ImGui::SeparatorText("Scene Depth");
+	ImGui::Checkbox("Show Scene Depth", &Settings.bShowSceneDepth);
 	ImGui::SetNextItemWidth(200.0f);
 	ImGui::DragFloat("Black Depth", &Settings.DepthDisplayMin, 0.0001f,
 		0.0f, Settings.DepthDisplayMax - 0.000001f, "%.6f", ImGuiSliderFlags_AlwaysClamp);
@@ -132,6 +133,7 @@ bool FSettingsPanel::SaveSettings() const
 	File << "ShowUUID=" << Settings.bShowUUID << "\n";
 	File << "DrawBatchLine=" << Settings.bDrawBatchLine << "\n";
 	File << "DrawPSGrid=" << Settings.bDrawPSGrid << "\n";
+	File << "ShowSceneDepth=" << Settings.bShowSceneDepth << "\n";
 	const auto PreviousPrecision = File.precision(9);
 	File << "RawDepthMin=" << Settings.DepthDisplayMin << "\n";
 	File << "RawDepthMax=" << Settings.DepthDisplayMax << "\n";
@@ -256,6 +258,7 @@ bool FSettingsPanel::LoadSettings()
 				else if (Key == "ShowUUID") Settings.bShowUUID = std::stoi(ValueStr);
 				else if (Key == "DrawBatchLine") Settings.bDrawBatchLine = std::stoi(ValueStr);
 				else if (Key == "DrawPSGrid") Settings.bDrawPSGrid = std::stoi(ValueStr);
+				else if (Key == "ShowSceneDepth") Settings.bShowSceneDepth = std::stoi(ValueStr);
 				else if (Key == "RawDepthMin") Settings.DepthDisplayMin = std::stof(ValueStr);
 				else if (Key == "RawDepthMax") Settings.DepthDisplayMax = std::stof(ValueStr);
 

@@ -17,6 +17,7 @@ struct FEditorSettings
 	bool bShowUUID = false;
 	bool bDrawBatchLine = true;
 	bool bDrawPSGrid = false;
+	bool bShowSceneDepth = false;
 
 	// Values
 	float DepthDisplayMin = 0.0f;

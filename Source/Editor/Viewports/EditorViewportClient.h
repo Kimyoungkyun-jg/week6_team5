@@ -105,6 +105,10 @@ public:
   FTexture2D *GetColorTarget() const { return ColorTarget.get(); }
   FTexture2D *GetDepthTarget() const { return DepthTarget.get(); }
   FTexture2D* GetFogColorTarget() const { return FogColorTarget.get(); }
+  FTexture2D* GetDisplayColorTarget() const {
+    return bUseFogColorTarget && FogColorTarget ? FogColorTarget.get() : ColorTarget.get();
+  }
+  void SetUseFogColorTarget(bool bInUseFogColorTarget) { bUseFogColorTarget = bInUseFogColorTarget; }
   FTexture2D* GetFogDepthTarget() const { return FogDepthTarget.get(); }
 
   bool IsWireframe() const { return bWireframe; }
@@ -121,6 +125,7 @@ protected:
   bool bIsRealtime = true;
   bool bActive = false;
   bool bWireframe = false;
+  bool bUseFogColorTarget = false;
 
   FRect Rect{};
   uint32 Width = 0;

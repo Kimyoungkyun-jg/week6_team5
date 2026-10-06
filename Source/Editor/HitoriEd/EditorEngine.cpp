@@ -609,14 +609,26 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 				TextComponent->GetTextSize(), *TextComponent->GetFont(),
 				SceneView.ViewProjectionMatrix);
 	}
-	RenderCommand::EndRenderPass();
 	FTexture2D* FogColorTarget = ViewClient ? ViewClient->GetFogColorTarget() : nullptr;
-	RenderCommand::BeginRenderPass(FogColorTarget, nullptr, Width, Height);
-	Renderer->RenderSceneDepth(DepthTarget,SettingsPanel->GetSettings().DepthDisplayMin,SettingsPanel->GetSettings().DepthDisplayMax);
-	for (TObjectIterator<UHeightFogComponent> FogComponent; FogComponent; ++FogComponent)
+	TObjectIterator<UHeightFogComponent> FogComp;
+	const bool bShowSceneDepth = SettingsPanel->GetSettings().bShowSceneDepth;
+	const bool bUseFogColorTarget = FogColorTarget && (bShowSceneDepth || static_cast<bool>(FogComp));
+	if (ViewClient)
 	{
-		Renderer->RenderExponentialFog(ColorTarget, DepthTarget, *FogComponent, SceneView);
-		break;
+		ViewClient->SetUseFogColorTarget(bUseFogColorTarget);
+	}
+	if (bUseFogColorTarget)
+	{
+		RenderCommand::EndRenderPass();
+		RenderCommand::BeginRenderPass(FogColorTarget, nullptr, Width, Height);
+		if (bShowSceneDepth)
+		{
+			Renderer->RenderSceneDepth(DepthTarget, SettingsPanel->GetSettings().DepthDisplayMin, SettingsPanel->GetSettings().DepthDisplayMax);
+		}
+		else if (FogComp)
+		{
+			Renderer->RenderExponentialFog(ColorTarget, DepthTarget, *FogComp, SceneView);
+		}
 	}
 
 	// 에디터 오버레이 렌더링

@@ -160,10 +160,11 @@ void FViewportsPanel::OnRender() {
 			continue;
 		}
 
-		if (!Client->GetColorTarget())
+		FTexture2D* DisplayColorTarget = Client->GetDisplayColorTarget();
+		if (!DisplayColorTarget)
 			continue;
 
-		DrawList->AddImage(Client->GetColorTarget()->GetSRV(), ViewMin, ViewMax);
+		DrawList->AddImage(DisplayColorTarget->GetSRV(), ViewMin, ViewMax);
 
 		// 마우스 클릭 시 활성 뷰포트 설정
 		const bool bViewHovered = bHovered && ImGui::IsMouseHoveringRect(ViewMin, ViewMax);

@@ -13,6 +13,19 @@ struct FDeferredViewTargets
 	TUniquePtr<FTexture2D> NormalRoughness;
 	TUniquePtr<FTexture2D> Depth;
 
+	// FXAA처리가 된 SceneColor로 swap하기 위해 사용된다.
+	FTexture2D* SwapSceneColorAndBind(TUniquePtr<FTexture2D>& Output)
+	{
+		const bool bCompatible = Output && 
+								Output->GetWidth() == SceneColor->GetWidth() && Output->GetHeight() == SceneColor->GetHeight() &&
+								Output->GetFormat() == SceneColor->GetFormat();
+		if (!bCompatible)
+			return nullptr;
+		SceneColor.swap(Output);
+		RenderCommand::BindRenderPassNoClear(SceneColor.get(), Depth.get(), SceneColor->GetWidth(), SceneColor->GetHeight());
+		return SceneColor.get();
+	}
+
 	void Reset()
 	{
 		SceneColor.reset();

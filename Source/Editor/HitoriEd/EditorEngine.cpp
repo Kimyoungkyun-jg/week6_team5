@@ -644,8 +644,8 @@ void UEditorEngine::RenderGameFrame(FGameViewportClient* GameClient, const FScen
 	RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 
 	// FXAA 렌더링
-	if (SettingsPanel->GetSettings().bEnableFXAA) {
-		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget);
+	if (SettingsPanel->GetSettings().bEnableFXAA && FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget)) {
+		GameClient->SwapSceneColorAndBind(FXAARenderer->GetOutputTarget());
 	}
 
 	RenderCommand::EndRenderPass();
@@ -908,8 +908,12 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	}
 
 	// FXAA 렌더링
-	if (SettingsPanel->GetSettings().bEnableFXAA) {
-		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget);
+	if (SettingsPanel->GetSettings().bEnableFXAA && FXAARenderer && !ViewClient->IsSceneDepth() &&
+		FXAARenderer->OnRender(SceneView, DepthTarget, ColorTarget)) {
+		if (FTexture2D* NewColorTarget = ViewClient->SwapSceneColorAndBind(FXAARenderer->GetOutputTarget()))
+			ColorTarget = NewColorTarget;
+		else
+			RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
 	}
 
 	// 에디터 오버레이 렌더링

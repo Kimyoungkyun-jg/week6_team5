@@ -58,6 +58,8 @@ public:
 	virtual FBox CalcLocalBounds() const { return FBox{ FVector(), FVector() }; }
 	FBox CalcBounds() const { return CalcLocalBounds().GetWorldAABB(GetWorldMatrix()); }
 
+	virtual float GetCollisionRadius() const;
+
 	FVector GetWorldLocation() const;
 	FRotator GetWorldRotation() const;
 	FVector GetWorldScale3D() const;

@@ -122,6 +122,20 @@ bool USceneComponent::MoveComponent(const FVector& Delta, const FRotator& NewRot
 	return MoveComponentImpl(Delta, NewRotation.Quaternion(), bSweep, OutHit);
 }
 
+float USceneComponent::GetCollisionRadius() const
+{
+	FBox Bounds = CalcBounds();
+	FVector Extent = Bounds.Max - Bounds.Min;
+	Extent *= 0.5f;
+
+	if(Extent.IsZero())
+	{
+		return 10.0f;
+	}
+
+	return std::min({ Extent.X, Extent.Y, Extent.Z });
+}
+
 bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
 {
 	FHitResult Temphit;
@@ -138,6 +152,8 @@ bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRo
 		{
 			return false;
 		}
+		SetRelativeRotation(NewRotation.ToFRotator());
+		return true;
 	}
 	// bSweep = true일 때 충돌 체크
 	if(bSweep)
@@ -146,18 +162,19 @@ bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRo
 		AActor* OwnerActor = GetOwner();
 		UWorld* World = OwnerActor->GetWorld();
 		if (!World) return false;
-
+		float Radius = GetCollisionRadius();
 		FRay Ray = FRay(GetWorldLocation(), Delta.Normalized());
-		if(World->LineTraceSingle(Ray, HitResult))
+
+		if(World->SweepSingle(Ray, Delta.Size(), Radius, HitResult, OwnerActor))
 		{
-			if(HitResult.Distance < Delta.Size() && HitResult.HitComponent->GetOwner() != OwnerActor)
-			{
-				// 충돌 발생 시 Hit에 충돌 정보 저장 및 종료
-				HitResult.bBlockingHit = true;
-				HitResult.Normal = -Delta.Normalized();
-				HitResult.ImpactNormal = HitResult.Normal;
-				return false;
-			}
+			// 충돌 발생 시 Hit에 충돌 정보 저장 및 종료
+			// 충돌 지점까지 이동 후 종료
+			FVector SafeLocation = GetRelativeLocation() + Delta * HitResult.Time + HitResult.ImpactNormal * 0.1f; // 충돌 지점에서 약간 떨어진 위치로 이동
+			SetRelativeLocation(SafeLocation);
+			//SetRelativeLocation(GetRelativeLocation() + Delta * HitResult.Time);
+			SetRelativeRotation(NewRotation.ToFRotator());
+
+			return false;
 		}
 	}
 

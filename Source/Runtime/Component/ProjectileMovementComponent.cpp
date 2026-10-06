@@ -4,8 +4,8 @@
 
 UProjectileMovementComponent::UProjectileMovementComponent()
 	: InitialSpeed(1000.0f)
-	, bShouldBounce(false)
-	, bRotationFollowsVelocity(false)
+	, bShouldBounce(true)
+	, bRotationFollowsVelocity(true)
 	, Bounciness(0.6f)
 	, GravityScale(1.0f)
 {
@@ -19,7 +19,7 @@ UProjectileMovementComponent::~UProjectileMovementComponent()
 UProjectileMovementComponent::UProjectileMovementComponent(float InInitialSpeed, float InMaxSpeed, bool bInShouldBounce, float InBounciness, float InGravityScale)
 	: InitialSpeed(InInitialSpeed)
 	, bShouldBounce(bInShouldBounce)
-	, bRotationFollowsVelocity(false)
+	, bRotationFollowsVelocity(true)
 	, Bounciness(InBounciness)
 	, GravityScale(InGravityScale)
 {
@@ -35,30 +35,56 @@ void UProjectileMovementComponent::BeginPlay()
 void UProjectileMovementComponent::TickComponent(float DeltaTime)
 {
 	Super::TickComponent(DeltaTime);
-	// 이동량 계신
-	FVector MoveDelta = ComputeMoveDelta(Velocity, DeltaTime);
-	// 속도 갱신
-	FVector NewVelocity = ComputeVelocity(Velocity, DeltaTime);
-	Velocity = NewVelocity;
-	// 회전 계산
-	FRotator NewRotation = UpdatedComponent ? UpdatedComponent->GetRelativeRotation() : FRotator();
-	if (bRotationFollowsVelocity && NewVelocity.Size() > 0)
-	{
-		float HoizontalSpeed = sqrt(NewVelocity.X * NewVelocity.X + NewVelocity.Y * NewVelocity.Y);
-		float Pitch = atan2(NewVelocity.Z, HoizontalSpeed);
-		float Yaw = atan2(NewVelocity.Y, NewVelocity.X);
-		Pitch = FMath::RadiansToDegrees(Pitch);
-		Yaw = FMath::RadiansToDegrees(Yaw);
-		NewRotation = FRotator(Pitch, Yaw, 0);
-	}
-	FHitResult HitResult;
 
-	MoveUpdatedComponent(MoveDelta, NewRotation, bSweep, &HitResult);
-	// 실제 이동 시도
-	if(HitResult.IsValidBlockingHit())
+	if(!UpdatedComponent) return;
+
+	float RemainingTime = DeltaTime;
+	int32 Iterations = 0;
+
+	while (RemainingTime > 0.0001f && Iterations < 4)
 	{
-		// 충돌 발생 시 연결
-		HandleImpact(HitResult, 0.f, MoveDelta);
+		Iterations++;
+		float TimeTick = RemainingTime;
+
+		// 이동량 계신
+		FVector MoveDelta = ComputeMoveDelta(Velocity, TimeTick);
+		// 속도 갱신
+		FVector NewVelocity = ComputeVelocity(Velocity, TimeTick);
+		Velocity = NewVelocity;
+		// 회전 계산
+		FRotator NewRotation = UpdatedComponent ? UpdatedComponent->GetRelativeRotation() : FRotator();
+		if (bRotationFollowsVelocity && NewVelocity.Size() > 0)
+		{
+			float HoizontalSpeed = sqrt(NewVelocity.X * NewVelocity.X + NewVelocity.Y * NewVelocity.Y);
+			float Pitch = atan2(-NewVelocity.Z, HoizontalSpeed);
+			float Yaw = atan2(NewVelocity.Y, NewVelocity.X);
+			Pitch = FMath::RadiansToDegrees(Pitch);
+			Yaw = FMath::RadiansToDegrees(Yaw);
+			NewRotation = FRotator(Pitch, Yaw, 0);
+		}
+		FHitResult HitResult;
+
+		MoveUpdatedComponent(MoveDelta, NewRotation, bSweep, &HitResult);
+		// 실제 이동 시도
+		if (HitResult.IsValidBlockingHit())
+		{
+			RemainingTime -= TimeTick * HitResult.Time;
+			// 충돌 발생 시 연결
+			HandleImpact(HitResult, RemainingTime, MoveDelta);
+			if (Velocity.Size() < 2.5f)
+			{
+				//FRotator FlatRotation(0.0f, UpdatedComponent->GetRelativeRotation().Yaw, 0.0f);
+				//UpdatedComponent->SetRelativeRotation(FlatRotation);
+
+				StopSimulating(HitResult);
+				break;
+			}
+		}
+		else
+		{
+			RemainingTime = 0.f;
+			break;
+		}
 	}
 }
 
@@ -120,7 +146,8 @@ FVector UProjectileMovementComponent::ComputeAcceleration(const FVector& InVeloc
 {
 	FVector Acceleration = FVector::ZeroVector;
 
-	Acceleration.Z -= 9.8f * GravityScale; // 중력 가속도 적용
+	if (bISGravityEnabled)
+		Acceleration.Z -= 9.8f * GravityScale; // 중력 가속도 적용
 
 	// 호밍 및 다른 외부 힘을 적용하려면 여기서 PendingForceThisUpdate를 사용하여 가속도를 계산할 수 있다.
 	// Acceleration += PendingForceThisUpdate;
@@ -135,7 +162,6 @@ void UProjectileMovementComponent::StopSimulating(const FHitResult& HitResult)
 	//PendingForceThisUpdate = FVector::ZeroVector;
 	//UpdateComponentVelocity();
 	SetUpdatedComponent(NULL);
-	//OnProjectileStop.Broadcast(HitResult);
 }
 
 void UProjectileMovementComponent::HandleImpact(const FHitResult& Hit, float TimeSlice, const FVector& MoveDelta)
@@ -162,12 +188,21 @@ void UProjectileMovementComponent::HandleImpact(const FHitResult& Hit, float Tim
 
 FVector UProjectileMovementComponent::ComputeBounceResult(const FHitResult& Hit, float TimeSlice, const FVector& MoveDelta)
 {
-	FVector NewVelocity = Velocity;
-	// 충돌한 표면의 법선 벡터를 기준으로 반사 벡터 계산
-	FVector Normal = Hit.ImpactNormal;
-	float VDotN = NewVelocity.Dot(Normal);
-	NewVelocity = NewVelocity - Normal * 2.0f * VDotN;
-	// 반사 후 속도에 Bounciness 적용
-	NewVelocity *= Bounciness;
-	return NewVelocity;
+	FVector TempVelocity = Velocity;
+	const FVector Normal = Hit.ImpactNormal;
+	const float VDotNormal = TempVelocity.Dot(Normal);
+
+	if (VDotNormal <= 0.0f)
+	{
+		const FVector ProjectedNormal = Normal * -VDotNormal;
+
+		TempVelocity += ProjectedNormal;
+
+		TempVelocity *= bIsFrictionEnabled ? FMath::Clamp(1.f - Friction, 0.f, 1.f) : 1.f;
+
+		TempVelocity += ProjectedNormal * std::max(0.0f, Bounciness);
+
+		TempVelocity = LimitVelocity(TempVelocity);
+	}
+	return TempVelocity;
 }

@@ -32,9 +32,26 @@ void UMovementComponent::BeginPlay()
 void UMovementComponent::TickComponent(float DeltaTime)
 {
 	Super::TickComponent(DeltaTime);
-	UpdateComponent(DeltaTime);
 }
 
-void UMovementComponent::UpdateComponent(float DeltaTime)
+bool UMovementComponent::MoveUpdatedComponent(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
 {
+	return MoveUpdatedComponentImpl(Delta, NewRotation, bSweep, OutHit);
+}
+
+bool UMovementComponent::MoveUpdatedComponent(const FVector& Delta, const FRotator& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+	return MoveUpdatedComponentImpl(Delta, NewRotation.Quaternion(), bSweep, OutHit);
+}
+
+bool UMovementComponent::MoveUpdatedComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+	if (!UpdatedComponent) return false;
+
+	return UpdatedComponent->MoveComponent(Delta, NewRotation, bSweep, OutHit);
+}
+
+void UMovementComponent::HandleImpact(const FHitResult& Hit, float TimeSlice, const FVector& MoveDelta)
+{
+
 }

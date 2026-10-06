@@ -13,6 +13,8 @@ class USceneComponent : public UActorComponent
 		REFLECT_END()
 
 public:
+	virtual void OnPropertyChanged(const FString& PropertyName) override;
+
 	USceneComponent() = default;
 	virtual ~USceneComponent() override;
 
@@ -21,21 +23,21 @@ public:
 	void SetRelativeLocation(const FVector& InLocation) 
 	{
 		Transform.Location = InLocation;
-		MarkTransformDirty();
+		OnPropertyChanged("Transform");
 	}
 
 	const FRotator& GetRelativeRotation() const { return Transform.Rotation; }
 	void SetRelativeRotation(const FRotator& InRotation) 
 	{
 		Transform.Rotation = InRotation; 
-		MarkTransformDirty();
+		OnPropertyChanged("Transform");
 	}
 
 	const FVector& GetRelativeScale3D() const { return Transform.Scale; }
 	void SetRelativeScale3D(const FVector& InScale) 
 	{
 		Transform.Scale = InScale;
-		MarkTransformDirty();
+		OnPropertyChanged("Transform");
 	}
 
 	// 쿼터니언 적용된 회전행렬
@@ -45,7 +47,7 @@ public:
 	void SetTransform(const FTransform& InTransform) 
 	{
 		Transform = InTransform;
-		MarkTransformDirty();
+		OnPropertyChanged("Transform");
 	}
 
 	// Attatch-To

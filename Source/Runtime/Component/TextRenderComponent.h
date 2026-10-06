@@ -27,13 +27,13 @@ public:
 	virtual void SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& View) override {}
 
 	const FString& GetText() const { return Text; }
-	void SetText(const FString& InText) { Text = InText; }
+	void SetText(const FString& InText) { Text = InText; OnPropertyChanged("Text"); }
 
 	UFont* GetFont() const { return Font; }
-	void SetFont(UFont* InFont) { Font = InFont; }
+	void SetFont(UFont* InFont) { Font = InFont; OnPropertyChanged("Font"); }
 
 	float GetTextSize() const { return TextSize < 0 ? 0.1f : TextSize; }
-	void SetTextSize(float InTextSize) { TextSize = InTextSize; }
+	void SetTextSize(float InTextSize) { TextSize = InTextSize; OnPropertyChanged("TextSize"); }
 
 private:
 	bool RebuildPickingMesh() const;

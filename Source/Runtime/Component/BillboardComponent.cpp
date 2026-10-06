@@ -104,7 +104,7 @@ void UBillboardComponent::Serialize(json& Handle, bool bIsLoading)
 		{
 			if (UMaterial* Loaded = UMaterial::LoadMaterial(Handle["Material"]))
 			{
-				Material = Loaded;   // 못 만들었으면 생성자 기본값 유지
+				SetMaterial(0, Loaded);   // 못 만들었으면 생성자 기본값 유지
 			}
 		}
 	}

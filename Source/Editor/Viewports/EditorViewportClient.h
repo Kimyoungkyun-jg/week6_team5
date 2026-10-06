@@ -8,6 +8,7 @@
 #include "Math/Vector2.h"
 #include "Render/DeferredViewTargets.h"
 #include "Render/SceneView.h"
+#include "Render/SceneRenderData.h"
 #include "Render/Texture2D.h"
 
 #include <functional>
@@ -29,7 +30,7 @@ public:
 
   // 월드 조회 및 설정
   virtual UWorld *GetWorld() const override { return World; }
-  void SetWorld(UWorld *InWorld) { World = InWorld; }
+  void SetWorld(UWorld *InWorld) { if (World != InWorld) RenderData.ResetScene(); World = InWorld; }
 
   // 입력 이벤트
   virtual void MouseMove(FViewport *Viewport, int32 X, int32 Y) override;
@@ -106,6 +107,7 @@ public:
   FTexture2D *GetColorTarget() const { return ViewTargets.SceneColor.get(); }
   FTexture2D* SwapSceneColorAndBind(TUniquePtr<FTexture2D>& Output) { return ViewTargets.SwapSceneColorAndBind(Output); }
   FTexture2D *GetDepthTarget() const { return ViewTargets.Depth.get(); }
+	FSceneRenderData& GetRenderData() { return RenderData; }
 	FDeferredViewTargets& GetViewTargets() { return ViewTargets; }
   const FDeferredViewTargets &GetViewTargets() const { return ViewTargets; }
 
@@ -132,6 +134,7 @@ protected:
   uint32 Width = 0;
   uint32 Height = 0;
   FDeferredViewTargets ViewTargets;
+	FSceneRenderData RenderData;
 
   FVector ViewLocation = FVector(0.0f, 0.0f, 0.0f);
   FRotator ViewRotation = FRotator(0.0f, 0.0f, 0.0f);

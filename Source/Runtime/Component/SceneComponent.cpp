@@ -111,3 +111,9 @@ void USceneComponent::MarkTransformDirty()
 }
 
 
+
+void USceneComponent::OnPropertyChanged(const FString& PropertyName)
+{
+	Super::OnPropertyChanged(PropertyName);
+	if (PropertyName == "Transform") MarkTransformDirty();
+}

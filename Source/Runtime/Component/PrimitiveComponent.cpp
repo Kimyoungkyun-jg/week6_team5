@@ -105,3 +105,12 @@ bool UPrimitiveComponent::TraceMeshLocal(const FRay& LocalRay, const FStaticMesh
 {
 	return RayIntersectsMesh(LocalRay, Mesh, OutT);
 }
+
+void UPrimitiveComponent::OnPropertyChanged(const FString& PropertyName)
+{
+	Super::OnPropertyChanged(PropertyName);
+	if (PropertyName == "Transform") return;
+	// Visibility, geometry, text and material changes may affect cached rendering and bounds.
+	MarkRenderStateDirty();
+	MarkTransformDirty();
+}

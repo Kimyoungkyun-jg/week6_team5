@@ -22,22 +22,22 @@ public:
 	~UExponentialHeightFogComponent() override = default;
 
 	float GetFogDensity() const { return FogDensity; }
-	void SetFogDensity(float InDensity) { FogDensity = InDensity; }
+	void SetFogDensity(float InDensity) { FogDensity = InDensity; OnPropertyChanged("FogDensity"); }
 
 	float GetFogHeightFalloff() const { return FogHeightFalloff; }
-	void SetFogHeightFalloff(float InFalloff) { FogHeightFalloff = InFalloff; }
+	void SetFogHeightFalloff(float InFalloff) { FogHeightFalloff = InFalloff; OnPropertyChanged("FogHeightFalloff"); }
 
 	const FVector4& GetFogColor() const { return FogColor; }
-	void SetFogColor(const FVector4& InColor) { FogColor = InColor; }
+	void SetFogColor(const FVector4& InColor) { FogColor = InColor; OnPropertyChanged("FogColor"); }
 
 	float GetStartDistance() const { return StartDistance; }
-	void SetStartDistance(float InDistance) { StartDistance = InDistance; }
+	void SetStartDistance(float InDistance) { StartDistance = InDistance; OnPropertyChanged("StartDistance"); }
 
 	float GetFogMaxOpacity() const { return FogMaxOpacity; }
-	void SetFogMaxOpacity(float InOpacity) { FogMaxOpacity = InOpacity; }
+	void SetFogMaxOpacity(float InOpacity) { FogMaxOpacity = InOpacity; OnPropertyChanged("FogMaxOpacity"); }
 
 	float GetFogCutoffDistance() const { return FogCutoffDistance; }
-	void SetFogCutoffDistance(float InDistance) { FogCutoffDistance = InDistance; }
+	void SetFogCutoffDistance(float InDistance) { FogCutoffDistance = InDistance; OnPropertyChanged("FogCutoffDistance"); }
 
 	// 부모 변환까지 반영된 현재 높이를 사용하므로 별도 갱신이 필요 없다.
 	float GetFogHeight() const { return GetWorldLocation().Z; }

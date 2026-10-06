@@ -366,6 +366,7 @@ void FGameViewportClient::Resize(uint32 InWidth, uint32 InHeight)
 
 void FGameViewportClient::Reset()
 {
+	RenderData.ResetScene();
 	EndSIEMode();
 	bExitRequested = false;
 	bSIEModeRequested = false;

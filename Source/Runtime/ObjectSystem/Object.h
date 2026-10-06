@@ -98,6 +98,8 @@ public:
 	inline EObjectFlags GetFlags() const { return Flags; }
 
 	virtual void Serialize(json& Handle, bool bIsLoading);
+	// Call after changing a property through a setter, editor widget or deserialization.
+	virtual void OnPropertyChanged(const FString& PropertyName) {}
 
 
 

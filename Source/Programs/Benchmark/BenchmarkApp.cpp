@@ -10,6 +10,7 @@
 #include "Render/Renderer.h"
 #include "Render/RenderingInfo.h"
 #include "Render/SceneView.h"
+#include "Render/SceneRenderer.h"
 #include "Render/RenderCommand.h"
 
 #include "GameFramework/Actor/StaticMeshActor.h"
@@ -314,9 +315,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	{
 		// 프러스텀 컬링 + GPU 오클루전 + Gather 전체
 		SCOPE_CYCLE_COUNTER(STAT_GatherTotal);
-		RenderQueue.Reset();
-		EditorWorld->GatherRenderPackets(RenderQueue, LODView, &Frustum, Renderer);
-		RenderQueue.Sort();
+		FSceneRenderer::GatherRenderPackets(EditorWorld->GetScene(), RenderData, LODView, &Frustum, Renderer);
+		RenderData.RenderQueue.Sort();
 	}
 
 	GetEngineLoop().BeginBackbufferPass();
@@ -334,14 +334,15 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 	// 반투명이 Grid 위에 합성되도록 불투명 → Grid → 반투명 순서로 그린다.
 	{
 		SCOPE_CYCLE_COUNTER(STAT_RenderOpaqueTotal);
-		Renderer->RenderOpaque(BenchmarkView, RenderQueue);
+		FSceneRenderer::PrepareDrawData(Renderer, RenderData);
+		Renderer->RenderOpaque(BenchmarkView, RenderData.RenderQueue);
 	}
 
 	// Grid가 깊이를 쓰기 전, 불투명만 그려진 깊이 버퍼로 측정한다.
 	if (bMeasureOcclusionRequested)
 	{
 		bMeasureOcclusionRequested = false;
-		LastOcclusionMeasure = Renderer->MeasureOpaqueOcclusion(ViewProjection, RenderQueue);
+		LastOcclusionMeasure = Renderer->MeasureOpaqueOcclusion(ViewProjection, RenderData.RenderQueue);
 	}
 
 	GridRenderer->OnRenderBatchGrid(
@@ -357,7 +358,8 @@ void UBenchmarkEngine::Tick(float DeltaTime)
 		// Grid 파이프라인이 바꾼 상태를 장면 기준으로 되돌린다.
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		Renderer->RenderTranslucent(BenchmarkView, RenderQueue);
+		FSceneRenderer::PrepareDrawData(Renderer, RenderData);
+		Renderer->RenderTranslucent(BenchmarkView, RenderData.RenderQueue);
 
 		DrawSelectionBounds(ViewProjection);
 
@@ -416,7 +418,7 @@ void UBenchmarkEngine::DrawProfileOverlay()
 		ImGui::Text("FPS: %.1f (%.2f ms)", Stats.AverageFPS, Stats.AverageFrameMs);
 		ImGui::Text("Frame Time: %.2f ms", Stats.AverageFrameMs);
 
-		const FRenderStats& RS = EditorWorld->GetRenderStats();
+		const FRenderStats& RS = RenderData.RenderStats;
 		ImGui::Text("Primitives: %u / %u visible", RS.VisiblePrimitives, RS.TotalPrimitives);
 		ImGui::Text("Draw Calls: %u", RS.DrawCalls);
 		ImGui::Text("Triangles: %.2f M", RS.Triangles / 1'000'000.0);

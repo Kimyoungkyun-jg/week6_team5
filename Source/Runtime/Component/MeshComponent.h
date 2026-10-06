@@ -24,7 +24,7 @@ public:
 	UMaterial* GetOverrideMaterial(int32 SlotIndex) const;
 	// 덮어쓰기 설정. nullptr을 넣으면 메시 기본값으로 되돌린다 (메시 에셋은 건드리지 않음)
 	void SetMaterial(int32 SlotIndex, UMaterial* InMaterial) override;
-	void ClearOverrideMaterials() { OverrideMaterials.Reset(); MarkRenderStateDirty(); }
+	void ClearOverrideMaterials() { OverrideMaterials.Reset(); OnPropertyChanged("OverrideMaterials"); }
 
 	// 리플렉션 프로퍼티에 더해 슬롯별 덮어쓰기를 저장/로드한다
 	virtual void Serialize(json& Handle, bool bIsLoading) override;

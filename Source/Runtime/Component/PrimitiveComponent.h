@@ -30,6 +30,8 @@ class UPrimitiveComponent :public USceneComponent
 		PROPERTY(bVisible)
 	REFLECT_END()
 public:
+	virtual void OnPropertyChanged(const FString& PropertyName) override;
+
 	UPrimitiveComponent();
 	virtual ~UPrimitiveComponent();
 
@@ -56,7 +58,7 @@ public:
 	void SetVisible(bool bInVisible)
 	{
 		bVisible = bInVisible;
-		MarkRenderStateDirty();
+		OnPropertyChanged("bVisible");
 	}
 
 	virtual bool LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit);

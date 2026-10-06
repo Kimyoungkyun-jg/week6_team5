@@ -122,8 +122,9 @@ namespace
 		return isChanged;
 	}
 
-	void DrawTextureSlot(UMaterial** MaterialPtr, int32 SlotIndex)
+	bool DrawTextureSlot(UMaterial** MaterialPtr, int32 SlotIndex)
 	{
+		bool bChanged = false;
 		const float ThumbnailSize = 64.0f;
 
 		UMaterial* Material = *MaterialPtr;
@@ -177,6 +178,7 @@ namespace
 
 					Material->Textures[SlotIndex] = DroppedTexture;
 					Texture = DroppedTexture;
+					bChanged = true;
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -198,6 +200,7 @@ namespace
 		ImGui::EndGroup();
 
 		ImGui::PopID();
+		return bChanged;
 	}
 
 	FString GetAssetDisplayName(const FString& Path)
@@ -406,6 +409,7 @@ namespace
 									Override->Textures.Add(nullptr);
 								}
 								Override->Textures[0] = DroppedTexture;
+								MeshComponent->OnPropertyChanged("OverrideMaterials");
 								Texture = DroppedTexture;
 								Effective = Override;
 							}
@@ -447,6 +451,7 @@ namespace
 						if (Override)
 						{
 							Override->BaseColor = TempColor;
+							MeshComponent->OnPropertyChanged("OverrideMaterials");
 							Effective = Override;
 						}
 					}
@@ -467,6 +472,7 @@ namespace
 						if (Override)
 						{
 							Override->UVScrollSpeed = TempUVScrollSpeed;
+							MeshComponent->OnPropertyChanged("OverrideMaterials");
 							Effective = Override;
 						}
 					}
@@ -492,6 +498,7 @@ namespace
 								if (Override)
 								{
 									Override->SamplerState = static_cast<ESamplerState>(i);
+									MeshComponent->OnPropertyChanged("OverrideMaterials");
 									Effective = Override;
 								}
 							}
@@ -520,6 +527,7 @@ namespace
 								if (Override)
 								{
 									Override->PSOType = (i == 1) ? EPSOType::StaticMesh_Translucent : EPSOType::StaticMesh_Opaque;
+									MeshComponent->OnPropertyChanged("OverrideMaterials");
 									Effective = Override;
 								}
 							}
@@ -597,7 +605,12 @@ namespace
 						{	
 							UTexture2D* DroppedTexture = *static_cast<UTexture2D**>(Payload->Data);
 							
-							BillboardComponent->GetMaterial(0)->Textures[0] = DroppedTexture;
+							if (UMaterial* Material = BillboardComponent->GetMaterial(0))
+							{
+								if (Material->Textures.IsEmpty()) Material->Textures.Add(nullptr);
+								Material->Textures[0] = DroppedTexture;
+								BillboardComponent->OnPropertyChanged("Material");
+							}
 						}
 						ImGui::EndDragDropTarget();
 					}
@@ -645,145 +658,82 @@ namespace
 	{
 		void* ValuePtr = reinterpret_cast<char*>(Object) + Property.Offset;
 		const FString Label = "##" + Property.Name;
+		bool bChanged = false;
 
-		ImGui::Text(Property.Name.c_str());
+		ImGui::TextUnformatted(Property.Name.c_str());
 		ImGui::SameLine(120.0f);
 		ImGui::SetNextItemWidth(-1.0f);
-
 		switch (Property.Type)
 		{
 		case EPropertyType::Float:
-		{
-			bool bChanged = false;
 			if (Property.bHasRange)
-			{
-				const float DragSpeed = (Property.MaxValue - Property.MinValue) * 0.001f;
-				bChanged = ImGui::DragFloat(Label.c_str(), static_cast<float*>(ValuePtr), DragSpeed,
+				bChanged = ImGui::DragFloat(Label.c_str(), static_cast<float*>(ValuePtr),
+					(Property.MaxValue - Property.MinValue) * 0.001f,
 					Property.MinValue, Property.MaxValue, "%.3f", ImGuiSliderFlags_AlwaysClamp);
-			}
 			else
-			{
 				bChanged = ImGui::DragFloat(Label.c_str(), static_cast<float*>(ValuePtr), 0.1f);
-			}
-			if (bChanged)
-			{
-				if (USceneComponent* SceneComponent = Cast<USceneComponent>(Object))
-					SceneComponent->MarkTransformDirty();
-			}
 			break;
-		}
-
 		case EPropertyType::Int:
-			ImGui::DragInt(Label.c_str(), static_cast<int*>(ValuePtr), 1.0f);
+			bChanged = ImGui::DragInt(Label.c_str(), static_cast<int*>(ValuePtr), 1.0f);
 			break;
-
 		case EPropertyType::Bool:
-			if (ImGui::Checkbox(Label.c_str(), static_cast<bool*>(ValuePtr)))
-			{
-				if (Property.Name == "bVisible")
-				{
-					if (UPrimitiveComponent* Primitive =
-						Cast<UPrimitiveComponent>(Object))
-					{
-						Primitive->SetVisible(*static_cast<bool*>(ValuePtr));
-					}
-				}
-			}
+			bChanged = ImGui::Checkbox(Label.c_str(), static_cast<bool*>(ValuePtr));
 			break;
-
 		case EPropertyType::Vector:
-		{
-			FVector* Value = static_cast<FVector*>(ValuePtr);
-			ImGui::DragFloat3(Label.c_str(), Value->V, 0.1f);
+			bChanged = ImGui::DragFloat3(Label.c_str(), static_cast<FVector*>(ValuePtr)->V, 0.1f);
 			break;
-		}
 		case EPropertyType::Rotator:
 		{
 			FRotator* Value = static_cast<FRotator*>(ValuePtr);
-			// Transform의 Rotation과 같은 X/Y/Z 축 순서로 보여준다.
 			float Euler[3] = { Value->Roll, Value->Pitch, Value->Yaw };
-			if (ImGui::DragFloat3(Label.c_str(), Euler, 0.1f))
-			{
-				Value->Roll = Euler[0];
-				Value->Pitch = Euler[1];
-				Value->Yaw = Euler[2];
-			}
+			bChanged = ImGui::DragFloat3(Label.c_str(), Euler, 0.1f);
+			if (bChanged) { Value->Roll = Euler[0]; Value->Pitch = Euler[1]; Value->Yaw = Euler[2]; }
 			break;
 		}
-
 		case EPropertyType::Vector4:
-		{
-			FVector4* Value = static_cast<FVector4*>(ValuePtr);
-			ImGui::DragFloat4(Label.c_str(), &Value->X, 0.1f);
+			bChanged = ImGui::DragFloat4(Label.c_str(), &static_cast<FVector4*>(ValuePtr)->X, 0.1f);
 			break;
-		}
-
 		case EPropertyType::Color:
-		{
-			// 타입은 Vector4와 같고 위젯만 색상 선택기다
-			FVector4* Value = static_cast<FVector4*>(ValuePtr);
-			ImGui::ColorEdit4(Label.c_str(), &Value->X);
+			bChanged = ImGui::ColorEdit4(Label.c_str(), &static_cast<FVector4*>(ValuePtr)->X);
 			break;
-		}
 		case EPropertyType::String:
 		{
 			FString* Value = static_cast<FString*>(ValuePtr);
-
 			char Buffer[256] = {};
 			strncpy_s(Buffer, Value->c_str(), sizeof(Buffer) - 1);
 			if (CustomFont) ImGui::PushFont(CustomFont);
-			if (ImGui::InputText(Label.c_str(), Buffer, sizeof(Buffer)))
-			{
-				*Value = Buffer;
-			}
+			bChanged = ImGui::InputText(Label.c_str(), Buffer, sizeof(Buffer));
+			if (bChanged) *Value = Buffer;
 			if (CustomFont) ImGui::PopFont();
 			break;
 		}
 		case EPropertyType::Transform:
 		{
 			FTransform* Value = static_cast<FTransform*>(ValuePtr);
-
 			ImGui::NewLine();
-			if (DrawVector3Controller("Location", Value->Location.V, 0.0f, 55.0f))
-			{
-				if (USceneComponent* Component = Cast<USceneComponent>(Object))
-				{
-					Component->MarkTransformDirty();
-				}
-			}
-
-			if (DrawRotatorAsXYZ("Rotation", Value->Rotation))
-			{
-				if (USceneComponent* Component = Cast<USceneComponent>(Object))
-				{
-					Component->MarkTransformDirty();
-				}
-			}
-
-			if (DrawVector3Controller("Scale", Value->Scale.V, 1.0f, 55.0f))
-			{
-				if (USceneComponent* Component = Cast<USceneComponent>(Object))
-				{
-					Component->MarkTransformDirty();
-				}
-			}
+			bChanged |= DrawVector3Controller("Location", Value->Location.V, 0.0f, 55.0f);
+			bChanged |= DrawRotatorAsXYZ("Rotation", Value->Rotation);
+			bChanged |= DrawVector3Controller("Scale", Value->Scale.V, 1.0f, 55.0f);
 			break;
 		}
 		case EPropertyType::Object:
 		{
-			UObject** ObjPtr = static_cast<UObject**>(ValuePtr);
-
+			UObject** Value = static_cast<UObject**>(ValuePtr);
+			UObject* Before = *Value;
+			// These selectors use component setters; those setters send the notification.
 			if (Property.Class == UMaterial::StaticClass())
 			{
-				DrawTextureSlot(reinterpret_cast<UMaterial**>(ObjPtr), 0);
+				bChanged = DrawTextureSlot(reinterpret_cast<UMaterial**>(Value), 0);
 			}
 			else if (Property.Class == UFont::StaticClass())
 			{
-				DrawFontSlot(Object, reinterpret_cast<UFont**>(ObjPtr));
+				DrawFontSlot(Object, reinterpret_cast<UFont**>(Value));
+				if (!Cast<UTextRenderComponent>(Object)) bChanged = Before != *Value;
 			}
 			else if (Property.Class == UStaticMesh::StaticClass())
 			{
-				DrawMeshSlot(Object, reinterpret_cast<UStaticMesh**>(ObjPtr));
+				DrawMeshSlot(Object, reinterpret_cast<UStaticMesh**>(Value));
+				if (!Cast<UStaticMeshComponent>(Object)) bChanged = Before != *Value;
 			}
 			break;
 		}
@@ -791,6 +741,7 @@ namespace
 			ImGui::TextDisabled("(Unsupported)");
 			break;
 		}
+		if (bChanged) Object->OnPropertyChanged(Property.Name);
 	}
 
 	// 클래스 계층을 따라 올라가며 각 단계의 프로퍼티를 표시

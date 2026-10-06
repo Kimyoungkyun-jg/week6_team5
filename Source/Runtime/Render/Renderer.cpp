@@ -457,7 +457,9 @@ uint8* FRenderer::BeginObjectConstants(uint32 MaxSlots)
 	if (!bUsePerObjectSlots || MaxSlots == 0) return nullptr;
 	EnsurePerObjectSlotCapacity(MaxSlots);
 	if (!PerObjectSlotCB) { bUsePerObjectSlots = false; return nullptr; }
-	return static_cast<uint8*>(RenderCommand::MapWriteDiscard(PerObjectSlotCB.get()));
+	uint8* Destination = static_cast<uint8*>(RenderCommand::MapWriteDiscard(PerObjectSlotCB.get()));
+	if (!Destination) bUsePerObjectSlots = false;
+	return Destination;
 }
 
 void FRenderer::EndObjectConstants()

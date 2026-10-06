@@ -1,30 +1,12 @@
 #pragma once
 
 #include "RenderPacket.h"
+#include "Render/ObjectConstants.h"
 #include "Texture2D.h"
 #include "Text/Font.h"
 #include "SceneView.h"
 #include "Occlusion/GPUOcclusion.h"
 #include "Engine/LightSceneProxy.h"
-
-constexpr uint32 ObjectSlotBytes = 256;
-
-struct FPerObjectConstants
-{
-	FMatrix World;
-	FMatrix NormalMatrix;
-};
-
-inline FPerObjectConstants MakePerObjectConstants(const FMatrix& World)
-{
-	FPerObjectConstants Result{};
-	Result.World = World;
-	Result.NormalMatrix = World.Inverse().GetTransposed();
-	return Result;
-}
-
-static_assert(sizeof(FPerObjectConstants) == sizeof(FMatrix) * 2);
-static_assert(sizeof(FPerObjectConstants) <= ObjectSlotBytes);
 
 struct FSortEntry
 {

@@ -36,9 +36,7 @@ void UStaticMeshComponent::SetStaticMesh(UStaticMesh* InStaticMesh)
 		return;
 
 	StaticMesh = InStaticMesh;
-	ClearOverrideMaterials();
-	MarkRenderStateDirty();
-	OnTransformDirty();
+	OnPropertyChanged("StaticMesh");
 }
 
 int32 UStaticMeshComponent::GetNumMaterials() const
@@ -126,3 +124,9 @@ void UStaticMeshComponent::SubmitToRenderQueue(TQueue<FRenderPacket>& RenderQueu
 	}
 }
 */
+
+void UStaticMeshComponent::OnPropertyChanged(const FString& PropertyName)
+{
+	if (PropertyName == "StaticMesh") OverrideMaterials.Reset();
+	Super::OnPropertyChanged(PropertyName);
+}

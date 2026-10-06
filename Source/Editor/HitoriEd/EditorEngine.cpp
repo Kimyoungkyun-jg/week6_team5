@@ -599,7 +599,7 @@ void UEditorEngine::RenderViewports() {
 
 					SceneView = GameClient->CalcSceneView(ViewRect);
 
-					FSceneRenderer SceneRenderer(CurrentWorld, SceneView);
+					FSceneRenderer SceneRenderer(CurrentWorld, SceneView, GameClient->GetRenderData());
 					SceneRenderer.InitViews(Renderer);
 
 
@@ -613,7 +613,7 @@ void UEditorEngine::RenderViewports() {
 		{
 			SceneView = ViewClient->CalcSceneView(ViewRect);
 
-			FSceneRenderer SceneRenderer(CurrentWorld, SceneView);
+			FSceneRenderer SceneRenderer(CurrentWorld, SceneView, ViewClient->GetRenderData());
 			SceneRenderer.InitViews(Renderer);
 
 			RenderFrame(ViewClient, SceneView, SceneRenderer, CurrentWorld, bIsGameView);
@@ -646,7 +646,7 @@ void UEditorEngine::RenderViewports() {
 				{
 					FRect ViewRect{0.0f, 0.0f, static_cast<float>(Width), static_cast<float>(Height)};
 					FSceneView SceneView = GameClient->CalcSceneView(ViewRect);
-					FSceneRenderer SceneRenderer(Context.World(), SceneView);
+					FSceneRenderer SceneRenderer(Context.World(), SceneView, GameClient->GetRenderData());
 					SceneRenderer.InitViews(Renderer);
 					RenderGameFrame(GameClient, SceneView, SceneRenderer);
 				}

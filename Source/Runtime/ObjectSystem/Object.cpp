@@ -76,61 +76,69 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 
 			void* Ptr = reinterpret_cast<uint8*>(this) + Property.Offset;
 
+			bool bPropertyLoaded = false;
 			switch (Property.Type)
 			{
 			case EPropertyType::Float:
 			{
 				float& Value = *static_cast<float*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<float>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<float>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
 			case EPropertyType::Int:
 			{
 				int32& Value = *static_cast<int32*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<int32>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<int32>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
 			case EPropertyType::String:
 			{
 				FString& Value = *static_cast<FString*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<std::string>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<std::string>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
 			case EPropertyType::Bool:
 			{
 				bool& Value = *static_cast<bool*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<bool>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<bool>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
 			case EPropertyType::Vector:
 			{
 				FVector& Value = *static_cast<FVector*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<FVector>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<FVector>(); bPropertyLoaded = true; }
+				else Handle[Property.Name] = Value;
+				break;
+			}
+			case EPropertyType::Rotator:
+			{
+				FRotator& Value = *static_cast<FRotator*>(Ptr);
+				if (bIsLoading) { Value = Handle[Property.Name].get<FRotator>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
 			case EPropertyType::Vector4:
 			{
 				FVector4& Value = *static_cast<FVector4*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<FVector4>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<FVector4>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
 			case EPropertyType::Color:
 			{
 				FVector4& Value = *static_cast<FVector4*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<FVector4>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<FVector4>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
 			case EPropertyType::Transform:
 			{
 				FTransform& Value = *static_cast<FTransform*>(Ptr);
-				if (bIsLoading) Value = Handle[Property.Name].get<FTransform>();
+				if (bIsLoading) { Value = Handle[Property.Name].get<FTransform>(); bPropertyLoaded = true; }
 				else Handle[Property.Name] = Value;
 				break;
 			}
@@ -167,6 +175,7 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 					}
 
 					Value = Asset;
+					bPropertyLoaded = true;
 				}
 				else
 				{
@@ -182,6 +191,7 @@ void UObject::Serialize(json& Handle, bool bIsLoading)
 			default:
 				break;
 			}
+			if (bPropertyLoaded) OnPropertyChanged(Property.Name);
 		}
 	}
 }
@@ -221,4 +231,8 @@ void UObject::CopyProperties(UObject* SourceObject, UObject* TargetObject)
 			}
 		}
 	}
+	for (UClass* Class = SourceObject->GetClass(); Class; Class = Class->Super)
+		for (const FProperty& Property : Class->Properties)
+			TargetObject->OnPropertyChanged(Property.Name);
+
 }

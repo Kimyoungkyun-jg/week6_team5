@@ -15,13 +15,13 @@ class UPointLightComponent : public ULightComponent
 
 public:
 	const FVector4& GetLightColor() const { return LightColor; }
-	void SetLightColor(const FVector4& InColor) { LightColor = InColor; }
+	void SetLightColor(const FVector4& InColor) { LightColor = InColor; OnPropertyChanged("LightColor"); }
 	float GetIntensity() const { return Intensity; }
-	void SetIntensity(float InIntensity) { Intensity = InIntensity; }
+	void SetIntensity(float InIntensity) { Intensity = InIntensity; OnPropertyChanged("Intensity"); }
 	float GetAttenuationRadius() const { return AttenuationRadius; }
-	void SetAttenuationRadius(float InRadius) { AttenuationRadius = InRadius; }
+	void SetAttenuationRadius(float InRadius) { AttenuationRadius = InRadius; OnPropertyChanged("AttenuationRadius"); }
 	bool IsEnabled() const { return bEnabled; }
-	void SetEnabled(bool bInEnabled) { bEnabled = bInEnabled; }
+	void SetEnabled(bool bInEnabled) { bEnabled = bInEnabled; OnPropertyChanged("bEnabled"); }
 
 private:
 	FVector4 LightColor{1.0f, 1.0f, 1.0f, 1.0f};

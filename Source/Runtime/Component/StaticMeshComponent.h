@@ -10,6 +10,8 @@ class UStaticMeshComponent : public UMeshComponent
 		PROPERTY(StaticMesh)
 	REFLECT_END()
 public:
+	virtual void OnPropertyChanged(const FString& PropertyName) override;
+
 	UStaticMeshComponent();
 	virtual ~UStaticMeshComponent();
 

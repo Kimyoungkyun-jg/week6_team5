@@ -5,6 +5,7 @@
 #include "Math/Rotator.h"
 #include "Math/Matrix.h"
 #include "Render/SceneView.h"
+#include "Render/SceneRenderData.h"
 #include "Render/DeferredViewTargets.h"
 
 class UWorld;
@@ -54,13 +55,14 @@ public:
 	class FTexture2D* GetColorTarget() const { return ViewTargets.SceneColor.get(); }
 	FTexture2D* SwapSceneColorAndBind(TUniquePtr<FTexture2D>& Output) { return ViewTargets.SwapSceneColorAndBind(Output); }
 	class FTexture2D* GetDepthTarget() const { return ViewTargets.Depth.get(); }
+	FSceneRenderData& GetRenderData() { return RenderData; }
 	FDeferredViewTargets& GetViewTargets() { return ViewTargets; }
 	const FDeferredViewTargets& GetViewTargets() const { return ViewTargets; }
 
 	void SetGameInstance(UGameInstance* InGameInstance) { GameInstance = InGameInstance; }
 	UGameInstance* GetGameInstance() const { return GameInstance; }
 
-	void SetWorld(UWorld* InWorld) { World = InWorld; }
+	void SetWorld(UWorld* InWorld) { if (World != InWorld) RenderData.ResetScene(); World = InWorld; }
 
 	void SetCameraComponent(UCameraComponent* InCameraComponent);
 
@@ -99,4 +101,5 @@ private:
 	uint32 Width = 0;
 	uint32 Height = 0;
 	FDeferredViewTargets ViewTargets;
+	FSceneRenderData RenderData;
 };

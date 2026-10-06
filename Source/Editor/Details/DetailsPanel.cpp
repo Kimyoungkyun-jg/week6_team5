@@ -1066,6 +1066,10 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
 		}
+		if (ImGui::Selectable("Projectile Movement Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UProjectileMovementComponent>("ProjectileMovement");
+		}
 		ImGui::EndPopup();
 	}
 

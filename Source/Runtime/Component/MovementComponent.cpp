@@ -48,7 +48,7 @@ bool UMovementComponent::MoveUpdatedComponent(const FVector& Delta, const FRotat
 bool UMovementComponent::MoveUpdatedComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
 {
 	if (!UpdatedComponent) return false;
-
+	// 이동시킬 컴포넌트의 MoveComponent 함수를 호출하여 실제 이동을 수행
 	return UpdatedComponent->MoveComponent(Delta, NewRotation, bSweep, OutHit);
 }
 

@@ -25,12 +25,19 @@ public:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime) override;
 
+	// 가속도 계산. 중력, 호밍, 외부 힘 등을 적용할 수 있다.
 	FVector ComputeAcceleration(const FVector& InVelocity, float DeltaTime) const;
+	// 충돌 처리. Bounce, Stop 등 처리
 	virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.f, const FVector& MoveDelta = FVector::ZeroVector) override;
+	// 최대 속도 제한. MaxSpeed를 초과하면 MaxSpeed로 제한한다.
 	FVector LimitVelocity(FVector NewVelocity) const;
+	// 속도 계산. 가속도와 DeltaTime을 적용하여 새로운 속도를 계산한다.
 	virtual FVector ComputeVelocity(FVector InitialVelocity, float DeltaTime) const;
+	// 이동량 계산
 	virtual FVector ComputeMoveDelta(const FVector& InVelocity, float DeltaTime) const;
+	// 충돌 후 반사 속도 계산. Bounce 시 반사 속도를 계산한다.
 	virtual FVector ComputeBounceResult(const FHitResult& Hit, float TimeSlice, const FVector& MoveDelta);
+	// 시뮬레이션 중지(속도가 일정 이하거나 반복 횟수가 많을 때)
 	void StopSimulating(const FHitResult& HitResult);
 
 	float GetInitialSpeed() const { return InitialSpeed; }

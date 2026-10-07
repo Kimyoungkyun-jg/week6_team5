@@ -131,24 +131,27 @@ bool USceneComponent::MoveComponent(const FVector& Delta, const FRotator& NewRot
 
 float USceneComponent::GetCollisionRadius() const
 {
+	// 충돌 반지름은 내접 구체의 반지름으로 설정, Extent의 최소값을 사용한다.
 	FBox Bounds = CalcBounds();
 	FVector Extent = Bounds.Max - Bounds.Min;
 	Extent *= 0.5f;
-
+	// Extent가 0이면 기본값 10.0f 반환
 	if(Extent.IsZero())
 	{
 		return 10.0f;
 	}
-
+	// 최소값 반환
 	return std::min({ Extent.X, Extent.Y, Extent.Z });
 }
 
 bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
 {
+	// OutHit이 nullptr이면 LocalHit을 사용하여 충돌 결과를 저장
     FHitResult LocalHit(1.0f);
     FHitResult& Hit = OutHit ? *OutHit : LocalHit;
     Hit = FHitResult(1.0f);
 
+	// 현재 컴포넌트의 상대 변환을 가져온다.
     FTransform Relative = GetTransform();
     const USceneComponent* Parent = GetAttachParent();
     FMatrix ParentInverse = FMatrix::Identity;
@@ -169,6 +172,7 @@ bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRo
         return true;
     }
 
+	// 이동량이 0이 아니면 충돌 체크를 수행하고, 충돌이 발생하면 이동량을 조정한다.
     const FVector Start = GetWorldLocation();
     FVector Destination = Start + Delta;
     bool bBlocked = false;
@@ -177,12 +181,15 @@ bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRo
         AActor* OwnerActor = GetOwner();
         UWorld* World = OwnerActor ? OwnerActor->GetWorld() : nullptr;
         if (!World) return false;
+		// 이동량의 방향을 정규화하여 Ray를 생성하고, SweepSingle 함수를 호출하여 충돌 체크를 수행한다.
         const FRay Ray(Start, Delta.Normalized());
         bBlocked = World->SweepSingle(Ray, Delta.Size(), GetCollisionRadius(), Hit, OwnerActor);
+		// 충돌이 발생하면 이동량을 조정하여 충돌 지점까지 이동하도록 한다.
         if (bBlocked)
             Destination = Start + Delta * Hit.Time + Hit.ImpactNormal * 0.1f;
     }
+	// 충돌 체크가 끝나면, 부모 컴포넌트가 있으면 부모의 월드 행렬을 이용하여 상대 위치를 계산하고, 없으면 절대 위치를 사용한다.
     Relative.Location = Parent ? ParentInverse.TransformPosition(Destination) : Destination;
-    SetTransform(Relative); // Use the same property/dirty notification as editor changes.
+    SetTransform(Relative);
     return !bBlocked;
 }

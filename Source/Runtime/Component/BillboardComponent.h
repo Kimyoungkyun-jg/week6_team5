@@ -2,6 +2,21 @@
 
 #include "PrimitiveComponent.h"
 
+class UTexture2D;
+
+struct FSubUVConstants
+{
+	// 한 파티클을 그릴 때 Shader에 전달할 Atlas 프레임과 투명도 값을 담는다.
+	float CurrentFrame;
+	float AtlasRowSize;
+	float AtlasColSize;
+	float Alpha;
+	float FogAdditive;
+	float Padding[3]{};
+};
+
+static_assert(sizeof(FSubUVConstants) == 32);
+
 class UBillboardComponent : public UPrimitiveComponent
 {
 	DECLARE_CLASS(UBillboardComponent, UPrimitiveComponent)
@@ -35,9 +50,13 @@ public:
 
 	virtual void Serialize(json& Handle, bool bIsLoading) override;
 
+	UTexture2D* GetSprite() const { return Sprite; }
+	void SetSprite(UTexture2D* InSprite);
+
 protected:
 	UMaterial* Material = nullptr;
 	UStaticMesh* QuadMesh = nullptr;
+	UTexture2D* Sprite = nullptr;
 private:
 
 };

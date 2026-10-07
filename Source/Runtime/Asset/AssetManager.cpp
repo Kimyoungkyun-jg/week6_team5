@@ -115,6 +115,10 @@ void UAssetManager::Init(const FAssetLoadProgress& OnProgress)
 	Get().CreateDefaultTextures();
 	Get().CreateDefaultMaterial();
 	Get().ScanAssets("Assets", OnProgress);
+	if (fs::exists("Editor"))
+	{
+		Get().ScanAssets("Editor", OnProgress);
+	}
 	Get().CreateDefaultMeshes();
 	Get().CreateParticleMaterial();
 }

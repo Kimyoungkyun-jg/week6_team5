@@ -56,6 +56,7 @@ void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const F
 	{
 		return;
 	}
+
 	const FVector WorldPos = GetWorldLocation();
 	const FVector WorldScale = GetWorldScale3D();
 	
@@ -86,10 +87,20 @@ void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const F
 	if (QuadMesh == nullptr || Material == nullptr)
 		return;
 
+	static const FSubUVConstants DefaultBillboardConstants{
+	0.0f,  // CurrentFrame
+	1.0f,  // AtlasRowSize
+	1.0f,  // AtlasColSize
+	1.0f,  // Alpha
+	0.0f   // FogAdditive
+	};
+
 	FRenderPacket Packet;
 	Packet.Mesh = QuadMesh;
 	Packet.Material = Material;
 	Packet.Model = RenderQueue.StoreWorldMatrix(BillboardWorldMatrix);
+	Packet.MaterialParamData = &DefaultBillboardConstants;
+	Packet.MaterialParamDataSize = sizeof(FSubUVConstants);
 	RenderQueue.Add(Packet);
 }
 
@@ -161,4 +172,26 @@ void UBillboardComponent::GetWorldTransformedMatrix(FMatrix* OutWorldMatrix) con
 	OutWorldMatrix->M[3][1] = WorldPos.Y;
 	OutWorldMatrix->M[3][2] = WorldPos.Z;
 	OutWorldMatrix->M[3][3] = 1.0f;
+}
+
+void UBillboardComponent::SetSprite(UTexture2D* InSprite)
+{
+	Sprite = InSprite;
+	if (!InSprite) return;
+	if (!Material || !Material->bIsInstance)
+	{
+		UMaterial* BaseMat = Material ? Material : UAssetManager::GetAssetByPath<UMaterial>("SubUVMaterial");
+		if (BaseMat)
+		{
+			Material = UMaterial::CreateInstance(BaseMat);
+		}
+	}
+	if (Material)
+	{
+		if (Material->Textures.IsEmpty())
+			Material->Textures.Add(InSprite);
+		else
+			Material->Textures[0] = InSprite;
+		OnPropertyChanged("Material");
+	}
 }

@@ -172,6 +172,9 @@ bool UEditorEngine::Init() {
 	FXAARenderer = MakeUnique<FFXAARenderer>();
 	FXAARenderer->Init(Renderer);
 
+	FireBallRenderer = MakeUnique<FFireBallRenderer>();
+	FireBallRenderer->Init(Renderer);
+
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
 	Outline = MakeUnique<FOutline>();
@@ -748,6 +751,9 @@ bool UEditorEngine::RenderSceneFrame(FDeferredViewTargets& Targets, const FScene
 
 	// Opaque/sky fog, then translucent objects using their own distance to the camera.
 	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
+	// FireBall adds color to opaque surfaces, so composite it before their fog.
+	if (Options.bDrawPrimitives)
+		RenderFireBall(TargetWorld, SceneView, DepthTarget, ColorTarget);
 	const bool bHasFog = Options.bDrawPrimitives && Options.bEnableFog &&
 		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 	if (Options.bDrawPrimitives)
@@ -810,6 +816,28 @@ bool UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& Scene
 			return true;
 	}
 	return false;
+}
+
+bool UEditorEngine::RenderFireBall(UWorld* TargetWorld, const FSceneView& SceneView, FTexture2D* DepthTarget, FTexture2D* ColorTarget)
+{
+	if (!TargetWorld || !FireBallRenderer || !DepthTarget || !ColorTarget)
+		return false;
+	bool bRendered = false;
+	for (TObjectIterator<UFireBallComponent> FireBall; FireBall; ++FireBall)
+	{
+		if (!FireBall || !FireBall->IsRegistered() || !FireBall->IsShown(SceneView.bGameView) || !FireBall->GetOwner() ||
+			FireBall->GetOwner()->GetWorld() != TargetWorld)
+			continue;
+		FFireBallData Data{};
+		Data.Center = FireBall->GetWorldLocation();
+		Data.Radius = FireBall->GetRadius();
+		Data.Color = FireBall->GetColor();
+		Data.Intensity = FireBall->GetIntensity();
+		Data.RadiusFallOff = FireBall->GetRadiusFallOff();
+
+		bRendered |= FireBallRenderer->OnRender(SceneView, DepthTarget, ColorTarget, Data);
+	}
+	return bRendered;
 }
 
 // 새 창 모드의 피아이이 윈도우 UI를 그린다

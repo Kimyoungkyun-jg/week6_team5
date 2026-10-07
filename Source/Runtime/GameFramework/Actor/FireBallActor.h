@@ -2,6 +2,7 @@
 
 #include "GameFramework/Actor.h"
 #include "Component/FireBallComponent.h"
+#include "Component/StaticMeshComponent.h"
 
 class AFireBallActor : public AActor
 {
@@ -17,4 +18,5 @@ public:
 
 private:
 	UFireBallComponent* FireBallComponent;
+	UStaticMeshComponent* SphereMesh = nullptr;
 };

@@ -1,18 +1,8 @@
 #pragma pack_matrix(row_major)
 
-cbuffer Viewconstants : register(b0)
+cbuffer PerObjectConstants : register(b0)
 {
-    matrix VP;
-};
-
-cbuffer Worldconstants : register(b2)
-{
-    matrix World;
-};
-
-
-cbuffer PerObjectConstants : register(b1)
-{
+    matrix InverseViewProjection;
     float3 Center;
     float Radius;
     float4 Color;
@@ -21,78 +11,52 @@ cbuffer PerObjectConstants : register(b1)
     float Intensity;
 };
 
-cbuffer TranslucentFogConstants : register(b3)
+Texture2D<float> SceneDepthTexture : register(t0);
+
+struct VSOutput
 {
-    float4x4 FogInverseViewProjection;
-    float4 FogCameraPosition;
-    float4 FogColor;
-    float4 FogDensityHeight;
-    float4 FogDistanceViewport;
+    float4 Position : SV_Position;
 };
 
-struct VS_INPUT
+VSOutput mainVS(uint VertexID : SV_VertexID)
 {
-    float3 p : POSITION;
-    float3 n : NORMAL;
-    float4 c : COLOR;
-    float2 t : TEXCOORD;
-};
-
-struct PS_INPUT
-{
-    float4 Position : SV_POSITION;
-    float3 WorldPos : TEXCOORD0;
-};
-
-float FogTransmittance(float3 Position)
-{
-    if (FogDensityHeight.x <= 0.0f || FogDistanceViewport.x <= 0.0f)
-        return 1.0f;
-
-    float3 Ray = Position - FogCameraPosition.xyz;
-    float Distance = length(Ray);
-    float Start = FogDensityHeight.w;
-    if (Distance <= Start ||
-        (FogDistanceViewport.y > 0.0f && Distance > FogDistanceViewport.y))
-        return 1.0f;
-
-    float Length = Distance - Start;
-    float StartHeight = FogCameraPosition.z + Ray.z * (Start / Distance);
-    float Falloff = FogDensityHeight.y;
-    float A = abs(Falloff * (Position.z - StartHeight));
-    float HeightExponent = -Falloff *
-        (min(StartHeight, Position.z) - FogDensityHeight.z);
-    float G;
-    if (A < 0.01f)
-        G = 1.0f - A * 0.5f + A * A / 6.0f;
-    else
-        G = (1.0f - exp(-A)) / A;
-    float LogTau = log(FogDensityHeight.x) + log(Length) +
-        HeightExponent + log(G);
-    if (!isfinite(LogTau))
-        return 1.0f;
-
-    float T = LogTau >= 4.382026635f ? 0.0f
-            : LogTau <= -80.0f ? 1.0f
-            : exp(-exp(LogTau));
-    return max(saturate(T), 1.0f - FogDistanceViewport.x);
+    // Scene Depth와 동일하게 Full-Screen Quad로 그린다.
+    static const float2 Positions[6] =
+    {
+        float2(-1, 1), float2(1, 1), float2(-1, -1),
+        float2(-1, -1), float2(1, 1), float2(1, -1)
+    };
+    VSOutput Output;
+    Output.Position = float4(Positions[VertexID], 0, 1);
+    return Output;
 }
 
-PS_INPUT mainVS(VS_INPUT input)
+float4 mainPS(VSOutput Input) : SV_Target
 {
-    PS_INPUT output;
+    if (Radius <= 0.0f || Intensity <= 0.0f)
+        return float4(0, 0, 0, 0);
 
-    output.Position = mul(mul(float4(input.p, 1.0f), World), VP);
-    output.WorldPos = mul(float4(input.p, 1.0f), World).xyz;
-    return output;
-}
+    float Depth = SceneDepthTexture.Load(int3(int2(Input.Position.xy), 0));
 
-float4 mainPS(PS_INPUT input) : SV_TARGET
-{
-    float3 ViewDir = normalize(CameraPosition - input.WorldPos);
-    float3 Normal = normalize(input.WorldPos - Center);
-    float NdotV = saturate(dot(Normal, ViewDir));
-    float Attenuation = pow(NdotV, RadiusFallOff);
-    float FogVisibility = FogTransmittance(input.WorldPos);
-    return Color * (Attenuation * Intensity * FogVisibility);
+    // 하늘이거나 유효하지 않으면 무시
+    if (!isfinite(Depth) || Depth >= 1.0f || Depth <= 0.0f)
+        return float4(0, 0, 0, 0);
+
+    uint Width, Height;
+    SceneDepthTexture.GetDimensions(Width, Height);
+    float2 UV = Input.Position.xy / float2(Width, Height);
+    float2 NDC = float2(UV.x * 2.0 - 1.0, 1.0f - UV.y * 2.0);
+
+    float4 WorldH = mul(float4(NDC, Depth, 1.0), InverseViewProjection);
+    if (!isfinite(WorldH.w) || abs(WorldH.w) < 1.0e-6f)
+        return float4(0, 0, 0, 0);
+    float3 WorldPosition = WorldH.xyz / WorldH.w;
+
+    float Distance = length(WorldPosition - Center);
+    if (Distance >= Radius)
+        return float4(0, 0, 0, 0); // 반경 밖이면 무시
+
+    float x = Distance / Radius;
+    float Attenuation = pow(saturate(1.0 - x), max(RadiusFallOff, 0.0f));
+    return Color * (Attenuation * Intensity);
 }

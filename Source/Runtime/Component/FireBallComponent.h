@@ -2,19 +2,6 @@
 
 #include "PrimitiveComponent.h"
 
-struct FFireBallMaterialParams
-{
-	FVector Center;
-	float Radius = 1.0f;
-	FVector4 Color;
-	FVector CameraPosition;
-	float RadiusFalloff = 0.5f;
-	float Intensity = 1.0f;
-	float Padding[3];
-};
-
-static_assert(sizeof(FFireBallMaterialParams) == 64);
-
 class UFireBallComponent : public UPrimitiveComponent
 {
 	DECLARE_CLASS(UFireBallComponent, UPrimitiveComponent)
@@ -26,13 +13,23 @@ class UFireBallComponent : public UPrimitiveComponent
 		PROPERTY_RANGE(Intensity, 0.0f, 10.0f)
 	REFLECT_END()
 public:
-	virtual void SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& ViewContext) override;
-	virtual FBox CalcLocalBounds() const override;
+	UFireBallComponent() = default;
+	FBox CalcLocalBounds() const override;
+	void OnPropertyChanged(const FString& PropertyName) override;
+	~UFireBallComponent() override = default;
+
+	float GetRadius() const { return Radius; }
+	void SetRadius(float InRadius) { Radius = InRadius; OnPropertyChanged("Radius"); }
+	FVector4 GetColor() const { return Color; }
+	void SetColor(const FVector4& InColor) { Color = InColor; OnPropertyChanged("Color"); }
+	float GetRadiusFallOff() const { return RadiusFalloff; }
+	void SetRadiusFallOff(float InRadiusFalloff) { RadiusFalloff = InRadiusFalloff; OnPropertyChanged("RadiusFalloff"); }
+	float GetIntensity() const { return Intensity; }
+	void SetIntensity(float InIntensity) { Intensity = InIntensity; OnPropertyChanged("Intensity"); }
 
 private:
 	float Radius = 1.0f;
 	FVector4 Color = FVector4(1.0f, 0.5f, 0.0f, 1.0f);
 	float RadiusFalloff = 0.5f;
 	float Intensity = 1.0f;
-	FFireBallMaterialParams MaterialParams{};
 };

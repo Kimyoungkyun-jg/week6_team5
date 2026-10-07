@@ -1,12 +1,12 @@
 #pragma once
 #include "EnginePCH.h"
-#include "ActorComponent.h"
+#include "MovementComponent.h"
 
 class AActor;
 
-class RotatingMovementComponent : public UActorComponent
+class RotatingMovementComponent : public UMovementComponent
 {
-	DECLARE_CLASS(RotatingMovementComponent, UActorComponent)
+	DECLARE_CLASS(RotatingMovementComponent, UMovementComponent)
 	REFLECT_START(RotatingMovementComponent)
 		PROPERTY(RotationRate)
 		PROPERTY(PivotTranslation)

@@ -28,9 +28,9 @@ void RotatingMovementComponent::BeginPlay()
 void RotatingMovementComponent::TickComponent(float DeltaTime)
 {
 	AActor* Owner = GetOwner();
-	if (!Owner || !Owner->GetRootComponent())
+	if (!UpdatedComponent)
 		return;
-	const FQuat LocalRotation = Owner->GetRootComponent()->GetRelativeRotation().Quaternion();
+	const FQuat LocalRotation = UpdatedComponent->GetRelativeRotation().Quaternion();
 	const FQuat DeltaRotation = FRotator(RotationRate.Pitch*DeltaTime, RotationRate.Yaw * DeltaTime, RotationRate.Roll * DeltaTime ).Quaternion();
 	const FQuat NewRotation = bRotateLocal ? (LocalRotation * DeltaRotation) : (DeltaRotation * LocalRotation); // Local 회전시 Old가 마지막, World 기준일경우 Delta가 마지막
 
@@ -42,6 +42,6 @@ void RotatingMovementComponent::TickComponent(float DeltaTime)
 		DeltaLocation = (LocalPivot - NewPivot); // -New - (-Local) => -New + Local => Local - New
 	}
 
-	Owner->GetRootComponent()->SetRelativeRotation(NewRotation.ToFRotator());
-	Owner->GetRootComponent()->SetRelativeLocation(Owner->GetRootComponent()->GetRelativeLocation() + DeltaLocation);
+	UpdatedComponent->SetRelativeRotation(NewRotation.ToFRotator());
+	UpdatedComponent->SetRelativeLocation(UpdatedComponent->GetRelativeLocation() + DeltaLocation);
 }

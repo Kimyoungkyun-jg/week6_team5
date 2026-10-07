@@ -14,6 +14,7 @@
 #include "Component/TextRenderComponent.h"
 #include "Component/ExponentialHeightFogComponent.h"
 #include "Component/ProjectileMovementComponent.h"
+#include "Component/FireBallComponent.h"
 #include "Asset/AssetManager.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
@@ -1017,6 +1018,13 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<UProjectileMovementComponent>("ProjectileMovement");
 			SelectedComponent = NewComp;
+			NewComp->RegisterComponent();
+		}
+		if (ImGui::Selectable("Fire Ball Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UFireBallComponent>("FireBall");
+			if (Owner->GetRootComponent())
+				NewComp->SetupAttachment(Owner->GetRootComponent());
 			NewComp->RegisterComponent();
 		}
 		ImGui::EndPopup();

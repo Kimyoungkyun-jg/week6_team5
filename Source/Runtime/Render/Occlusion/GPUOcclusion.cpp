@@ -9,7 +9,7 @@
 #include "Engine/PrimitiveSceneProxy.h"
 #include "Render/RenderResourceManager.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
-#include "Core/Async/TaskPool.h"
+#include "Tasks/Tasks.h"
 #include "Core/Stats/LightweightStats.h"
 
 #include <d3dcompiler.h>
@@ -389,8 +389,8 @@ bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32
 	const float Aspect = static_cast<float>(std::min(View.Width, View.Height)) / static_cast<float>(std::max(View.Width, View.Height));
 	CoverageScale = 3.14159265f / 12.0f * View.ProjectionScaleSquared * Aspect;
 
-	FTaskPool& Pool = FTaskPool::Get();
-	const uint32 ChunkCount = std::clamp(Count / 1024u, 1u, Pool.GetNumThreads() * 4);
+	const uint32 NumThreads = Tasks::FTaskScheduler::Get().GetNumWorkers() + 1;
+	const uint32 ChunkCount = std::clamp(Count / 1024u, 1u, NumThreads * 4);
 	HistogramCounts.assign(size_t(ChunkCount) * ScoreBucketCount, 0u);
 	HistogramScores.assign(size_t(ChunkCount) * ScoreBucketCount, 0.0f);
 	HistogramChunks = ChunkCount;   // 아래에서 실패해도 0으로 채워진 히스토그램을 읽게 된다 (가림막 없음)
@@ -403,7 +403,7 @@ bool FGPUOcclusion::FillItems(const FPrimitiveSceneProxy* const* Proxies, uint32
 	}
 	FCullItem* Dest = static_cast<FCullItem*>(Mapped.pData);
 
-	Pool.ParallelFor(Count, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
+	Tasks::ParallelForChunks(Count, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
 		{
 			uint32* Counts = HistogramCounts.data() + size_t(ChunkIndex) * ScoreBucketCount;   // 조각 전용
 			float* ScoreSums = HistogramScores.data() + size_t(ChunkIndex) * ScoreBucketCount;

@@ -62,6 +62,10 @@ private:
 	float GravityScale = 1.0f;
 	bool bSweep = true;
 	bool bIsFrictionEnabled = false;
+	bool bInitialVelocityInLocalSpace = true;
+
+
+
 	float Friction = 0.2f;
 	// 정지 속ㄷ도 임계값. 이 값보다 속도가 작으면 시뮬레이션을 중지한다.
 	float BounceVelocityStopSimulatingThreshold = 5.0f;

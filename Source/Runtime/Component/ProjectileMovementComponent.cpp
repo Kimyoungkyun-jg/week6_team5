@@ -30,7 +30,15 @@ UProjectileMovementComponent::UProjectileMovementComponent(float InInitialSpeed,
 void UProjectileMovementComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	Velocity = UpdatedComponent ? UpdatedComponent->GetWorldRotation().Quaternion().GetForwardVector() * InitialSpeed : FVector::ZeroVector;
+
+	if (bInitialVelocityInLocalSpace)
+	{
+		Velocity = UpdatedComponent ? UpdatedComponent->GetWorldRotation().Quaternion().GetForwardVector() * InitialSpeed : FVector::ZeroVector;
+	}
+	else
+	{
+	
+	}
 }
 
 void UProjectileMovementComponent::TickComponent(float DeltaTime)

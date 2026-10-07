@@ -4,7 +4,7 @@
 #include "Render/RenderCommand.h"
 #include "Render/DeferredViewTargets.h"
 #include "Engine/World.h"
-#include "Core/Async/TaskPool.h"
+#include "Tasks/Tasks.h"
 #include "Core/Stats/LightweightStats.h"
 #include "Component/StaticMeshComponent.h"
 #include "Asset/LOD/StaticMeshLODSelector.h"
@@ -169,8 +169,8 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 	uint32 NextExtraSlot = VisibleCount;
 
 	// 조각 수 = 스레드 수 × 4. 잘게 나눠야 먼저 끝난 스레드가 남은 조각을 가져가서 부하가 고르게 된다.
-	FTaskPool& Pool = FTaskPool::Get();
-	const uint32 ChunkCount = FMath::Clamp(VisibleCount, 1u, Pool.GetNumThreads() * 4);
+	const uint32 NumThreads = Tasks::FTaskScheduler::Get().GetNumWorkers() + 1;
+	const uint32 ChunkCount = FMath::Clamp(VisibleCount, 1u, NumThreads * 4);
 
 	if (GatherChunks.Num() < ChunkCount)
 		GatherChunks.SetNum(ChunkCount);     // 늘릴 때만. 줄이지 않아야 배열 용량이 계속 재사용된다.
@@ -187,7 +187,7 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 		for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
 			LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
 		SelectLODs(LODInputs, View, SelectedLODs);
-		Pool.ParallelFor(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
+		Tasks::ParallelForChunks(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
 			{
 				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
 				// (머티리얼, 메시, LOD) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.

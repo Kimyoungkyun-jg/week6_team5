@@ -28,4 +28,6 @@ protected:
 	float MoveSpeed = 20.0f;
 	UCameraComponent* CameraComponent = nullptr;
 	UStaticMeshComponent* StaticMeshComponent = nullptr;
+
+
 };

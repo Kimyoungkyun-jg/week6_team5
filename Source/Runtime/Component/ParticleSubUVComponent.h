@@ -19,7 +19,7 @@ struct FParticle
 	bool bAlive;
 };
 
-/*struct FSubUVConstants
+struct FSubUVConstants
 {
 	// 한 파티클을 그릴 때 Shader에 전달할 Atlas 프레임과 투명도 값을 담는다.
 	float CurrentFrame;
@@ -30,7 +30,7 @@ struct FParticle
 	float Padding[3]{};
 };
 
-static_assert(sizeof(FSubUVConstants) == 32);*/
+static_assert(sizeof(FSubUVConstants) == 32);
 
 // 가장 단순한 SubUV 파티클입니다.
 // Atlas 전체를 Col x Row로 나누고 CurrentFrame 하나만 변경합니다.

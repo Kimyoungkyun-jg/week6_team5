@@ -11,7 +11,7 @@
 UBillboardComponent::UBillboardComponent()
 {
 	QuadMesh = UAssetManager::GetAssetByPath<UStaticMesh>("ParticleQuad");
-	Material = UAssetManager::GetAssetByPath<UMaterial>("SubUVMaterial");
+	Material = UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial");
 }
 
 // Billboard 컴포넌트의 소멸을 처리한다.
@@ -87,20 +87,10 @@ void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const F
 	if (QuadMesh == nullptr || Material == nullptr)
 		return;
 
-	static const FSubUVConstants DefaultBillboardConstants{
-	0.0f,  // CurrentFrame
-	1.0f,  // AtlasRowSize
-	1.0f,  // AtlasColSize
-	1.0f,  // Alpha
-	0.0f   // FogAdditive
-	};
-
 	FRenderPacket Packet;
 	Packet.Mesh = QuadMesh;
 	Packet.Material = Material;
 	Packet.Model = RenderQueue.StoreWorldMatrix(BillboardWorldMatrix);
-	Packet.MaterialParamData = &DefaultBillboardConstants;
-	Packet.MaterialParamDataSize = sizeof(FSubUVConstants);
 	RenderQueue.Add(Packet);
 }
 
@@ -180,7 +170,7 @@ void UBillboardComponent::SetSprite(UTexture2D* InSprite)
 	if (!InSprite) return;
 	if (!Material || !Material->bIsInstance)
 	{
-		UMaterial* BaseMat = Material ? Material : UAssetManager::GetAssetByPath<UMaterial>("SubUVMaterial");
+		UMaterial* BaseMat = Material ? Material : UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial");
 		if (BaseMat)
 		{
 			Material = UMaterial::CreateInstance(BaseMat);

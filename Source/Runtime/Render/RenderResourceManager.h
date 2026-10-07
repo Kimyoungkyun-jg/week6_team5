@@ -20,6 +20,7 @@ enum class EPSOType : uint8
 	DeferredPointLighting,
 	ToneMap,
 	FireBall,
+	Billboard,
 	Count
 };
 

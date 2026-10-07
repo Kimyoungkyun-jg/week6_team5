@@ -27,7 +27,7 @@ UParticleSubUVComponent::UParticleSubUVComponent()
 	// AtlasTexture = nullptr;
 
 	//Shader = RenderCommand::CreateShader(L"Resources/Shader/ParticleSubUVShader.hlsl", FParticleVertex::GetLayout());
-	//Material = UAssetManager::GetAssetByPath<UMaterial>("SubUVMaterial");	
+	Material = UAssetManager::GetAssetByPath<UMaterial>("SubUVMaterial");
 }
 
 // 파티클 에셋과 배열을 준비하고 초기 상태를 채운다.

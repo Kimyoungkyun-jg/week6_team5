@@ -120,6 +120,7 @@ void UAssetManager::Init(const FAssetLoadProgress& OnProgress)
 		Get().ScanAssets("Editor", OnProgress);
 	}
 	Get().CreateDefaultMeshes();
+	Get().CreateBillboardMaterial();
 	Get().CreateParticleMaterial();
 }
 
@@ -287,6 +288,15 @@ void UAssetManager::CreateDefaultMaterial()
 
 	DefaultMat->ParamBuffer = RenderCommand::CreateConstantBuffer(sizeof(FStaticMeshMaterialParams));
 	RegisterAsset("DefaultMaterial", DefaultMat);
+}
+
+void UAssetManager::CreateBillboardMaterial()
+{
+	UMaterial* BillboardMat = FObjectFactory::ConstructObject<UMaterial>();
+	BillboardMat->PSOType = EPSOType::Billboard;
+	BillboardMat->Textures.Add(GetAssetByPath<UTexture2D>("WhiteTexture"));
+	BillboardMat->SamplerState = ESamplerState::LinearClamp;
+	RegisterAsset("BillboardMaterial", BillboardMat);
 }
 
 void UAssetManager::CreateParticleMaterial()

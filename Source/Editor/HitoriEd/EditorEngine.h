@@ -12,6 +12,7 @@
 #include "Editor/Rendering/SceneDepthRenderer.h"
 #include "Editor/Rendering/HeightFogRenderer.h"
 #include "Editor/Rendering/FXAARenderer.h"
+#include "Editor/Rendering/FireBallRenderer.h"
 #include "Editor/Gizmo/GizmoRenderer.h"
 #include "Render/LineBatcher.h"
 
@@ -86,6 +87,7 @@ private:
 		FSceneRenderer& SceneRenderer, UWorld* TargetWorld, const FSceneRenderOptions& Options);
 	void RenderSceneText(UWorld* TargetWorld, const FSceneView& SceneView);
 	bool RenderHeightFog(UWorld* TargetWorld, const FSceneView& SceneView, FTexture2D* DepthTarget, FTexture2D* ColorTarget);
+	bool RenderFireBall(UWorld* TargetWorld, const FSceneView& SceneView, FTexture2D* DepthTarget, FTexture2D* ColorTarget);
 	// 화면 합성과 View 설정 보관으로 프레임을 마무리한다.
 	void EndFrame();
 
@@ -112,6 +114,7 @@ private:
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
 	TUniquePtr<FHeightFogRenderer> HeightFogRenderer;
 	TUniquePtr<FFXAARenderer> FXAARenderer;
+	TUniquePtr<FFireBallRenderer> FireBallRenderer;
 
 	UFont* SystemFont;
 

@@ -172,6 +172,9 @@ bool UEditorEngine::Init() {
 	FXAARenderer = MakeUnique<FFXAARenderer>();
 	FXAARenderer->Init(Renderer);
 
+	FireBallRenderer = MakeUnique<FFireBallRenderer>();
+	FireBallRenderer->Init(Renderer);
+
 	SettingsPanel = EditorUI->AddEditorPanel<FSettingsPanel>();
 
 	Outline = MakeUnique<FOutline>();
@@ -725,6 +728,7 @@ bool UEditorEngine::RenderSceneFrame(FDeferredViewTargets& Targets, const FScene
 		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 	if (Options.bDrawPrimitives)
 	{
+		RenderFireBall(TargetWorld, SceneView, DepthTarget, ColorTarget);
 		FConstantBuffer* FogConstants = HeightFogRenderer
 			? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
 		SceneRenderer.RenderTranslucent(Renderer, FogConstants);
@@ -780,6 +784,27 @@ bool UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& Scene
 		Setting.FogCutoffDistance = Fog->GetFogCutoffDistance();
 		if (HeightFogRenderer->OnRender(SceneView, DepthTarget, ColorTarget, Setting))
 			return true;
+	}
+	return false;
+}
+
+bool UEditorEngine::RenderFireBall(UWorld* TargetWorld, const FSceneView& SceneView, FTexture2D* DepthTarget, FTexture2D* ColorTarget)
+{
+	if (!TargetWorld || !FireBallRenderer || !DepthTarget || !ColorTarget)
+		return false;
+	for (TObjectIterator<UFireBallComponent> FireBall; FireBall; ++FireBall)
+	{
+		if (!FireBall || !FireBall->IsVisible() || !FireBall->GetOwner() ||
+			FireBall->GetOwner()->GetWorld() != TargetWorld)
+			continue;
+		FFireBallData Data;
+		Data.Center = FireBall->GetWorldLocation();
+		Data.Radius = FireBall->GetRadius();
+		Data.Color = FireBall->GetColor();
+		Data.Intensity = FireBall->GetIntensity();
+		Data.RadiusFallOff = FireBall->GetRadiusFallOff();
+
+		FireBallRenderer->OnRender(SceneView, DepthTarget, ColorTarget, Data);
 	}
 	return false;
 }

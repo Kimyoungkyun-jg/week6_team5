@@ -265,3 +265,19 @@ float FVector::Distance(const FVector& V1, const FVector& V2)
 
 	return sqrt(sum);
 }
+
+FVector FVector::GetClampedToMaxSize(float MaxSize) const
+{
+	float SizeSq = X * X + Y * Y + Z * Z;
+	if (SizeSq > MaxSize * MaxSize)
+	{
+		float Scale = MaxSize / sqrt(SizeSq);
+		return FVector(X * Scale, Y * Scale, Z * Scale);
+	}
+	return *this;
+}
+
+bool FVector::IsZero() const
+{
+	return (X == 0.f) && (Y == 0.f) && (Z == 0.f);
+}

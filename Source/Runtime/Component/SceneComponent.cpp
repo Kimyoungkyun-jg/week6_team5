@@ -2,6 +2,8 @@
 #include "Component/SceneComponent.h"
 
 #include "GameFramework/Actor.h"
+#include "Engine/World.h"
+#include <cmath>
 
 USceneComponent::~USceneComponent()
 {
@@ -116,4 +118,71 @@ void USceneComponent::OnPropertyChanged(const FString& PropertyName)
 {
 	Super::OnPropertyChanged(PropertyName);
 	if (PropertyName == "Transform") MarkTransformDirty();
+}
+bool USceneComponent::MoveComponent(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+	return MoveComponentImpl(Delta, NewRotation, bSweep, OutHit);
+}
+
+bool USceneComponent::MoveComponent(const FVector& Delta, const FRotator& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+	return MoveComponentImpl(Delta, NewRotation.Quaternion(), bSweep, OutHit);
+}
+
+float USceneComponent::GetCollisionRadius() const
+{
+	FBox Bounds = CalcBounds();
+	FVector Extent = Bounds.Max - Bounds.Min;
+	Extent *= 0.5f;
+
+	if(Extent.IsZero())
+	{
+		return 10.0f;
+	}
+
+	return std::min({ Extent.X, Extent.Y, Extent.Z });
+}
+
+bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit)
+{
+    FHitResult LocalHit(1.0f);
+    FHitResult& Hit = OutHit ? *OutHit : LocalHit;
+    Hit = FHitResult(1.0f);
+
+    FTransform Relative = GetTransform();
+    const USceneComponent* Parent = GetAttachParent();
+    FMatrix ParentInverse = FMatrix::Identity;
+    if (Parent)
+    {
+        const FMatrix ParentWorld = Parent->GetWorldMatrix();
+        const float Determinant = ParentWorld.Determinant();
+        if (!std::isfinite(Determinant) || Determinant == 0.0f) return false;
+        ParentInverse = ParentWorld.Inverse();
+        Relative.Rotation = (Parent->GetWorldRotation().Quaternion().Inverse() * NewRotation).ToFRotator();
+    }
+    else Relative.Rotation = NewRotation.ToFRotator();
+
+    if (Delta.IsZero())
+    {
+        if (NewRotation.Equals(GetWorldRotation().Quaternion())) return false;
+        SetTransform(Relative);
+        return true;
+    }
+
+    const FVector Start = GetWorldLocation();
+    FVector Destination = Start + Delta;
+    bool bBlocked = false;
+    if (bSweep)
+    {
+        AActor* OwnerActor = GetOwner();
+        UWorld* World = OwnerActor ? OwnerActor->GetWorld() : nullptr;
+        if (!World) return false;
+        const FRay Ray(Start, Delta.Normalized());
+        bBlocked = World->SweepSingle(Ray, Delta.Size(), GetCollisionRadius(), Hit, OwnerActor);
+        if (bBlocked)
+            Destination = Start + Delta * Hit.Time + Hit.ImpactNormal * 0.1f;
+    }
+    Relative.Location = Parent ? ParentInverse.TransformPosition(Destination) : Destination;
+    SetTransform(Relative); // Use the same property/dirty notification as editor changes.
+    return !bBlocked;
 }

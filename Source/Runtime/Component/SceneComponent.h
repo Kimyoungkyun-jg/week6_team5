@@ -3,6 +3,7 @@
 #include "../Math/Transform.h"
 #include "ActorComponent.h"
 #include "Math/Box.h"
+#include "Collision/HitResult.h"
 
 class USceneComponent : public UActorComponent
 {
@@ -59,6 +60,8 @@ public:
 	virtual FBox CalcLocalBounds() const { return FBox{ FVector(), FVector() }; }
 	FBox CalcBounds() const { return CalcLocalBounds().GetWorldAABB(GetWorldMatrix()); }
 
+	virtual float GetCollisionRadius() const;
+
 	FVector GetWorldLocation() const;
 	FRotator GetWorldRotation() const;
 	FVector GetWorldScale3D() const;
@@ -67,6 +70,10 @@ public:
 	void MarkTransformDirty();
 	virtual void OnTransformDirty() {};
 
+	// Delta and NewRotation are in world space; attachment is preserved.
+	bool MoveComponent(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
+	bool MoveComponent(const FVector& Delta, const FRotator& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
+	virtual bool MoveComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
 
 protected:
 	bool bTransformDirty;

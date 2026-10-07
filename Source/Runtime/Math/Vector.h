@@ -102,7 +102,8 @@ public:
 	static FVector UnitZ();
 
 	static FVector Zero();*/
-
+	[[nodiscard]] FVector GetClampedToMaxSize(float MaxSize) const;
+	bool IsZero() const;
 };
 
 /* Global Operator */

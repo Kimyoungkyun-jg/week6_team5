@@ -12,6 +12,8 @@
 #include "Component/ParticleSubUVComponent.h"
 #include "Component/BillboardComponent.h"
 #include "Component/TextRenderComponent.h"
+#include "Component/ExponentialHeightFogComponent.h"
+#include "Component/ProjectileMovementComponent.h"
 #include "Asset/AssetManager.h"
 #include "Render/Material.h"
 #include "Render/Texture2D.h"
@@ -1008,6 +1010,22 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 				NewComp->SetupAttachment(Owner->GetRootComponent());
 			if (World)
 				World->GetScene().AddPrimitive(NewComp);
+		}
+		if(ImGui::Selectable("Exponential Height Fog Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UExponentialHeightFogComponent>("ExponentialHeightFog");
+			if (Owner->GetRootComponent())
+				NewComp->SetupAttachment(Owner->GetRootComponent());
+		}
+		if (ImGui::Selectable("Projectile Movement Component"))
+		{
+			auto* NewComp = Owner->CreateDefaultSubobject<UProjectileMovementComponent>("ProjectileMovement");
+			SelectedComponent = NewComp;
+			if (UWorld* OwnerWorld = Owner->GetWorld(); OwnerWorld && OwnerWorld->GetWorldType() == EWorldType::PIE)
+			{
+				NewComp->BeginPlay();
+				NewComp->PrimaryComponentTick.RegisterTickFunction(OwnerWorld->GetTickTaskManager());
+			}
 		}
 		ImGui::EndPopup();
 	}

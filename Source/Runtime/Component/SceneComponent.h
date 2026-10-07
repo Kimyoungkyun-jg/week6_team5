@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "../Math/Transform.h"
 #include "ActorComponent.h"
@@ -11,7 +11,23 @@ class USceneComponent : public UActorComponent
 
 	REFLECT_START(ClassName)
 		PROPERTY(Transform)
+		PROPERTY(bVisible)
+		PROPERTY(bHiddenInGame)
 		REFLECT_END()
+
+
+public:
+	enum class EVisibilityPropagation : uint8
+	{
+		/** Only change the visibility if needed */
+		NoPropagation,
+
+		/** If the visibility changed, mark all attached component's render states as dirty */
+		DirtyOnly,
+
+		/** Call function recursively on attached components and also mark their render state as dirty */
+		Propagate
+	};
 
 public:
 	virtual void OnPropertyChanged(const FString& PropertyName) override;
@@ -21,21 +37,21 @@ public:
 
 	// Get & Set
 	const FVector& GetRelativeLocation() const { return Transform.Location; }
-	void SetRelativeLocation(const FVector& InLocation) 
+	void SetRelativeLocation(const FVector& InLocation)
 	{
 		Transform.Location = InLocation;
 		OnPropertyChanged("Transform");
 	}
 
 	const FRotator& GetRelativeRotation() const { return Transform.Rotation; }
-	void SetRelativeRotation(const FRotator& InRotation) 
+	void SetRelativeRotation(const FRotator& InRotation)
 	{
-		Transform.Rotation = InRotation; 
+		Transform.Rotation = InRotation;
 		OnPropertyChanged("Transform");
 	}
 
 	const FVector& GetRelativeScale3D() const { return Transform.Scale; }
-	void SetRelativeScale3D(const FVector& InScale) 
+	void SetRelativeScale3D(const FVector& InScale)
 	{
 		Transform.Scale = InScale;
 		OnPropertyChanged("Transform");
@@ -45,7 +61,7 @@ public:
 	FQuat GetRelativeRotationQuat() const { return Transform.GetOrientation(); }
 
 	const FTransform& GetTransform() const { return Transform; }
-	void SetTransform(const FTransform& InTransform) 
+	void SetTransform(const FTransform& InTransform)
 	{
 		Transform = InTransform;
 		OnPropertyChanged("Transform");
@@ -54,6 +70,7 @@ public:
 	// Attatch-To
 	USceneComponent* GetAttachParent() const { return AttachParent; }
 	const TArray<USceneComponent*>& GetAttachChildren() const { return AttachChildren; }
+
 	void SetupAttachment(USceneComponent* InParent);
 	void DetachFromParent();
 
@@ -75,6 +92,29 @@ public:
 	bool MoveComponent(const FVector& Delta, const FRotator& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
 	virtual bool MoveComponentImpl(const FVector& Delta, const FQuat& NewRotation, bool bSweep, FHitResult* OutHit = NULL);
 
+	bool GetVisibleFlag() const
+	{
+		return bVisible;
+	}
+
+	void SetVisibleFlag(const bool bNewVisible);
+
+
+	void SetVisibility(bool bNewVisibility, EVisibilityPropagation PropagateToChildren = EVisibilityPropagation::NoPropagation);
+	void SetVisibility(bool bNewVisibility, bool bPropagateToChildren)
+	{ SetVisibility(bNewVisibility, bPropagateToChildren ? EVisibilityPropagation::Propagate : EVisibilityPropagation::NoPropagation); }
+	void SetHiddenInGame(bool bNewHiddenInGame, EVisibilityPropagation PropagateToChildren = EVisibilityPropagation::NoPropagation);
+	void SetHiddenInGame(bool bNewHiddenInGame, bool bPropagateToChildren)
+	{ SetHiddenInGame(bNewHiddenInGame, bPropagateToChildren ? EVisibilityPropagation::Propagate : EVisibilityPropagation::NoPropagation); }
+	bool IsVisible() const { return bVisible; }
+	bool IsHiddenInGame() const { return bHiddenInGame; }
+	bool IsShown(bool bGameView) const { return bVisible && !(bGameView && bHiddenInGame); }
+	virtual void MarkRenderStateDirty() {}
+	virtual void OnVisibilityChanged() { MarkRenderStateDirty(); }
+	virtual void OnHiddenInGameChanged() { MarkRenderStateDirty(); }
+
+
+
 protected:
 	bool bTransformDirty;
 	FTransform Transform;
@@ -82,4 +122,7 @@ protected:
 	USceneComponent* AttachParent = nullptr; // Attach 부모 정보
 	TArray<USceneComponent*> AttachChildren;
 
+
+	bool bVisible = true;
+	bool bHiddenInGame = false;
 };

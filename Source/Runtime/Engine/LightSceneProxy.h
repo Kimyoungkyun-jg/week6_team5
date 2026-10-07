@@ -20,10 +20,13 @@ public:
 	void Update();
 	UPointLightComponent* GetComponent() const { return Component; }
 	bool IsEnabled() const { return bEnabled; }
+	bool IsShown(bool bGameView) const { return bVisible && !(bGameView && bHiddenInGame); }
 	const FPointLightRenderData& GetRenderData() const { return RenderData; }
 
 private:
 	UPointLightComponent* Component = nullptr;
 	FPointLightRenderData RenderData{};
 	bool bEnabled = false;
+	bool bVisible = true;
+	bool bHiddenInGame = false;
 };

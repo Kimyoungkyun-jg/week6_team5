@@ -27,7 +27,6 @@ class UPrimitiveComponent :public USceneComponent
 	// Material은 여기서 등록하지 않는다. 컴포넌트마다 머티리얼을 다루는 방식이 달라서
 	// (빌보드는 단일 머티리얼, 스태틱 메시는 슬롯별 덮어쓰기) 각자 등록한다.
 	REFLECT_START(ClassName)
-		PROPERTY(bVisible)
 	REFLECT_END()
 public:
 	virtual void OnPropertyChanged(const FString& PropertyName) override;
@@ -54,12 +53,7 @@ public:
 	//
 	// FShader* GetShader() const { return Shader.get(); };
 
-	bool IsVisible() const { return bVisible; }
-	void SetVisible(bool bInVisible)
-	{
-		bVisible = bInVisible;
-		OnPropertyChanged("bVisible");
-	}
+	void SetVisible(bool bInVisible) { SetVisibility(bInVisible); }
 
 	virtual bool LineTraceComponent(const FRay& WorldRay, FHitResult& OutHit);
 	virtual bool LineTraceComponentLocal(const FRay& LocalRay, float& OutT);
@@ -71,14 +65,13 @@ public:
 
 	FPrimitiveSceneProxy* GetSceneProxy() const { return SceneProxy; }
 
-	void MarkRenderStateDirty();
+	void MarkRenderStateDirty() override;
 
 	virtual void OnTransformDirty() override;
 
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
 	bool TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
-	bool bVisible = true;
 
 private:
 	friend class FScene;

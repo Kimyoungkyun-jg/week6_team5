@@ -39,6 +39,7 @@ struct FViewContext
     float ProjectionScaleSquared = 0.0f;
     float NearZ = 0.0f;
     bool bOrthographic = false;
+    bool bGameView = false;
     float CameraDepth = 0.0f;
     FMatrix ViewProjection = FMatrix::Identity;
     void Prepare()

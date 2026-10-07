@@ -748,7 +748,7 @@ void UEditorEngine::RenderSceneText(UWorld* TargetWorld, const FSceneView& Scene
 	if (!TextRenderer) return;
 	for (TObjectIterator<UTextRenderComponent> Text; Text; ++Text)
 	{
-		if (!Text || !Text->GetFont() || !Text->IsVisible() || !Text->GetOwner() ||
+		if (!Text || !Text->GetFont() || !Text->IsShown(SceneView.bGameView) || !Text->GetOwner() ||
 			Text->GetOwner()->GetWorld() != TargetWorld)
 			continue;
 		TextRenderer->OnRender(Text->GetText(), Text->GetWorldMatrix(), Text->GetTextSize(),
@@ -766,7 +766,7 @@ bool UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& Scene
 
 	for (TObjectIterator<UExponentialHeightFogComponent> Fog; Fog; ++Fog)
 	{
-		if (!Fog || !Fog->IsVisible() || !Fog->GetOwner() ||
+		if (!Fog || !Fog->IsShown(SceneView.bGameView) || !Fog->GetOwner() ||
 			Fog->GetOwner()->GetWorld() != TargetWorld)
 			continue;
 

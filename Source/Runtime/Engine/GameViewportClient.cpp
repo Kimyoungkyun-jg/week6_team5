@@ -52,6 +52,8 @@ bool FGameViewportClient::InputKey(FViewport* Viewport, int32 Key, bool bDown)
 	}
 
 
+	if (bSIEMode && Key == static_cast<int32>(EKeyCode::LButton)) return true;
+
 	if (World)
 	{
 		if (APlayerController* PC = World->GetPlayerController())
@@ -146,6 +148,7 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 {
 	FSceneView OutView;
 	OutView.ViewIndex = 0;
+	OutView.bGameView = !bSIEMode;
 	OutView.ViewRect = InViewRect;
 
 	Resize(

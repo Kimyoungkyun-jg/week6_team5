@@ -393,6 +393,7 @@ bool UWorld::SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, 
 		{
 			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
 			if (!Component || !Component->IsVisible() || !Component->GetOwner() ||
+				!Component->GetOwner()->GetActorEnableCollision() ||
 				Component->GetOwner() == IgnoreActor || Component->GetOwner()->GetWorld() != this) return false;
 			if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
 			{
@@ -529,23 +530,16 @@ void UWorld::BeginPlay()
 		}
 	}
 
-	// 레벨 액터 재생 시작
-	for (ULevel* Level : Levels)
-	{
-		if (Level)
-		{
-			for (AActor* Actor : Level->GetActors())
-			{
-				if (Actor)
-				{
-					Actor->BeginPlay();
-				}
-			}
-		}
-	}
+    // BeginPlay can spawn actors (for example the Pawn's projectile pool).
+    // Snapshot the initial actors before callbacks; newly spawned actors enter BeginPlayList.
+    TArray<AActor*> InitialActors;
+    for (ULevel* Level : Levels)
+        if (Level)
+            for (AActor* Actor : Level->GetActors())
+                if (Actor) InitialActors.Add(Actor);
 
-	// 재생 상태 설정
-	bBegunPlay = true;
+    bBegunPlay = true;
+    for (AActor* Actor : InitialActors) Actor->BeginPlay();
 
 	// 대기열 액터 재생 시작
 	while (!BeginPlayList.IsEmpty())

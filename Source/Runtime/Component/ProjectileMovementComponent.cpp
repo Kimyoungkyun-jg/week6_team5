@@ -31,7 +31,7 @@ void UProjectileMovementComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (bInitialVelocityInLocalSpace)
+	if (IsActive() && bInitialVelocityInLocalSpace)
 	{
 		Velocity = UpdatedComponent ? UpdatedComponent->GetWorldRotation().Quaternion().GetForwardVector() * InitialSpeed : FVector::ZeroVector;
 	}
@@ -148,6 +148,7 @@ void UProjectileMovementComponent::StopSimulating(const FHitResult& HitResult)
 	//PendingForceThisUpdate = FVector::ZeroVector;
 	//UpdateComponentVelocity();
 	SetUpdatedComponent(NULL);
+	Deactivate();
 }
 
 void UProjectileMovementComponent::HandleImpact(const FHitResult& Hit, float TimeSlice, const FVector& MoveDelta)

@@ -172,7 +172,7 @@ bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRo
     const FVector Start = GetWorldLocation();
     FVector Destination = Start + Delta;
     bool bBlocked = false;
-    if (bSweep)
+    if (bSweep && (!GetOwner() || GetOwner()->GetActorEnableCollision()))
     {
         AActor* OwnerActor = GetOwner();
         UWorld* World = OwnerActor ? OwnerActor->GetWorld() : nullptr;
@@ -185,4 +185,63 @@ bool USceneComponent::MoveComponentImpl(const FVector& Delta, const FQuat& NewRo
     Relative.Location = Parent ? ParentInverse.TransformPosition(Destination) : Destination;
     SetTransform(Relative); // Use the same property/dirty notification as editor changes.
     return !bBlocked;
+}
+
+void USceneComponent::SetVisibility(bool bNewVisibility, EVisibilityPropagation Propagation)
+{
+    const bool bChanged = bVisible != bNewVisibility;
+    if (bChanged)
+    {
+        SetVisibleFlag(bNewVisibility);
+        OnVisibilityChanged();
+    }
+    if (Propagation == EVisibilityPropagation::NoPropagation ||
+        (Propagation == EVisibilityPropagation::DirtyOnly && !bChanged)) return;
+
+    TArray<USceneComponent*> Pending;
+    for (USceneComponent* Child : AttachChildren) if (Child) Pending.Add(Child);
+    while (Pending.Num() > 0)
+    {
+        USceneComponent* Child = Pending[Pending.Num() - 1];
+        Pending.RemoveLast();
+        if (Propagation == EVisibilityPropagation::Propagate)
+            Child->SetVisibility(bNewVisibility, EVisibilityPropagation::NoPropagation);
+        // DirtyOnly preserves the descendant's own visibility flag.
+        Child->MarkRenderStateDirty();
+        for (USceneComponent* Descendant : Child->GetAttachChildren())
+            if (Descendant) Pending.Add(Descendant);
+    }
+}
+
+void USceneComponent::SetHiddenInGame(bool bNewHidden, EVisibilityPropagation Propagation)
+{
+    const bool bChanged = bHiddenInGame != bNewHidden;
+    if (bChanged)
+    {
+        bHiddenInGame = bNewHidden;
+        OnPropertyChanged("bHiddenInGame");
+        OnHiddenInGameChanged();
+    }
+    if (Propagation == EVisibilityPropagation::NoPropagation ||
+        (Propagation == EVisibilityPropagation::DirtyOnly && !bChanged)) return;
+
+    TArray<USceneComponent*> Pending;
+    for (USceneComponent* Child : AttachChildren) if (Child) Pending.Add(Child);
+    while (Pending.Num() > 0)
+    {
+        USceneComponent* Child = Pending[Pending.Num() - 1];
+        Pending.RemoveLast();
+        if (Propagation == EVisibilityPropagation::Propagate)
+            Child->SetHiddenInGame(bNewHidden, EVisibilityPropagation::NoPropagation);
+        Child->MarkRenderStateDirty();
+        for (USceneComponent* Descendant : Child->GetAttachChildren())
+            if (Descendant) Pending.Add(Descendant);
+    }
+}
+
+void USceneComponent::SetVisibleFlag(bool bNewVisible)
+{
+    if (bVisible == bNewVisible) return;
+    bVisible = bNewVisible;
+    OnPropertyChanged("bVisible");
 }

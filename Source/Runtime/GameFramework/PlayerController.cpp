@@ -1,6 +1,8 @@
 #include "EnginePCH.h"
 #include "PlayerController.h"
 #include "Pawn.h"
+#include "DefaultPawn.h"
+#include "Engine/World.h"
 #include "Input/InputSystem.h"
 
 APlayerController::APlayerController()
@@ -128,8 +130,14 @@ void APlayerController::DuplicateSubobjects(UObject* SourceObject)
 
 void APlayerController::InputKey(int32 Key, bool bDown)
 {
-	if (Key >= 0 && Key < 256)
-		bKeyDown[Key] = bDown;
+	if (Key < 0 || Key >= 256) return;
+    const bool bPressed = bDown && !bKeyDown[Key];
+    bKeyDown[Key] = bDown;
+    if (bPressed && Key == static_cast<int32>(EKeyCode::LButton) &&
+        GetWorld() && GetWorld()->GetWorldType() == EWorldType::PIE)
+    {
+        if (ADefaultPawn* Pawn = Cast<ADefaultPawn>(PossessedPawn)) Pawn->FireProjectile();
+    }
 }
 
 void APlayerController::InputAxis(EGameInputAxis AxisKey, float Delta)

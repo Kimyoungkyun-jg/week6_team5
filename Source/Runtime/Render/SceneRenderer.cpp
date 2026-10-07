@@ -39,7 +39,7 @@ void FSceneRenderer::InitViews(FRenderer* Renderer)
 
 	for (const FLightSceneProxy* Light : World->GetScene().GetLights()) // 월드에 있는 모든 라이트 정보 가져오기
 	{
-		if (!Light->IsEnabled()) continue;
+		if (!Light->IsEnabled() || !Light->IsShown(View.bGameView)) continue;
 		const FPointLightRenderData& Data = Light->GetRenderData();
 		const float Radius = Data.PositionRadius.W;
 		bool bInView = true;
@@ -113,8 +113,11 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
-		// 컬링 단계에서는 프록시 포인터만 모으고, 컴포넌트 역참조(가시성 확인)는 어차피 컴포넌트를 읽는 Gather로 미룬다.
-		const auto Visit = [&](FPrimitiveSceneProxy* Proxy) { VisibleProxies.Add(Proxy); };
+		// 표시 상태는 프록시 캐시로 판정해 오클루전과 드로우 수집 전에 제외한다.
+		const auto Visit = [&](FPrimitiveSceneProxy* Proxy)
+		{
+			if (Proxy->IsShown(View.bGameView)) VisibleProxies.Add(Proxy);
+		};
 
 		if (Frustum)
 		{

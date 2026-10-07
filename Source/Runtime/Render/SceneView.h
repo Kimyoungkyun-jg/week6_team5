@@ -42,6 +42,7 @@ struct FSceneView
 	// 렌더링 플래그
 	bool bIsPerspective = true;
 	bool bIsWireframe = false;
+	bool bGameView = false;
 
 	// 기존 뷰 컨텍스트 변환
 	FViewContext ToViewContext() const
@@ -55,6 +56,7 @@ struct FSceneView
 		Context.ViewProjection = ViewProjectionMatrix;
 		Context.NearZ = NearClip;
 		Context.bOrthographic = !bIsPerspective;
+		Context.bGameView = bGameView;
 
 		const float ScaleX = ProjectionMatrix.M[1][0];
 		const float ScaleY = ProjectionMatrix.M[2][1];

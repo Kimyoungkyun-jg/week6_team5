@@ -12,6 +12,8 @@ void FLightSceneProxy::Update()
 		return;
 	}
 
+	bVisible = Component->IsVisible();
+	bHiddenInGame = Component->IsHiddenInGame();
 	const FVector Position = Component->GetWorldLocation();
 	const FVector4& Color = Component->GetLightColor();
 	const float Radius = std::max(0.0f, Component->GetAttenuationRadius());

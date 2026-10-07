@@ -15,6 +15,7 @@ class AActor : public UObject
 {
 	DECLARE_CLASS(AActor, UObject)
 	REFLECT_START(ClassName)
+		PROPERTY(bActorEnableCollision)
 		REFLECT_END()
 public:
 	AActor();
@@ -44,6 +45,9 @@ public:
 	FQuat GetActorQuat() const;           //xx 타입명변경
 	FTransform GetActorTransform() const;
 
+	void SetActorEnableCollision(bool bEnabled) { bActorEnableCollision = bEnabled; }
+	bool GetActorEnableCollision() const { return bActorEnableCollision; }
+
 	bool Destroy();
 	
 	//xx삭제 예정
@@ -68,6 +72,7 @@ public:
 
 protected:
 	//TSet<TObjectPtr<UActorComponent>> OwnedComponents;
+	bool bActorEnableCollision = true;
 	TArray<UActorComponent*> Components;
 	USceneComponent* RootComponent = nullptr;
 

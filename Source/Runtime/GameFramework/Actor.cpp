@@ -27,6 +27,7 @@ AActor::~AActor()
 
 void AActor::BeginPlay()
 {
+	RegisterAllActorTickFunctions(true);
 	//if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(RootComponent))
 	//{
 	//	World->AddPrimitive(Cast<UPrimitiveComponent>(RootComponent));
@@ -37,7 +38,6 @@ void AActor::BeginPlay()
 		Component->BeginPlay();
 	}
 
-	RegisterAllActorTickFunctions(true);
 }
 
 void AActor::RegisterAllActorTickFunctions(bool bRegister)
@@ -57,8 +57,17 @@ void AActor::RegisterAllActorTickFunctions(bool bRegister)
 	Apply(PrimaryActorTick);
 	for (UActorComponent* Component : Components)
 	{
-		if (Component)
-			Apply(Component->PrimaryComponentTick);
+		if (!Component) continue;
+		if (bRegister)
+		{
+			if (!Component->IsRegistered()) Component->RegisterComponentWithWorld(World);
+		}
+		else
+		{
+			Component->UnregisterComponent();
+			// Also remove ticks registered directly by legacy callers.
+			Component->PrimaryComponentTick.UnRegisterTickFunction();
+		}
 	}
 }
 

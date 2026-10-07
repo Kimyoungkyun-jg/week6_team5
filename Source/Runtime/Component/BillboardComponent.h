@@ -2,6 +2,8 @@
 
 #include "PrimitiveComponent.h"
 
+class UTexture2D;
+
 class UBillboardComponent : public UPrimitiveComponent
 {
 	DECLARE_CLASS(UBillboardComponent, UPrimitiveComponent)
@@ -35,9 +37,13 @@ public:
 
 	virtual void Serialize(json& Handle, bool bIsLoading) override;
 
+	UTexture2D* GetSprite() const { return Sprite; }
+	void SetSprite(UTexture2D* InSprite);
+
 protected:
 	UMaterial* Material = nullptr;
 	UStaticMesh* QuadMesh = nullptr;
+	UTexture2D* Sprite = nullptr;
 private:
 
 };

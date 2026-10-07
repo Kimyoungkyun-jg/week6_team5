@@ -556,6 +556,49 @@ namespace
 			return;
 		}
 
+		if (ImGui::CollapsingHeader("Billboard Sprite", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			static const char* IconNames[] = {
+				"None",
+				"PointLight_64x",
+				"SpotLight_64x",
+				"Pawn_64x"
+			};
+			static const char* IconPaths[] = {
+				"",
+				"Editor/Icon/PointLight_64x.png",
+				"Editor/Icon/SpotLight_64x.png",
+				"Editor/Icon/Pawn_64x.png"
+			};
+			// 현재 선택된 아이콘 인덱스 찾기
+			int CurrentIndex = 0;
+			UTexture2D* CurrentSprite = BillboardComponent->GetSprite();
+			if (CurrentSprite)
+			{
+				for (int i = 1; i < IM_ARRAYSIZE(IconNames); ++i)
+				{
+					if (CurrentSprite->GetPath().find(IconNames[i]) != std::string::npos)
+					{
+						CurrentIndex = i;
+						break;
+					}
+				}
+			}
+			// 드롭다운 콤보박스 렌더링
+			if (ImGui::Combo("Sprite Icon", &CurrentIndex, IconNames, IM_ARRAYSIZE(IconNames)))
+			{
+				if (CurrentIndex == 0)
+				{
+					BillboardComponent->SetSprite(nullptr);
+				}
+				else
+				{
+					UTexture2D* SelectedTex = UAssetManager::Get().LoadTexture(IconPaths[CurrentIndex]);
+					BillboardComponent->SetSprite(SelectedTex);
+				}
+			}
+		}
+
 		if (!ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			return;

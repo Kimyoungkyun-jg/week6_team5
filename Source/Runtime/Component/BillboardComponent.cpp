@@ -11,7 +11,7 @@
 UBillboardComponent::UBillboardComponent()
 {
 	QuadMesh = UAssetManager::GetAssetByPath<UStaticMesh>("ParticleQuad");
-	Material = UAssetManager::GetAssetByPath<UMaterial>("SubUVMaterial");
+	Material = UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial");
 }
 
 // Billboard 컴포넌트의 소멸을 처리한다.
@@ -56,6 +56,7 @@ void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const F
 	{
 		return;
 	}
+
 	const FVector WorldPos = GetWorldLocation();
 	const FVector WorldScale = GetWorldScale3D();
 	
@@ -161,4 +162,26 @@ void UBillboardComponent::GetWorldTransformedMatrix(FMatrix* OutWorldMatrix) con
 	OutWorldMatrix->M[3][1] = WorldPos.Y;
 	OutWorldMatrix->M[3][2] = WorldPos.Z;
 	OutWorldMatrix->M[3][3] = 1.0f;
+}
+
+void UBillboardComponent::SetSprite(UTexture2D* InSprite)
+{
+	Sprite = InSprite;
+	if (!InSprite) return;
+	if (!Material || !Material->bIsInstance)
+	{
+		UMaterial* BaseMat = Material ? Material : UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial");
+		if (BaseMat)
+		{
+			Material = UMaterial::CreateInstance(BaseMat);
+		}
+	}
+	if (Material)
+	{
+		if (Material->Textures.IsEmpty())
+			Material->Textures.Add(InSprite);
+		else
+			Material->Textures[0] = InSprite;
+		OnPropertyChanged("Material");
+	}
 }

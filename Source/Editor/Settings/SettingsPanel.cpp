@@ -6,6 +6,9 @@
 #include "Engine/World.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/Viewports/EditorViewportClient.h"
+#include "GameFramework/DefaultPawn.h"
+#include "Component/StaticMeshComponent.h"
+#include "UObject/UObjectIterator.h"
 
 // 종료 시 렌더·에디터·뷰포트 설정을 함께 저장한다.
 FSettingsPanel::~FSettingsPanel()
@@ -86,7 +89,9 @@ void FSettingsPanel::OnRender()
 	CamCom->SetMoveSpeed(Settings.CameraSpeed);
 
 	//////////////////////////////////////////////////////////
+	DrawDefaultPawnSettings();
 
+	//////////////////////////////////////////////////////////
 	ImGui::Dummy(ImVec2(0.0f, SectionGap));
 	ImGui::SeparatorText("Load Settings");
 
@@ -349,3 +354,73 @@ void FSettingsPanel::ApplySceneDepthRange()
 	}
 }
 
+void FSettingsPanel::DrawDefaultPawnSettings()
+{
+    ImGui::Dummy(ImVec2(0.0f, SectionGap));
+    ImGui::SeparatorText("DefaultPawn Settings");
+    ADefaultPawn* Pawn = World ? Cast<ADefaultPawn>(World->GetPlayerPawn()) : nullptr;
+    if (!Pawn)
+    {
+        ImGui::TextDisabled("Start PIE with a DefaultPawn to edit these settings.");
+        return;
+    }
+
+    const auto DrawMeshPicker = [](const char* Label, UStaticMesh*& SelectedMesh)
+    {
+        const auto GetMeshDisplayName = [](const UStaticMesh* Mesh) -> FString
+        {
+            if (!Mesh) return "None";
+            const fs::path Path(Mesh->GetPath());
+            return Path.stem() == "Atlas"
+                ? Path.parent_path().filename().string()
+                : Path.stem().string();
+        };
+        const FString Preview = GetMeshDisplayName(SelectedMesh);
+        bool bChanged = false;
+        const bool bOpen = ImGui::BeginCombo(Label, Preview.c_str());
+        if (SelectedMesh && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", SelectedMesh->GetPath().c_str());
+        if (bOpen)
+        {
+            if (ImGui::Selectable("None", SelectedMesh == nullptr))
+            {
+                SelectedMesh = nullptr;
+                bChanged = true;
+            }
+            for (TObjectIterator<UStaticMesh> Mesh; Mesh; ++Mesh)
+            {
+                const FString Name = GetMeshDisplayName(*Mesh);
+                const bool bSelected = *Mesh == SelectedMesh;
+                ImGui::PushID(*Mesh);
+                if (ImGui::Selectable(Name.c_str(), bSelected))
+                {
+                    SelectedMesh = *Mesh;
+                    bChanged = true;
+                }
+                if (bSelected) ImGui::SetItemDefaultFocus();
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", Mesh->GetPath().c_str());
+                ImGui::PopID();
+            }
+            ImGui::EndCombo();
+        }
+        return bChanged;
+    };
+
+    UStaticMeshComponent* PawnMesh = Pawn->GetStaticMeshComponent();
+    if (PawnMesh)
+    {
+        UStaticMesh* Mesh = PawnMesh->GetStaticMesh();
+        if (DrawMeshPicker("Pawn Mesh", Mesh)) PawnMesh->SetStaticMesh(Mesh);
+    }
+    int Type = Pawn->UsesStaticMeshProjectiles() ? 1 : 0;
+    const char* Types[] = {"FireBall", "StaticMesh"};
+    if (ImGui::Combo("Projectile Type", &Type, Types, IM_ARRAYSIZE(Types)))
+        Pawn->SetUseStaticMeshProjectiles(Type == 1);
+    if (Pawn->UsesStaticMeshProjectiles())
+    {
+        UStaticMesh* Mesh = Pawn->GetProjectileMesh();
+        if (DrawMeshPicker("Projectile Mesh", Mesh)) Pawn->SetProjectileMesh(Mesh);
+        if (!Mesh) ImGui::TextDisabled("Select a projectile mesh to fire.");
+    }
+    ImGui::TextDisabled("Projectile settings apply to the next shot.");
+}

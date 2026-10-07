@@ -1,4 +1,4 @@
-﻿#include "EnginePCH.h"
+#include "EnginePCH.h"
 #include "JsonArchive.h"
 
 #include "Engine/World.h"
@@ -198,6 +198,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 			HTR_LOG(Warning, "Load: failed to spawn {}", ActorJson["Class"].get<FString>());
 			continue;
 		}
+		Actor->UnregisterAllComponents();
 		Actor->Serialize(ActorJson["Properties"], true);
 
 		for (json& ComponentJson : ActorJson["Components"])       // json → json&
@@ -217,14 +218,22 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 
 			if (!Component)
 			{
-				if (ComponentJson.contains("Class") && ComponentJson["Class"] == "UPointLightComponent")
-				{
-					UPointLightComponent* Light = Actor->CreateDefaultSubobject<UPointLightComponent>(Name);
-					if (Actor->GetRootComponent())
-						Light->SetupAttachment(Actor->GetRootComponent());
-					World->GetScene().AddLight(Light);
-					Component = Light;
-				}
+                UClass* ComponentClass = ComponentJson.contains("Class")
+                    ? FindClass(ComponentJson["Class"].get<FString>()) : nullptr;
+                if (ComponentClass && ComponentClass->IsChildOf(UActorComponent::StaticClass()))
+                {
+                    Component = Cast<UActorComponent>(FObjectFactory::ConstructObject(ComponentClass, Actor, Name));
+                    if (Component)
+                    {
+                        Component->SetOwner(Actor);
+                        Actor->AddComponents(Component);
+                        if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component))
+                        {
+                            if (Actor->GetRootComponent()) SceneComponent->SetupAttachment(Actor->GetRootComponent());
+                            else Actor->SetRootComponent(SceneComponent);
+                        }
+                    }
+                }
 			}
 
 			if (!Component)
@@ -241,6 +250,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 
 			Component->Serialize(ComponentJson["Properties"], true);
 		}
+		Actor->RegisterAllComponents();
 	}
 
 	//if (!Json.contains("NextUUID"))

@@ -76,6 +76,7 @@ private:
     // View별 Transform·투영·표시 설정을 읽어 저장용 스냅샷에 반영한다.
     void ReadViewportSettings(FEditorSettings& Out) const;
 	void ApplySceneDepthRange();
+	void DrawDefaultPawnSettings();
 	UWorld* World = nullptr;
 	FViewportsPanel* ViewportsPanel = nullptr;
 	FEditorSettings Settings;

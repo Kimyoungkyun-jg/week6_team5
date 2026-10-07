@@ -14,6 +14,8 @@ AActor::AActor()
 
 AActor::~AActor()
 {
+    RegisterAllActorTickFunctions(false);
+    UnregisterAllComponents();
     TArray<UActorComponent*> ToDelete = Components;
     Components.Reset();
     RootComponent = nullptr;
@@ -25,50 +27,36 @@ AActor::~AActor()
 }
 
 
+void AActor::RegisterAllComponents()
+{
+    if (!World) return;
+    for (UActorComponent* Component : Components)
+        if (Component && !Component->IsRegistered()) Component->RegisterComponentWithWorld(World);
+}
+
+void AActor::UnregisterAllComponents()
+{
+    for (UActorComponent* Component : Components)
+        if (Component) Component->UnregisterComponent();
+}
+
 void AActor::BeginPlay()
 {
-	RegisterAllActorTickFunctions(true);
-	//if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(RootComponent))
-	//{
-	//	World->AddPrimitive(Cast<UPrimitiveComponent>(RootComponent));
-	//}
-
-	for (UActorComponent* Component : Components)
-	{
-		Component->BeginPlay();
-	}
-
+    if (bHasBegunPlay || !World || !World->HasBegunPlay()) return;
+    RegisterAllComponents();
+    bHasBegunPlay = true;
+    for (UActorComponent* Component : Components)
+        if (Component) Component->BeginPlayComponent();
+    RegisterAllActorTickFunctions(true);
 }
 
 void AActor::RegisterAllActorTickFunctions(bool bRegister)
 {
-	if (bRegister && !World)
-		return;
-
-	// bCanEverTick이 꺼진 함수는 등록하지 않으므로 정적 메시 액터는 매 프레임 순회 대상에서 빠진다.
-	auto Apply = [&](FTickFunction& Function)
-	{
-		if (bRegister)
-			Function.RegisterTickFunction(World->GetTickTaskManager());
-		else
-			Function.UnRegisterTickFunction();
-	};
-
-	Apply(PrimaryActorTick);
-	for (UActorComponent* Component : Components)
-	{
-		if (!Component) continue;
-		if (bRegister)
-		{
-			if (!Component->IsRegistered()) Component->RegisterComponentWithWorld(World);
-		}
-		else
-		{
-			Component->UnregisterComponent();
-			// Also remove ticks registered directly by legacy callers.
-			Component->PrimaryComponentTick.UnRegisterTickFunction();
-		}
-	}
+    if (bRegister && !World) return;
+    if (bRegister) PrimaryActorTick.RegisterTickFunction(World->GetTickTaskManager());
+    else PrimaryActorTick.UnRegisterTickFunction();
+    for (UActorComponent* Component : Components)
+        if (Component) Component->RegisterComponentTickFunctions(bRegister);
 }
 
 void AActor::RemoveOwnedComponent(UActorComponent* Component)

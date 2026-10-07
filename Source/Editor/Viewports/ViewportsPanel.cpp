@@ -69,7 +69,10 @@ void FViewportsPanel::SetView(const int32 ViewIndex, const FRect &Rect,
 
 // 마우스 위치에서 패널 원점을 빼 로컬 좌표로 바꾼다.
 FVector2 FViewportsPanel::GetLocalMousePosition() const {
-	const ImVec2 Mouse = ImGui::GetMousePos();
+	POINT Cursor{};
+	const ImVec2 Mouse = ::GetCursorPos(&Cursor)
+		? ImVec2(static_cast<float>(Cursor.x), static_cast<float>(Cursor.y))
+		: ImGui::GetMousePos();
 	return {Mouse.x - ContentOrigin.x, Mouse.y - ContentOrigin.y};
 }
 
@@ -83,7 +86,9 @@ bool FViewportsPanel::IsHovered() const {
 				Cursor.y < StatResetButtonMax.y)
 			return false;
 	}
-	return bHovered;
+	const FVector2 Mouse = GetLocalMousePosition();
+	return bHovered && Mouse.X >= 0.0f && Mouse.Y >= 0.0f &&
+		Mouse.X < ContentSize.x && Mouse.Y < ContentSize.y;
 }
 
 // 누적 가로 Splitter 이동량을 반환하고 초기화한다.
@@ -126,6 +131,7 @@ void FViewportsPanel::OnRender() {
 	ContentSize.x = std::max(1.0f, ContentSize.x);
 	ContentSize.y = std::max(1.0f, ContentSize.y);
 	bHovered = ImGui::IsWindowHovered();
+	bFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 	bStatResetButtonVisible = false;
 
 	// 전체 캔버스를 한 번 확보한 뒤 각 렌더 타깃을 창 DrawList에 직접 그린다.
@@ -176,6 +182,8 @@ void FViewportsPanel::OnRender() {
 				ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
 				ImGui::IsMouseClicked(ImGuiMouseButton_Middle))) {
 			ActiveViewIndex = ViewIndex;
+			ImGui::SetWindowFocus();
+			bFocused = true;
 		}
 	}
 	DrawList->PopClipRect();

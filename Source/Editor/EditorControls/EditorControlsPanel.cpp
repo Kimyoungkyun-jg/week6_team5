@@ -9,9 +9,6 @@
 #include "Editor/Viewports/EditorViewportClient.h"
 
 #include "Input/InputSystem.h"
-#include "GameFramework/DefaultPawn.h"
-#include "Component/StaticMeshComponent.h"
-#include "UObject/UObjectIterator.h"
 
 #include <cmath>
 
@@ -94,7 +91,6 @@ void FEditorControlsPanel::OnRender()
 	//////////////////////////////////////////////////////
 
 	DrawCameraProperties();
-	DrawDefaultPawnSettings();
 
 	//////////////////////////////////////////////////////
 
@@ -343,64 +339,4 @@ void FEditorControlsPanel::DrawCameraProperties()
 		}
 		ImGui::EndTable();
 	}
-}
-
-void FEditorControlsPanel::DrawDefaultPawnSettings()
-{
-    ImGui::Dummy(ImVec2(0.0f, SectionGap));
-    ImGui::SeparatorText("DefaultPawn Settings");
-    ADefaultPawn* Pawn = World ? Cast<ADefaultPawn>(World->GetPlayerPawn()) : nullptr;
-    if (!Pawn)
-    {
-        ImGui::TextDisabled("Start PIE with a DefaultPawn to edit these settings.");
-        return;
-    }
-
-    const auto DrawMeshPicker = [](const char* Label, UStaticMesh*& SelectedMesh)
-    {
-        const FString Preview = SelectedMesh ? SelectedMesh->GetFName().ToString() : "None";
-        bool bChanged = false;
-        if (ImGui::BeginCombo(Label, Preview.c_str()))
-        {
-            if (ImGui::Selectable("None", SelectedMesh == nullptr))
-            {
-                SelectedMesh = nullptr;
-                bChanged = true;
-            }
-            for (TObjectIterator<UStaticMesh> Mesh; Mesh; ++Mesh)
-            {
-                const FString Name = Mesh->GetFName().ToString();
-                const bool bSelected = *Mesh == SelectedMesh;
-                ImGui::PushID(*Mesh);
-                if (ImGui::Selectable(Name.c_str(), bSelected))
-                {
-                    SelectedMesh = *Mesh;
-                    bChanged = true;
-                }
-                if (bSelected) ImGui::SetItemDefaultFocus();
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", Mesh->GetPath().c_str());
-                ImGui::PopID();
-            }
-            ImGui::EndCombo();
-        }
-        return bChanged;
-    };
-
-    UStaticMeshComponent* PawnMesh = Pawn->GetStaticMeshComponent();
-    if (PawnMesh)
-    {
-        UStaticMesh* Mesh = PawnMesh->GetStaticMesh();
-        if (DrawMeshPicker("Pawn Mesh", Mesh)) PawnMesh->SetStaticMesh(Mesh);
-    }
-    int Type = Pawn->UsesStaticMeshProjectiles() ? 1 : 0;
-    const char* Types[] = {"FireBall", "StaticMesh"};
-    if (ImGui::Combo("Projectile Type", &Type, Types, IM_ARRAYSIZE(Types)))
-        Pawn->SetUseStaticMeshProjectiles(Type == 1);
-    if (Pawn->UsesStaticMeshProjectiles())
-    {
-        UStaticMesh* Mesh = Pawn->GetProjectileMesh();
-        if (DrawMeshPicker("Projectile Mesh", Mesh)) Pawn->SetProjectileMesh(Mesh);
-        if (!Mesh) ImGui::TextDisabled("Select a projectile mesh to fire.");
-    }
-    ImGui::TextDisabled("Projectile settings apply to the next shot.");
 }

@@ -958,29 +958,27 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 			auto* NewComp = Owner->CreateDefaultSubobject<UStaticMeshComponent>("StaticMesh");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
-			if (World)
-				World->GetScene().AddPrimitive(NewComp);
+			NewComp->RegisterComponent();
 		}
 		if (ImGui::Selectable("SpotLight Component"))
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<USpotLightComponent>("SpotLight");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
+			NewComp->RegisterComponent();
 		}
 		if (ImGui::Selectable("PointLight Component"))
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<UPointLightComponent>("PointLight");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
-			if (World)
-				World->GetScene().AddLight(NewComp);
+			NewComp->RegisterComponent();
 		}
 		if (ImGui::Selectable("RotatingMovement Component"))
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<RotatingMovementComponent>("RotatingMovement");
 			SelectedComponent = NewComp;
-			if (UWorld* OwnerWorld = Owner->GetWorld(); OwnerWorld && OwnerWorld->GetWorldType() == EWorldType::PIE)
-				NewComp->PrimaryComponentTick.RegisterTickFunction(OwnerWorld->GetTickTaskManager());
+			NewComp->RegisterComponent();
 		}
 		if (ImGui::Selectable("ParticleSubUV Component"))
 		{
@@ -992,40 +990,34 @@ void FDetailsPanel::DrawAddComponentPopup(AActor * Owner)
 			}
 				
 
-			if (World)
-				World->GetScene().AddPrimitive(NewComp);
+			NewComp->RegisterComponent();
 		}
 		if (ImGui::Selectable("TextRender Component"))
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<UTextRenderComponent>("TextRender");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
-			if (World)
-				World->GetScene().AddPrimitive(NewComp);
+			NewComp->RegisterComponent();
 		}
 		if (ImGui::Selectable("Billboard Component"))
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<UBillboardComponent>("Billboard");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
-			if (World)
-				World->GetScene().AddPrimitive(NewComp);
+			NewComp->RegisterComponent();
 		}
 		if(ImGui::Selectable("Exponential Height Fog Component"))
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<UExponentialHeightFogComponent>("ExponentialHeightFog");
 			if (Owner->GetRootComponent())
 				NewComp->SetupAttachment(Owner->GetRootComponent());
+			NewComp->RegisterComponent();
 		}
 		if (ImGui::Selectable("Projectile Movement Component"))
 		{
 			auto* NewComp = Owner->CreateDefaultSubobject<UProjectileMovementComponent>("ProjectileMovement");
 			SelectedComponent = NewComp;
-			if (UWorld* OwnerWorld = Owner->GetWorld(); OwnerWorld && OwnerWorld->GetWorldType() == EWorldType::PIE)
-			{
-				NewComp->BeginPlay();
-				NewComp->PrimaryComponentTick.RegisterTickFunction(OwnerWorld->GetTickTaskManager());
-			}
+			NewComp->RegisterComponent();
 		}
 		ImGui::EndPopup();
 	}

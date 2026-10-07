@@ -84,16 +84,8 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 		NewActor->GetRootComponent()->SetTransform(SpawnTransform);
 	}
 
-	for (UActorComponent* Component : NewActor->GetComponents())
-	{
-		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
-			Scene.AddPrimitive(Primitive);
-		if (UPointLightComponent* Light = Cast<UPointLightComponent>(Component))
-			Scene.AddLight(Light);
-	}
-
-	// 4. Level->Actors에 등록
 	PersistentLevel->AddActor(NewActor);
+	NewActor->RegisterAllComponents();
 
 	// 재생 중 스폰 시 대기 목록 추가
 	if (bBegunPlay)
@@ -135,6 +127,7 @@ void UWorld::Tick(EWorldTick TickType, float DeltaTime)
 
 		for (TObjectIterator<UParticleSubUVComponent> Comp; Comp; ++Comp)
 		{
+			if (!Comp->IsRegistered() || Comp->GetWorld() != this) continue;
 			Comp->SetParticles(10); // 이걸 매틱마다 하는게 맞나?
 			Comp->TickComponent(DeltaTime);
 		}
@@ -160,17 +153,19 @@ void UWorld::ClearWorld()
 	PathTracker.SetPathRenderingEnabled(false);
 	PathTracker.ClearPath();
 
-	// 액터를 지우기 전에 렌더 프록시와 틱 등록부터 푼다. ClearActors는 액터를 delete만 하므로,
-	// 그대로 두면 지워진 컴포넌트를 가리키는 프록시가 FScene에 남아 다음 프레임에 터진다.
-	Scene.RemoveAllPrimitives();
-	Scene.RemoveAllLights();
+	// 컴포넌트 해제로 프록시와 Tick을 정리한 후 액터를 삭제한다.
 	for (ULevel* Level : Levels)
 	{
 		for (AActor* Actor : Level->Actors)
 			if (Actor)
+			{
 				Actor->RegisterAllActorTickFunctions(false);
+				Actor->UnregisterAllComponents();
+			}
 		Level->ClearActors();
 	}
+	Scene.RemoveAllPrimitives();
+	Scene.RemoveAllLights();
 	PlayerPawn = nullptr;
 	PlayerController = nullptr;
 	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
@@ -195,6 +190,9 @@ void UWorld::CreateMainCamera()
 	MainCamera->GetCameraComponent()->SetRelativeLocation(FVector(-5.0f, -5.0f, 5.0f));
 
 	// 메인 카메라는 Level에 속하지 않아 BeginPlay를 거치지 않으므로 여기서 등록한다.
+	MainCamera->RegisterAllComponents();
+	MainCamera->GetCameraComponent()->InitializeComponent();
+	MainCamera->GetCameraComponent()->Activate();
 	MainCamera->RegisterAllActorTickFunctions(true);
 }
 
@@ -204,13 +202,19 @@ void UWorld::SetMainCamera(ACameraActor* Camera)
 		return;
 
 	if (MainCamera)
+	{
 		MainCamera->RegisterAllActorTickFunctions(false);
+		MainCamera->UnregisterAllComponents();
+	}
 
 	MainCamera = Camera;
 
 	if (MainCamera)
 	{
 		MainCamera->World = this;
+		MainCamera->RegisterAllComponents();
+		MainCamera->GetCameraComponent()->InitializeComponent();
+		MainCamera->GetCameraComponent()->Activate();
 		MainCamera->RegisterAllActorTickFunctions(true);
 	}
 }
@@ -262,18 +266,8 @@ bool UWorld::DestroyActor(AActor* Actor)
 	FString ActorName = Actor->GetName();
 	uint32 ActorUUID = Actor->GetUUID();
 
-	// 5. 프록시 제거
-	for (UActorComponent* Component : Actor->GetComponents())
-	{
-		if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Component))
-		{
-			Scene.RemovePrimitive(Primitive);
-		}
-		if (UPointLightComponent* Light = Cast<UPointLightComponent>(Component))
-			Scene.RemoveLight(Light);
-	}
-
 	Actor->RegisterAllActorTickFunctions(false);
+	Actor->UnregisterAllComponents();
 
 	// 6. Actor 삭제
 	delete Actor;
@@ -611,6 +605,9 @@ bool UWorld::DuplicateWorld(UWorld* Source)
 
 	auto Rollback = [&]() -> bool
 	{
+		for (ULevel* Level : Levels)
+			for (AActor* Actor : Level->GetActors())
+				if (Actor) { Actor->RegisterAllActorTickFunctions(false); Actor->UnregisterAllComponents(); }
 		Scene.RemoveAllPrimitives();
 		Scene.RemoveAllLights();
 		ACameraActor* Camera = MainCamera;
@@ -709,13 +706,15 @@ bool UWorld::DuplicateWorld(UWorld* Source)
 		MainCamera = Cast<ACameraActor>(Resolve(OriginalCamera));
 		if (!MainCamera) CreateMainCamera();
 		if (!MainCamera) return Rollback();
+		MainCamera->RegisterAllComponents();
+		MainCamera->GetCameraComponent()->InitializeComponent();
+		MainCamera->GetCameraComponent()->Activate();
 		MainCamera->RegisterAllActorTickFunctions(true);
 
 		// 4. 완성된 소유/부모 관계로 프록시를 생성한다.
 		for (const auto& Pair : OriginalToDuplicate)
 		{
-			if (UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Pair.second)) Scene.AddPrimitive(Primitive);
-			if (UPointLightComponent* Light = Cast<UPointLightComponent>(Pair.second)) Scene.AddLight(Light);
+			if (AActor* Actor = Cast<AActor>(Pair.second)) Actor->RegisterAllComponents();
 		}
 		WorldType = EWorldType::PIE;
 		return true;

@@ -103,6 +103,7 @@ public:
 	bool SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, FHitResult& OutHit, AActor* IgnoreActor = nullptr);
 
 	void BeginPlay();
+	bool HasBegunPlay() const { return bBegunPlay; }
 	void EndPlay();
 
 	FScene& GetScene() { return Scene; }

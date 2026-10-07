@@ -70,6 +70,9 @@ public:
 	virtual void OnTransformDirty() override;
 
 protected:
+	bool ShouldCreateRenderState() const override { return true; }
+	void CreateRenderState() override;
+	void DestroyRenderState() override;
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
 	bool TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
 

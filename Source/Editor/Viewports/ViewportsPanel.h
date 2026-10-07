@@ -28,6 +28,7 @@ public:
 	FVector2 GetContentSize() const { return {ContentSize.x, ContentSize.y}; }
 	FVector2 GetLocalMousePosition() const;
 	bool IsHovered() const;
+	bool IsFocused() const { return bFocused; }
 
 	float ConsumeHorizontalDrag();
 	float ConsumeVerticalDrag();
@@ -86,6 +87,7 @@ private:
 	ImVec2 ContentOrigin{};
 	ImVec2 ContentSize{1.0f, 1.0f};
 	bool bHovered = false;
+	bool bFocused = false;
 	bool bStatResetButtonVisible = false;
 	ImVec2 StatResetButtonMin{};
 	ImVec2 StatResetButtonMax{};

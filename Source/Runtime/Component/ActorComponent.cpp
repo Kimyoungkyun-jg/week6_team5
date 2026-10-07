@@ -48,16 +48,17 @@ void UActorComponent::RegisterComponentWithWorld(UWorld* InWorld)
 		return;
 	}
 
-	if (bIsRegistered)
-	{
-		HTR_LOG(Warning, "RegisterComponentWithWorld: Component is already registered");
-		return;
-	}
+    if (bIsRegistered)
+    {
+        if (World != InWorld) HTR_LOG(Warning, "RegisterComponentWithWorld: unregister before changing worlds");
+        return;
+    }
 
 	AActor* MyOwner = GetOwner();
 	if (MyOwner && InWorld != MyOwner->GetWorld())
 	{
 		HTR_LOG(Warning, "RegisterComponentWithWorld: InWorld does not match Owner World");
+		return;
 	}
 
 	if (!bHasBeenCreated)
@@ -71,14 +72,13 @@ void UActorComponent::RegisterComponentWithWorld(UWorld* InWorld)
 	bIsRegistered = true;
 	OnRegister();
 
-	// 컴포넌트 틱 함수 등록
-	if (World && PrimaryComponentTick.bCanEverTick)
-	{
-		PrimaryComponentTick.RegisterTickFunction(World->GetTickTaskManager());
-	}
-
-	InitializeComponent();
-	if (bAutoActivate) Activate();
+    if (ShouldCreateRenderState())
+    {
+        CreateRenderState();
+        bRenderStateCreated = true;
+    }
+    // Registration alone does not start gameplay in the editor or in a pre-play PIE world.
+    if (MyOwner && MyOwner->HasBegunPlay()) BeginPlayComponent();
 }
 
 // 컴포넌트 월드 등록 해제
@@ -89,13 +89,13 @@ void UActorComponent::UnregisterComponent()
 		return;
 	}
 
-	OnUnregister();
-
-	// 컴포넌트 틱 함수 등록 해제
-	if (PrimaryComponentTick.bCanEverTick)
-	{
-		PrimaryComponentTick.UnRegisterTickFunction();
-	}
+    RegisterComponentTickFunctions(false);
+    if (bRenderStateCreated)
+    {
+        DestroyRenderState();
+        bRenderStateCreated = false;
+    }
+    OnUnregister();
 
 	World = nullptr;
 	bIsRegistered = false;
@@ -133,4 +133,26 @@ void UActorComponent::SetAutoActivate(bool bNewAutoActivate)
         return;
     }
     bAutoActivate = bNewAutoActivate;
+}
+
+void UActorComponent::RegisterComponentTickFunctions(bool bRegister)
+{
+    if (!bRegister)
+    {
+        PrimaryComponentTick.UnRegisterTickFunction();
+        return;
+    }
+    if (IsRegistered() && World && PrimaryComponentTick.bCanEverTick)
+        PrimaryComponentTick.RegisterTickFunction(World->GetTickTaskManager());
+}
+
+void UActorComponent::BeginPlayComponent()
+{
+    if (!IsRegistered() || !World || !World->HasBegunPlay()) return;
+    InitializeComponent();
+    RegisterComponentTickFunctions(true);
+    if (bHasBegunPlay) return;
+    if (bAutoActivate) Activate();
+    bHasBegunPlay = true;
+    BeginPlay();
 }

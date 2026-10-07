@@ -23,6 +23,8 @@ public:
   virtual void InitializeComponent();
 
   virtual void BeginPlay() {};
+  void BeginPlayComponent();
+  bool HasBegunPlay() const { return bHasBegunPlay; }
   virtual void TickComponent(float DeltaTime) {};
 
   virtual void Activate(bool bReset = false);
@@ -45,11 +47,13 @@ public:
   void RegisterComponentWithWorld(UWorld *InWorld);
   void UnregisterComponent();
 
-  virtual void OnComponentCreated() {}
-  virtual void OnRegister() {}
+  virtual void OnComponentCreated() {} // 등록할때 한번만 사용되는 함수, ex) particle reserve를 등록할때 한번만 해준다.
+  virtual void OnRegister() {} // 나중에 시스템에 해당 컴포넌트를 추가해야될때 사용 가능, ex) audiosystem에 이 컴포넌트 추가, collisionsystem에 이 컴포넌트 추가
   virtual void OnUnregister() {}
 
   bool IsRegistered() const { return bIsRegistered; }
+  bool IsRenderStateCreated() const { return bRenderStateCreated; }
+  void RegisterComponentTickFunctions(bool bRegister);
   UWorld *GetWorld() const { return World; }
 
   void SetOwner(AActor *InOwner) { Owner = InOwner; }
@@ -60,6 +64,9 @@ public:
   FActorComponentTickFunction PrimaryComponentTick;
 
 protected:
+  virtual bool ShouldCreateRenderState() const { return false; }
+  virtual void CreateRenderState() {}
+  virtual void DestroyRenderState() {}
   void SetActiveFlag(bool bNewActive) { bIsActive = bNewActive; }
   bool bAutoActivate = true;
   bool bIsActive = false;
@@ -74,4 +81,6 @@ protected:
 private:
   AActor *Owner = nullptr;
   bool bIsInitialized = false;
+  bool bHasBegunPlay = false;
+  bool bRenderStateCreated = false;
 };

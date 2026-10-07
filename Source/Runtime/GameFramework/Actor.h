@@ -21,7 +21,10 @@ public:
 	AActor();
 	virtual ~AActor();
 
-	virtual void BeginPlay(); // xx World->AddPrimitive 책임이동 필요
+	virtual void BeginPlay();
+	bool HasBegunPlay() const { return bHasBegunPlay; }
+	void RegisterAllComponents();
+	void UnregisterAllComponents();
 	// 액터 자신의 로직. 컴포넌트는 각자의 PrimaryComponentTick으로 따로 실행된다.
 	virtual void Tick(float DeltaTime) {}
 	// FActorTickFunction이 호출하는 진입점
@@ -80,6 +83,7 @@ protected:
 	ULevel* Level = nullptr;
 
 private:
+	bool bHasBegunPlay = false;
 
 	
 

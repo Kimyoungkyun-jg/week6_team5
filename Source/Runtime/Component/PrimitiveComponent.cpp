@@ -7,6 +7,7 @@
 
 #include "Engine/PrimitiveSceneProxy.h"
 #include "Engine/Scene.h"
+#include "Engine/World.h"
 
 namespace
 {
@@ -40,7 +41,7 @@ UPrimitiveComponent::UPrimitiveComponent()
 
 UPrimitiveComponent::~UPrimitiveComponent()
 {
-
+	UnregisterComponent();
 }
 
 void UPrimitiveComponent::BeginPlay()
@@ -113,4 +114,14 @@ void UPrimitiveComponent::OnPropertyChanged(const FString& PropertyName)
 	// Visibility, geometry, text and material changes may affect cached rendering and bounds.
 	MarkRenderStateDirty();
 	MarkTransformDirty();
+}
+
+void UPrimitiveComponent::CreateRenderState()
+{
+    GetWorld()->GetScene().AddPrimitive(this);
+}
+
+void UPrimitiveComponent::DestroyRenderState()
+{
+    GetWorld()->GetScene().RemovePrimitive(this);
 }

@@ -61,6 +61,5 @@ private:
 	static constexpr float SubsectionGap = 4.0f;
 
     void DrawCameraProperties();
-    void DrawDefaultPawnSettings();
 };
 

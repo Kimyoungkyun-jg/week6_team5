@@ -326,6 +326,8 @@ void UEditorEngine::UpdateViewportState(const float DeltaTime) {
 	}
 	if (FInputSystem::IsMousePressed(EMouseButton::Right) && HoveredViewIndex != -1) {
 		CapturedViewportIndex = HoveredViewIndex;
+		ImGui::SetWindowFocus("Viewports");
+		PendingFocusedPIEInstance = -1;
 	}
 	if (CapturedViewportIndex != -1) {
 		ViewportsPanel->SetActiveViewIndex(CapturedViewportIndex);
@@ -382,30 +384,53 @@ void UEditorEngine::DispatchGameInput(float DeltaTime) {
 	if (!Client)
 		return;
 
-	const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
-	if (Mode == EPIEMode::NewWindow || InputOwnerPIEInstance > 0) {
-		const FRect& Image = PIEImageScreenRects[InputOwnerPIEInstance];
-		if (Image.Width > 0.0f && Image.Height > 0.0f) {
-			const ImVec2 Mouse = ImGui::GetMousePos();
-			Client->MouseMove(nullptr, static_cast<int32>(Mouse.x - Image.X),
-				static_cast<int32>(Mouse.y - Image.Y));
-		}
-	} else if (ViewportsPanel) {
-		if (FEditorViewportClient* View = ViewportsPanel->GetViewportClient(PIEStartViewportIndex)) {
-			const FVector2 Mouse = ViewportsPanel->GetLocalMousePosition();
-			const FRect& Rect = View->GetRect();
-			Client->MouseMove(nullptr, static_cast<int32>(Mouse.X - Rect.X),
-				static_cast<int32>(Mouse.Y - Rect.Y));
-		}
-	}
+    const EPIEMode Mode = EditorUI ? EditorUI->GetPIEMode() : EPIEMode::SelectedViewport;
+    POINT Cursor{};
+    const ImVec2 Mouse = ::GetCursorPos(&Cursor)
+        ? ImVec2(static_cast<float>(Cursor.x), static_cast<float>(Cursor.y))
+        : ImGui::GetMousePos();
+    bool bMouseOverGame = false;
+    if (Mode == EPIEMode::NewWindow || InputOwnerPIEInstance > 0) {
+        const FRect& Image = PIEImageScreenRects[InputOwnerPIEInstance];
+        bMouseOverGame = Image.Width > 0.0f && Image.Height > 0.0f &&
+            Mouse.x >= Image.X && Mouse.x < Image.X + Image.Width &&
+            Mouse.y >= Image.Y && Mouse.y < Image.Y + Image.Height;
+        if (bMouseOverGame)
+            Client->MouseMove(nullptr, static_cast<int32>(Mouse.x - Image.X),
+                static_cast<int32>(Mouse.y - Image.Y));
+    } else if (ViewportsPanel) {
+        if (FEditorViewportClient* View = ViewportsPanel->GetViewportClient(PIEStartViewportIndex)) {
+            const FVector2 LocalMouse = ViewportsPanel->GetLocalMousePosition();
+            const FRect& Rect = View->GetRect();
+            bMouseOverGame = ViewportsPanel->IsHovered() &&
+                LocalMouse.X >= Rect.X && LocalMouse.X < Rect.X + Rect.Width &&
+                LocalMouse.Y >= Rect.Y && LocalMouse.Y < Rect.Y + Rect.Height;
+            if (bMouseOverGame)
+                Client->MouseMove(nullptr, static_cast<int32>(LocalMouse.X - Rect.X),
+                    static_cast<int32>(LocalMouse.Y - Rect.Y));
+        }
+    }
+    const bool bMousePressed = FInputSystem::IsMousePressed(EMouseButton::Left) ||
+        FInputSystem::IsMousePressed(EMouseButton::Right) ||
+        FInputSystem::IsMousePressed(EMouseButton::Middle);
+    // A click outside the game image belongs to the editor, even before ImGui updates focus.
+    if ((bMousePressed && !bMouseOverGame) ||
+        ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+        Client->LostFocus();
+        bGameMouseCaptured = false;
+        return;
+    }
 
 	// 텍스트 편집으로 전환할 때 누르고 있던 게임 키도 해제한다.
 	if (ImGui::GetIO().WantTextInput) {
 		Client->LostFocus();
+		bGameMouseCaptured = false;
 		return;
 	}
 
 	for (int32 Key = 0; Key < 256; ++Key) {
+		// Mouse buttons use their own routing below.
+		if (Key == 0x01 || Key == 0x02 || Key == 0x04) continue;
 		const EKeyCode Code = static_cast<EKeyCode>(Key);
 		const bool bControlKey = Code == EKeyCode::Escape || Code == EKeyCode::F8;
 		if (FInputSystem::IsKeyPressed(Code)) {
@@ -448,13 +473,15 @@ void UEditorEngine::DispatchGameInput(float DeltaTime) {
 	};
 	const bool bSIEInput = bIsSIEMode && InputOwnerPIEInstance == 0;
 	for (const FMouseKey& Mouse : MouseKeys) {
-		if (FInputSystem::IsMousePressed(Mouse.Button))
+		if (bMouseOverGame && FInputSystem::IsMousePressed(Mouse.Button))
 		{
+			if (Mouse.Button == EMouseButton::Right) bGameMouseCaptured = true;
 			if (bSIEInput) Client->GetKeyInputBySIEMode(Mouse.Key, true);
 			else Client->InputKey(nullptr, Mouse.Key, true);
 		}
 		if (FInputSystem::IsMouseReleased(Mouse.Button))
 		{
+			if (Mouse.Button == EMouseButton::Right) bGameMouseCaptured = false;
 			if (bSIEInput) Client->GetKeyInputBySIEMode(Mouse.Key, false);
 			else Client->InputKey(nullptr, Mouse.Key, false);
 		}
@@ -462,13 +489,13 @@ void UEditorEngine::DispatchGameInput(float DeltaTime) {
 
 	const float DX = static_cast<float>(FInputSystem::GetMouseDeltaX());
 	const float DY = static_cast<float>(FInputSystem::GetMouseDeltaY());
-	if (DX != 0.0f)
+	if ((bMouseOverGame || bGameMouseCaptured) && DX != 0.0f)
 		if (bSIEInput) Client->GetAxisInputBySIEMode(EGameInputAxis::MouseX, DX);
 		else Client->InputAxis(nullptr, 0, EGameInputAxis::MouseX, DX, DeltaTime);
-	if (DY != 0.0f)
+	if ((bMouseOverGame || bGameMouseCaptured) && DY != 0.0f)
 		if (bSIEInput) Client->GetAxisInputBySIEMode(EGameInputAxis::MouseY, DY);
 		else Client->InputAxis(nullptr, 0, EGameInputAxis::MouseY, DY, DeltaTime);
-	if (PendingWheelDelta != 0)
+	if (bMouseOverGame && PendingWheelDelta != 0)
 		if (bSIEInput) Client->GetAxisInputBySIEMode(EGameInputAxis::MouseWheel, static_cast<float>(PendingWheelDelta));
 		else Client->InputAxis(nullptr, 0, EGameInputAxis::MouseWheel,
 			static_cast<float>(PendingWheelDelta), DeltaTime);
@@ -729,6 +756,7 @@ bool UEditorEngine::RenderSceneFrame(FDeferredViewTargets& Targets, const FScene
 			? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
 		SceneRenderer.RenderTranslucent(Renderer, FogConstants);
 	}
+
 	RenderSceneText(TargetWorld, SceneView);
 
 	if (Options.bShowSceneDepth && SceneDepthRenderer)
@@ -748,7 +776,7 @@ void UEditorEngine::RenderSceneText(UWorld* TargetWorld, const FSceneView& Scene
 	if (!TextRenderer) return;
 	for (TObjectIterator<UTextRenderComponent> Text; Text; ++Text)
 	{
-		if (!Text || !Text->GetFont() || !Text->IsShown(SceneView.bGameView) || !Text->GetOwner() ||
+		if (!Text || !Text->IsRegistered() || !Text->GetFont() || !Text->IsShown(SceneView.bGameView) || !Text->GetOwner() ||
 			Text->GetOwner()->GetWorld() != TargetWorld)
 			continue;
 		TextRenderer->OnRender(Text->GetText(), Text->GetWorldMatrix(), Text->GetTextSize(),
@@ -766,7 +794,7 @@ bool UEditorEngine::RenderHeightFog(UWorld* TargetWorld, const FSceneView& Scene
 
 	for (TObjectIterator<UExponentialHeightFogComponent> Fog; Fog; ++Fog)
 	{
-		if (!Fog || !Fog->IsShown(SceneView.bGameView) || !Fog->GetOwner() ||
+		if (!Fog || !Fog->IsRegistered() || !Fog->IsShown(SceneView.bGameView) || !Fog->GetOwner() ||
 			Fog->GetOwner()->GetWorld() != TargetWorld)
 			continue;
 
@@ -834,6 +862,14 @@ void UEditorEngine::DrawPIEWindows()
 						ImGui::Image(
 							GameClient->GetColorTarget()->GetSRV(),
 							ContentSize);
+                        // ImGui normally focuses on left click; game images also accept right click.
+                        if (ImGui::IsItemHovered() &&
+                            (ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+                             ImGui::IsMouseClicked(ImGuiMouseButton_Middle)))
+                        {
+                            ImGui::SetWindowFocus();
+                            PendingFocusedPIEInstance = Context.PIEInstance;
+                        }
 					}
 				}
 			}
@@ -892,6 +928,7 @@ void UEditorEngine::RenderFrame(FEditorViewportClient *ViewClient,
 	Options.bEnableFXAA = SettingsPanel->GetSettings().bEnableFXAA;
 	Options.bShowSceneDepth = !bIsPIE && ViewClient->IsSceneDepth();
 	Options.SceneDepthRange = ViewClient->GetMaxRange();
+	
 	FDeferredViewTargets& Targets = ViewClient->GetViewTargets();
 	if (!RenderSceneFrame(Targets, SceneView, SceneRenderer, TargetWorld, Options))
 		return;
@@ -1247,7 +1284,12 @@ void UEditorEngine::UpdateInputOwner()
 		{
 			if (PendingFocusedPIEInstance > 0 && PendingFocusedPIEInstance < NumPlayers)
 				NewOwner = PendingFocusedPIEInstance;
-			else if (ViewportsPanel->GetActiveViewIndex() == PIEStartViewportIndex)
+			else if (ViewportsPanel->GetActiveViewIndex() == PIEStartViewportIndex &&
+				(ViewportsPanel->IsFocused() ||
+				 (ViewportsPanel->IsHovered() &&
+				  (FInputSystem::IsMousePressed(EMouseButton::Left) ||
+				   FInputSystem::IsMousePressed(EMouseButton::Right) ||
+				   FInputSystem::IsMousePressed(EMouseButton::Middle)))))
 				NewOwner = 0;
 		}
 
@@ -1261,6 +1303,7 @@ void UEditorEngine::UpdateInputOwner()
 	if (FGameViewportClient* OldClient = FindPIEGameClient(InputOwnerPIEInstance))
 		OldClient->LostFocus();
 
+	bGameMouseCaptured = false;
 	InputOwnerPIEInstance = NewOwner;
 
 	if (FGameViewportClient* NewClient = FindPIEGameClient(InputOwnerPIEInstance))

@@ -14,6 +14,7 @@ class UPointLightComponent : public ULightComponent
 	REFLECT_END()
 
 public:
+	~UPointLightComponent() override { UnregisterComponent(); }
 	const FVector4& GetLightColor() const { return LightColor; }
 	void SetLightColor(const FVector4& InColor) { LightColor = InColor; OnPropertyChanged("LightColor"); }
 	float GetIntensity() const { return Intensity; }
@@ -22,6 +23,11 @@ public:
 	void SetAttenuationRadius(float InRadius) { AttenuationRadius = InRadius; OnPropertyChanged("AttenuationRadius"); }
 	bool IsEnabled() const { return bEnabled; }
 	void SetEnabled(bool bInEnabled) { bEnabled = bInEnabled; OnPropertyChanged("bEnabled"); }
+
+protected:
+	bool ShouldCreateRenderState() const override { return true; }
+	void CreateRenderState() override;
+	void DestroyRenderState() override;
 
 private:
 	FVector4 LightColor{1.0f, 1.0f, 1.0f, 1.0f};

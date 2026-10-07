@@ -124,7 +124,7 @@ FVector UProjectileMovementComponent::ComputeAcceleration(const FVector& InVeloc
 {
 	FVector Acceleration = FVector::ZeroVector;
 
-	if (bISGravityEnabled)
+	if (bIsGravityEnabled)
 		Acceleration.Z -= 9.8f * GravityScale; // 중력 가속도 적용
 
 	// 호밍 및 다른 외부 힘을 적용하려면 여기서 PendingForceThisUpdate를 사용하여 가속도를 계산할 수 있다.

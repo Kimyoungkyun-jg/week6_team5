@@ -6,15 +6,16 @@ class UProjectileMovementComponent : public UMovementComponent
 {
 	DECLARE_CLASS(UProjectileMovementComponent, UMovementComponent)
 	REFLECT_START(ClassName)
-		PROPERTY(InitialSpeed)
+		PROPERTY_RANGE(InitialSpeed, 0.0f, 100.0f)
+		PROPERTY_RANGE(MaxSpeed, 0.0f, 200.0f)
 		PROPERTY(bShouldBounce)
-		PROPERTY(Bounciness)
+		PROPERTY_RANGE(Bounciness, 0.0f, 1.0f)
 		PROPERTY(bRotationFollowsVelocity)
-		PROPERTY(bISGravityEnabled)
-		PROPERTY(GravityScale)
+		PROPERTY(bIsGravityEnabled)
+		PROPERTY_RANGE(GravityScale, 0.0f, 2.0f)
 		PROPERTY(bSweep)
 		PROPERTY(bIsFrictionEnabled)
-		PROPERTY(Friction)
+		PROPERTY_RANGE(Friction, 0.0f, 1.0f)
 		REFLECT_END()
 public:
 	UProjectileMovementComponent();
@@ -44,8 +45,8 @@ public:
 	void SetBounciness(float InBounciness) { Bounciness = InBounciness; }
 	float GetGravityScale() const { return GravityScale; }
 	void SetGravityScale(float InGravityScale) { GravityScale = InGravityScale; }
-	bool GetIsGravityEnabled() const { return bISGravityEnabled; }
-	void SetIsGravityEnabled(bool bInIsGravityEnabled) { bISGravityEnabled = bInIsGravityEnabled; }
+	bool GetIsGravityEnabled() const { return bIsGravityEnabled; }
+	void SetIsGravityEnabled(bool bInIsGravityEnabled) { bIsGravityEnabled = bInIsGravityEnabled; }
 	bool GetSweep() const { return bSweep; }
 	void SetSweep(bool bInSweep) { bSweep = bInSweep; }
 	bool GetIsFrictionEnabled() const { return bIsFrictionEnabled; }
@@ -58,7 +59,7 @@ private:
 	bool bShouldBounce = true;
 	float Bounciness = 0.6f;
 	bool bRotationFollowsVelocity = true;
-	bool bISGravityEnabled = true;
+	bool bIsGravityEnabled = true;
 	float GravityScale = 1.0f;
 	bool bSweep = true;
 	bool bIsFrictionEnabled = false;

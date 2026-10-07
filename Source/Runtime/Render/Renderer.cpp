@@ -20,7 +20,6 @@
 #include <bit>
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
-DECLARE_CYCLE_STAT("Upload Per-Object CB", STAT_UploadPerObjectCB);
 
 namespace
 {
@@ -86,44 +85,6 @@ void FRenderer::EnsurePerObjectSlotCapacity(uint32 SlotCount)
 	PerObjectSlotCapacity = NewCapacity;
 }
 
-// 원래 패킷 순서로 World 행렬을 올린다. 정렬 목록은 원래 패킷 번호의 칸을 바인딩한다.
-void FRenderer::UploadPerObjectConstants(const FRenderQueue& InQueue)
-{
-	SCOPE_CYCLE_COUNTER(STAT_UploadPerObjectCB);
-
-	const uint32 Count = static_cast<uint32>(InQueue.Num());
-	if (!bUsePerObjectSlots || Count == 0)
-		return;
-
-	EnsurePerObjectSlotCapacity(Count);
-	if (!PerObjectSlotCB)
-	{
-		bUsePerObjectSlots = false;
-		return;
-	}
-
-	uint8* Dest = static_cast<uint8*>(RenderCommand::MapWriteDiscard(PerObjectSlotCB.get()));
-	if (!Dest)
-	{
-		bUsePerObjectSlots = false;
-		return;
-	}
-
-	// 매핑된 메모리는 write-combined라 순차 쓰기만 하고 읽지 않는다.
-	for (uint32 Index = 0; Index < Count; ++Index)
-	{
-		const FRenderPacket& Packet = InQueue[Index];
-		const FPerObjectConstants Constants = MakePerObjectConstants(GetPacketWorld(Packet));
-
-		std::memcpy(
-			Dest + static_cast<size_t>(Index) * ObjectSlotBytes,
-			&Constants,
-			sizeof(Constants));
-	}
-
-	RenderCommand::Unmap(PerObjectSlotCB.get());
-}
-
 // 시점 상수 버퍼 및 렌더링 상태 설정
 void FRenderer::SetupView(const FSceneView& View)
 {
@@ -182,8 +143,7 @@ void FRenderer::DrawDeferredLighting(const FSceneView& View, const FDeferredView
 		}
 	}
 
-	ID3D11ShaderResourceView* NullSRVs[3] = { nullptr, nullptr, nullptr };
-	RenderCommand::GetContext()->PSSetShaderResources(0, 3, NullSRVs);
+	RenderCommand::UnbindShaderResources(0, 3, EShaderBindFlagBits::Pixel);
 }
 
 void FRenderer::DrawToneMap(const FDeferredViewTargets& Targets)
@@ -198,8 +158,7 @@ void FRenderer::DrawToneMap(const FDeferredViewTargets& Targets)
 	RenderCommand::BindShaderResource(1, Targets.Depth.get(), EShaderBindFlagBits::Pixel);
 	RenderCommand::Draw(3);
 
-	ID3D11ShaderResourceView* NullSRVs[2] = { nullptr, nullptr };
-	RenderCommand::GetContext()->PSSetShaderResources(0, 2, NullSRVs);
+	RenderCommand::UnbindShaderResources(0, 2, EShaderBindFlagBits::Pixel);
 }
 
 // 반투명 요소 렌더링
@@ -252,8 +211,6 @@ void FRenderer::DrawStaticGroups(bool bGBufferPass)
 		}
 	}
 
-	LastMesh = nullptr;
-	LastMaterial = nullptr;
 }
 
 // 정렬된 패킷 중 [Begin, End) 범위를 그린다
@@ -261,8 +218,8 @@ void FRenderer::DrawPackets(const FRenderQueue& InQueue, uint32 Begin, uint32 En
 {
 	SCOPE_CYCLE_COUNTER(STAT_DrawRenderPackets);
 
-	LastMesh = nullptr;
-	LastMaterial = nullptr;
+	UStaticMesh* LastMesh = nullptr;
+	UMaterial* LastMaterial = nullptr;
 	uint8 LastLODIndex = 0;
 
 	RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);
@@ -453,7 +410,6 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 
 uint8* FRenderer::BeginObjectConstants(uint32 MaxSlots)
 {
-	bObjectConstantsPrepared = false;
 	if (!bUsePerObjectSlots || MaxSlots == 0) return nullptr;
 	EnsurePerObjectSlotCapacity(MaxSlots);
 	if (!PerObjectSlotCB) { bUsePerObjectSlots = false; return nullptr; }
@@ -467,7 +423,6 @@ void FRenderer::EndObjectConstants()
 	if (PerObjectSlotCB)
 	{
 		RenderCommand::Unmap(PerObjectSlotCB.get());
-		bObjectConstantsPrepared = true;
 	}
 }
 

@@ -29,8 +29,7 @@ public:
 	static void PrepareDrawData(FRenderer* Renderer, const FSceneRenderData& Data);
 	const FRenderStats& GetRenderStats() const { return RenderData.RenderStats; }
 
-	// 불투명 렌더링
-	void RenderOpaque(FRenderer* Renderer);
+	// 불투명 장면은 GBuffer 패스로 렌더링한다.
 	bool RenderGBuffer(FRenderer* Renderer, const FDeferredViewTargets& Targets, uint32 Width, uint32 Height);
 	void RenderDeferredLighting(FRenderer* Renderer, const FDeferredViewTargets& Targets);
 	void RenderToneMap(FRenderer* Renderer, const FDeferredViewTargets& Targets);

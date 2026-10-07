@@ -29,12 +29,6 @@ class FViewportClient
 public:
 	virtual ~FViewportClient() = default;
 
-	// 렌더링
-	virtual void Draw(FViewport* Viewport) {}
-
-	// 갱신
-	virtual void Tick(float DeltaTime) {}
-
 	// 월드 조회
 	virtual UWorld* GetWorld() const { return nullptr; }
 

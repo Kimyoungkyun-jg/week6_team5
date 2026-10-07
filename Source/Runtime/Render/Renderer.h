@@ -8,12 +8,6 @@
 #include "Occlusion/GPUOcclusion.h"
 #include "Engine/LightSceneProxy.h"
 
-struct FSortEntry
-{
-	uint64 Key;
-	uint32 PacketIndex;
-};
-
 // 오클루전 컬링의 효과 상한을 재기 위한 측정 결과 (디버그 전용)
 struct FOcclusionMeasureResult
 {
@@ -41,7 +35,7 @@ public:
 	// 시점 상수 버퍼 및 렌더링 상태 설정
 	void SetupView(const FSceneView& View);
 
-	// 전체 렌더 큐 렌더링
+	// ObjViewer uses this forward path. Editor/PIE use SceneRenderer and GBuffer.
 	void RenderAll(const FSceneView& View, const FRenderQueue& InQueue);
 
 	// 불투명 요소 렌더링
@@ -72,10 +66,7 @@ private:
 	TUniquePtr<FConstantBuffer> PerObjectSlotCB;
 	uint32 PerObjectSlotCapacity = 0;
 	bool bUsePerObjectSlots = false;
-	bool bObjectConstantsPrepared = false;
 	bool bCurrentWireframe = false;
-	UMaterial* LastMaterial;
-	UStaticMesh* LastMesh;
 
 	// 측정 전용 자원
 	TArray<ComPtr<ID3D11Query>> OcclusionQueries;
@@ -96,7 +87,6 @@ private:
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
 	void EnsurePerObjectSlotCapacity(uint32 SlotCount);
-	void UploadPerObjectConstants(const FRenderQueue& InQueue);
 
 
 };

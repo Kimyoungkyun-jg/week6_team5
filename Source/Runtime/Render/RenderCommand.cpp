@@ -9,6 +9,7 @@
 #include "Texture2D.h"
 #include "TextureCube.h"
 #include "RenderingInfo.h"
+#include <algorithm>
 
 void RenderCommand::Init(FRenderDevice* InRenderDevice)
 {
@@ -141,7 +142,7 @@ void RenderCommand::BindIndexBuffer(FIndexBuffer* IndexBuffer)
 
 void RenderCommand::BindConstantBuffer(uint32 Slot, FConstantBuffer* ConstantBuffer, EShaderBindFlagBits FlagBits)
 {
-	ID3D11Buffer* Buffer = ConstantBuffer->GetBuffer();
+	ID3D11Buffer* Buffer = ConstantBuffer ? ConstantBuffer->GetBuffer() : nullptr;
 	if (HasFlag(FlagBits, EShaderBindFlagBits::Vertex))
 		RenderDevice->GetContext()->VSSetConstantBuffers(Slot, 1, &Buffer);
 	if (HasFlag(FlagBits, EShaderBindFlagBits::Pixel))
@@ -193,9 +194,21 @@ void RenderCommand::BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShad
 
 void RenderCommand::BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits)
 {
-	BindShaderResource(Slot, Texture2D->GetResource(), FlagBits);
+	BindShaderResource(Slot, Texture2D ? Texture2D->GetResource() : nullptr, FlagBits);
 }
 
+
+void RenderCommand::UnbindShaderResources(uint32 FirstSlot, uint32 Count, EShaderBindFlagBits FlagBits)
+{
+    constexpr uint32 MaxSlots = D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT;
+    if (FirstSlot >= MaxSlots || Count == 0) return;
+    Count = std::min(Count, MaxSlots - FirstSlot);
+    ID3D11ShaderResourceView* NullResources[MaxSlots]{};
+    if (HasFlag(FlagBits, EShaderBindFlagBits::Vertex))
+        RenderDevice->GetContext()->VSSetShaderResources(FirstSlot, Count, NullResources);
+    if (HasFlag(FlagBits, EShaderBindFlagBits::Pixel))
+        RenderDevice->GetContext()->PSSetShaderResources(FirstSlot, Count, NullResources);
+}
 
 bool RenderCommand::BeginGBufferPass(const FDeferredViewTargets& Targets, uint32 Width, uint32 Height)
 {

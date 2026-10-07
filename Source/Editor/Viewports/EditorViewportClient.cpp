@@ -5,100 +5,34 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Input/InputSystem.h"
+#include "Camera/ViewportCameraMovement.h"
 #include "Math/EngineMath.h"
 #include "Render/RenderCommand.h"
 
 FEditorViewportClient::FEditorViewportClient() {}
 
-void FEditorViewportClient::Draw(FViewport *Viewport) {}
-
-void FEditorViewportClient::Tick(float DeltaTime) {}
-
 void FEditorViewportClient::TickInput(float DeltaTime, bool bCaptured,
                                       bool bHovered, int32 WheelDelta,
                                       float MoveSpeed, float MouseSensitivity) {
 
-  if (bIsPerspective) {
-    if (bCaptured) {
-      // 마우스 회전 처리
-      const float DeltaX = static_cast<float>(FInputSystem::GetMouseDeltaX());
-      const float DeltaY = static_cast<float>(FInputSystem::GetMouseDeltaY());
-      ViewRotation.Yaw += DeltaX * MouseSensitivity;
-      ViewRotation.Pitch = FMath::Clamp(
-          ViewRotation.Pitch + DeltaY * MouseSensitivity, -89.0f, 89.0f);
-
-      // 키보드 이동 처리
-      const FQuat RotationQuat = ViewRotation.Quaternion();
-      const FVector Forward = RotationQuat.GetForwardVector();
-      const FVector Right = RotationQuat.GetRightVector();
-      const FVector Up = RotationQuat.GetUpVector();
-
-      FVector MoveDir = FVector::ZeroVector;
-      if (FInputSystem::IsKeyDown(EKeyCode::W))
-        MoveDir += Forward;
-      if (FInputSystem::IsKeyDown(EKeyCode::S))
-        MoveDir -= Forward;
-      if (FInputSystem::IsKeyDown(EKeyCode::D))
-        MoveDir += Right;
-      if (FInputSystem::IsKeyDown(EKeyCode::A))
-        MoveDir -= Right;
-      if (FInputSystem::IsKeyDown(EKeyCode::E))
-        MoveDir += Up;
-      if (FInputSystem::IsKeyDown(EKeyCode::Q))
-        MoveDir -= Up;
-
-      if (MoveDir.Size() > 0.0001f) {
-        MoveDir = MoveDir.Normalized();
-        ViewLocation += MoveDir * (MoveSpeed * DeltaTime);
-      }
-    }
-
-    // 휠 줌 처리
-    if ((bCaptured || bHovered) && WheelDelta != 0) {
-      const FQuat RotationQuat = ViewRotation.Quaternion();
-      const FVector Forward = RotationQuat.GetForwardVector();
-      ViewLocation +=
-          Forward * (static_cast<float>(WheelDelta) * 0.01f * MoveSpeed);
-    }
-  } else {
-    const FQuat RotationQuat = ViewRotation.Quaternion();
-    const FVector Right = RotationQuat.GetRightVector();
-    const FVector Up = RotationQuat.GetUpVector();
-
-    if (bCaptured) {
-      // 직교 평면 드래그
-      const float ViewWidth = Width > 0 ? static_cast<float>(Width) : 800.0f;
-      const float WorldUnitsPerPixel = OrthoWidth / ViewWidth;
-      const float DeltaX = static_cast<float>(FInputSystem::GetMouseDeltaX());
-      const float DeltaY = static_cast<float>(FInputSystem::GetMouseDeltaY());
-
-      const FVector PanOffset = (Right * (-DeltaX * WorldUnitsPerPixel)) +
-                                (Up * (DeltaY * WorldUnitsPerPixel));
-      ViewLocation += PanOffset;
-
-      // 키보드 평면 이동
-      FVector MoveDir = FVector::ZeroVector;
-      if (FInputSystem::IsKeyDown(EKeyCode::W))
-        MoveDir += Up;
-      if (FInputSystem::IsKeyDown(EKeyCode::S))
-        MoveDir -= Up;
-      if (FInputSystem::IsKeyDown(EKeyCode::D))
-        MoveDir += Right;
-      if (FInputSystem::IsKeyDown(EKeyCode::A))
-        MoveDir -= Right;
-
-      if (MoveDir.Size() > 0.0001f) {
-        MoveDir = MoveDir.Normalized();
-        ViewLocation += MoveDir * (MoveSpeed * DeltaTime);
-      }
-    }
-
-    // 직교 휠 줌
-    if ((bCaptured || bHovered) && WheelDelta != 0) {
-      const float ZoomFactor = WheelDelta > 0 ? 0.9f : 1.1f;
-      OrthoWidth = FMath::Clamp(OrthoWidth * ZoomFactor, 0.1f, 100000.0f);
-    }
-  }
+  FViewportCameraInput Input;
+  Input.bCaptured = bCaptured;
+  Input.bAllowWheel = bCaptured || bHovered;
+  Input.MouseX = static_cast<float>(FInputSystem::GetMouseDeltaX());
+  Input.MouseY = static_cast<float>(FInputSystem::GetMouseDeltaY());
+  Input.Wheel = static_cast<float>(WheelDelta);
+  Input.bForward = FInputSystem::IsKeyDown(EKeyCode::W);
+  Input.bBackward = FInputSystem::IsKeyDown(EKeyCode::S);
+  Input.bRight = FInputSystem::IsKeyDown(EKeyCode::D);
+  Input.bLeft = FInputSystem::IsKeyDown(EKeyCode::A);
+  Input.bUp = FInputSystem::IsKeyDown(EKeyCode::E);
+  Input.bDown = FInputSystem::IsKeyDown(EKeyCode::Q);
+  FViewportCameraState Camera{ViewLocation, ViewRotation, OrthoWidth,
+      Width > 0 ? static_cast<float>(Width) : 800.0f, bIsPerspective};
+  ApplyViewportCameraMovement(Camera, Input, DeltaTime, MoveSpeed, MouseSensitivity);
+  ViewLocation = Camera.Location;
+  ViewRotation = Camera.Rotation;
+  OrthoWidth = Camera.OrthoWidth;
 }
 
 // 기즈모 조작 및 액터 피킹 갱신

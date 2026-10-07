@@ -24,10 +24,6 @@ public:
   FEditorViewportClient();
   virtual ~FEditorViewportClient() override = default;
 
-  // 렌더링 및 갱신
-  virtual void Draw(FViewport *Viewport) override;
-  virtual void Tick(float DeltaTime) override;
-
   // 월드 조회 및 설정
   virtual UWorld *GetWorld() const override { return World; }
   void SetWorld(UWorld *InWorld) { if (World != InWorld) RenderData.ResetScene(); World = InWorld; }

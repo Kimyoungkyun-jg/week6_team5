@@ -25,8 +25,6 @@ public:
 	// 월드 및 게임 인스턴스 초기화
 	void Init(FWorldContext& InWorldContext, UEngine* InEngine);
 
-	virtual void Draw(FViewport* Viewport) override;
-	virtual void Tick(float DeltaTime) override;
 	virtual UWorld* GetWorld() const override;
 
 	virtual void MouseMove(FViewport* Viewport, int32 X, int32 Y) override;
@@ -62,7 +60,7 @@ public:
 	void SetGameInstance(UGameInstance* InGameInstance) { GameInstance = InGameInstance; }
 	UGameInstance* GetGameInstance() const { return GameInstance; }
 
-	void SetWorld(UWorld* InWorld) { if (World != InWorld) RenderData.ResetScene(); World = InWorld; }
+	void SetWorld(UWorld* InWorld);
 
 	void SetCameraComponent(UCameraComponent* InCameraComponent);
 
@@ -77,10 +75,14 @@ public:
 
 	virtual void LostFocus() override;
 
+protected:
+	// Optional HUD layer: return true when consumed. Game input is forwarded otherwise.
+	virtual bool HandleUIKey(int32 Key, bool bDown) { return false; }
+	virtual bool HandleUIAxis(EGameInputAxis AxisKey, float Delta) { return false; }
+	virtual bool HandleUIMouseMove(int32 X, int32 Y) { return false; }
+
 private:
-	bool HandleUIKey(int32 Key, bool bDown);
-	bool HandleUIAxis(EGameInputAxis AxisKey, float Delta);
-	bool HandleUIMouseMove(int32 X, int32 Y);
+	UCameraComponent* FindPlayerCamera() const;
 
 
 	UWorld* World = nullptr;

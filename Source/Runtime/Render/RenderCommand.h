@@ -62,6 +62,7 @@ public:
 
 	static void BindVertexBuffer(FVertexBuffer* VertexBuffer);
 	static void BindIndexBuffer(FIndexBuffer* IndexBuffer);
+	// A null buffer explicitly unbinds the slot.
 	static void BindConstantBuffer(uint32 Slot, FConstantBuffer* ConstantBuffer, EShaderBindFlagBits FlagBits);
 
 	// 상수 버퍼의 일부 구간만 바인딩한다. FirstConstant·NumConstants는 16바이트 단위이며 16의 배수여야 한다.
@@ -73,6 +74,7 @@ public:
 	static void Unmap(FBuffer* InBuffer);
 	static void BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 	static void BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
+	static void UnbindShaderResources(uint32 FirstSlot, uint32 Count, EShaderBindFlagBits FlagBits);
 
 	static void BeginRenderPass(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height);
 	static void BindRenderPassNoClear(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height);
@@ -96,18 +98,6 @@ public:
 	// 래퍼가 없는 D3D 기능(쿼리 등)을 디버그·측정 코드에서 직접 쓸 때만 사용한다.
 	inline static ID3D11Device* GetDevice() { return RenderDevice->GetDevice(); }
 	inline static ID3D11DeviceContext* GetContext() { return RenderDevice->GetContext(); }
-
-	//inline static void BindTexture(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
-
-	//inline static void SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY Topology);
-
-	//inline static void SetDepthStencilEnabled(bool bEnabled);
-
-	//inline static void SetBlendStateEnabled(bool bEnabled);
-
-	//inline static void BindShader(FShader* InShader);
-
-	//inline static void BindMesh(UStaticMesh* InMesh);
 
 
 private:

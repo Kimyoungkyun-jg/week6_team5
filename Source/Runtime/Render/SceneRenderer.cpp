@@ -2,7 +2,6 @@
 #include "Render/SceneRenderer.h"
 #include "Render/Renderer.h"
 #include "Render/RenderCommand.h"
-#include "Render/Buffer.h"
 #include "Render/DeferredViewTargets.h"
 #include "Engine/World.h"
 #include "Core/Async/TaskPool.h"
@@ -63,18 +62,6 @@ void FSceneRenderer::InitViews(FRenderer* Renderer)
 	}
 }
 
-// 불투명 렌더링
-void FSceneRenderer::RenderOpaque(FRenderer* Renderer)
-{
-	if (!Renderer)
-	{
-		return;
-	}
-
-	PrepareDrawData(Renderer, RenderData);
-	Renderer->RenderOpaque(View, RenderData.RenderQueue);
-}
-
 bool FSceneRenderer::RenderGBuffer(FRenderer* Renderer, const FDeferredViewTargets& Targets, uint32 Width, uint32 Height)
 {
 	if (!Renderer || !RenderCommand::BeginGBufferPass(Targets, Width, Height))
@@ -106,12 +93,10 @@ void FSceneRenderer::RenderTranslucent(FRenderer* Renderer, FConstantBuffer* Fog
 		return;
 	}
 
-	ID3D11Buffer* FogBuffer = FogConstants ? FogConstants->GetBuffer() : nullptr;
-	RenderCommand::GetContext()->PSSetConstantBuffers(3, 1, &FogBuffer);
+	RenderCommand::BindConstantBuffer(3, FogConstants, EShaderBindFlagBits::Pixel);
 	PrepareDrawData(Renderer, RenderData);
 	Renderer->RenderTranslucent(View, RenderData.RenderQueue);
-	FogBuffer = nullptr;
-	RenderCommand::GetContext()->PSSetConstantBuffers(3, 1, &FogBuffer);
+	RenderCommand::BindConstantBuffer(3, nullptr, EShaderBindFlagBits::Pixel);
 }
 
 void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,

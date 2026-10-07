@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "ProjectileActor.h"
 #include "Engine/World.h"
+#include "Asset/AssetManager.h"
 
 AProjectileActor::AProjectileActor()
 {
@@ -10,6 +11,14 @@ AProjectileActor::AProjectileActor()
 	SetRootComponent(FireBallComponent);
 	FireBallComponent->SetAutoActivate(false);
 	FireBallComponent->SetVisibility(false);
+
+    // The depth-based FireBall effect needs a visible surface travelling with it.
+    FireBallMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("FireBallMeshComponent");
+    FireBallMeshComponent->SetupAttachment(FireBallComponent);
+    FireBallMeshComponent->SetStaticMesh(UAssetManager::GetAssetByPath<UStaticMesh>("Sphere"));
+    FireBallMeshComponent->SetRelativeScale3D(FVector(0.5f));
+    FireBallMeshComponent->SetAutoActivate(false);
+    FireBallMeshComponent->SetVisibility(false);
 
     StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("ProjectileMeshComponent");
     StaticMeshComponent->SetupAttachment(FireBallComponent);
@@ -52,6 +61,12 @@ void AProjectileActor::Launch(const FVector& Position, const FVector& Direction,
     bInFlight = true;
     ActiveComponent->SetVisibility(true);
     ActiveComponent->Activate();
+    if (!bUseStaticMesh)
+    {
+        FireBallMeshComponent->SetRelativeScale3D(FVector(std::max(FireBallComponent->GetRadius(), 0.0f) * 0.5f));
+        FireBallMeshComponent->SetVisibility(true);
+        FireBallMeshComponent->Activate();
+    }
     ProjectileMovementComponent->Activate(true);
     PrimaryActorTick.SetTickFunctionEnable(true);
 }
@@ -65,6 +80,8 @@ void AProjectileActor::ReturnToPool()
     ProjectileMovementComponent->Deactivate();
     FireBallComponent->Deactivate();
     FireBallComponent->SetVisibility(false);
+    FireBallMeshComponent->Deactivate();
+    FireBallMeshComponent->SetVisibility(false);
     StaticMeshComponent->Deactivate();
     StaticMeshComponent->SetVisibility(false);
     PrimaryActorTick.SetTickFunctionEnable(false);

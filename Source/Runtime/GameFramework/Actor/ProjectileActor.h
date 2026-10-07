@@ -23,6 +23,7 @@ public:
 
 	UStaticMeshComponent* GetStaticMeshComponent() const { return StaticMeshComponent; }
 	UFireBallComponent* GetFireBallComponent() const { return FireBallComponent; }
+	UStaticMeshComponent* GetFireBallMeshComponent() const { return FireBallMeshComponent; }
 	UProjectileMovementComponent* GetProjectileMovementComponent() const { return ProjectileMovementComponent; }
 
 private:
@@ -33,6 +34,7 @@ private:
 	// 파이어볼 컴포넌트
 	UFireBallComponent* FireBallComponent = nullptr;
 	UStaticMeshComponent* StaticMeshComponent = nullptr;
+	UStaticMeshComponent* FireBallMeshComponent = nullptr;
 	// 투사체 이동 컴포넌트
 	UProjectileMovementComponent* ProjectileMovementComponent = nullptr;
 };

@@ -26,6 +26,8 @@ namespace
 	struct FDeferredLightConstants
 	{
 		FMatrix InverseViewProjection;
+		FVector4 CameraPosition; // W: perspective projection
+		FVector4 CameraForward;
 		FVector4 ViewportLightCount;
 		FPointLightRenderData PointLights[MaxDeferredPointLights];
 	};
@@ -115,6 +117,9 @@ void FRenderer::DrawDeferredLighting(const FSceneView& View, const FDeferredView
 		return;
 	FDeferredLightConstants Constants{};
 	Constants.InverseViewProjection = View.ViewProjectionMatrix.Inverse();
+	Constants.CameraPosition = FVector4(View.ViewLocation.X, View.ViewLocation.Y,
+		View.ViewLocation.Z, View.bIsPerspective ? 1.0f : 0.0f);
+	Constants.CameraForward = FVector4(View.ViewForward.X, View.ViewForward.Y, View.ViewForward.Z, 0.0f);
 	const uint32 LightCount = std::min<uint32>(static_cast<uint32>(PointLights.Num()), MaxDeferredPointLights);
 	Constants.ViewportLightCount = FVector4(
 		static_cast<float>(Targets.SceneColor->GetWidth()),

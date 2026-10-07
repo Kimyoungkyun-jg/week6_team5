@@ -724,11 +724,12 @@ bool UEditorEngine::RenderSceneFrame(FDeferredViewTargets& Targets, const FScene
 
 	// Opaque/sky fog, then translucent objects using their own distance to the camera.
 	RenderCommand::BindRenderPassNoClear(ColorTarget, DepthTarget, Width, Height);
+	if(Options.bDrawPrimitives)
+		RenderFireBall(TargetWorld, SceneView, DepthTarget, ColorTarget);
 	const bool bHasFog = Options.bDrawPrimitives && Options.bEnableFog &&
 		RenderHeightFog(TargetWorld, SceneView, DepthTarget, ColorTarget);
 	if (Options.bDrawPrimitives)
 	{
-		RenderFireBall(TargetWorld, SceneView, DepthTarget, ColorTarget);
 		FConstantBuffer* FogConstants = HeightFogRenderer
 			? HeightFogRenderer->GetTranslucentFogConstants(bHasFog) : nullptr;
 		SceneRenderer.RenderTranslucent(Renderer, FogConstants);
